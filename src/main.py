@@ -68,8 +68,17 @@ if __name__ == "__main__":
     match selected_algorithm:
         case Algorithm.Q_ROUTING:
             print(f"Running simulation with {selected_algorithm.value}")
-            for i in range(1, args.episodes + 1):
-                simulation.run_episode(i)
+
+            from applications.q_routing import SenderQRoutingApplication, IntermediateQRoutingApplication
+
+            first_node_id = next(iter(network.nodes))
+            sender_node.install_application(SenderQRoutingApplication)
+
+            for node_id, node in network.nodes.items():
+                if node_id != first_node_id:
+                    node.install_application(IntermediateQRoutingApplication)
+
+            simulation.start(args.episodes)
 
         case Algorithm.DIJKSTRA:
             raise NotImplementedError("Algorithm DIJKSTRA not yet implemented")
