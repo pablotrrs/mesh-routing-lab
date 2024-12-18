@@ -1,0 +1,19 @@
+ #   (0)
+ #   / \
+ # (1) (2)
+ #   \ /
+ #   (3)
+ #    |
+ #   (4)
+nodes:
+  0:
+    type: sender
+    neighbors: [1, 2]
+  1:
+    neighbors: [0, 3]
+  2:
+    neighbors: [0, 3]
+  3:
+    neighbors: [1, 2, 4]
+  4:
+    neighbors: [3]

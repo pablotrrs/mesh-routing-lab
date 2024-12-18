@@ -1,0 +1,69 @@
+# 6x6 irregular grid
+nodes:
+  0:
+    type: sender
+    neighbors: [1, 6]
+  1:
+    neighbors: [0, 2, 7]
+  2:
+    neighbors: [1, 3]
+  3:
+    neighbors: [2, 4, 9]
+  4:
+    neighbors: [3, 5, 10]
+  5:
+    neighbors: [4, 11]
+  6:
+    neighbors: [0, 7, 12]
+  7:
+    neighbors: [1, 6, 8, 13]
+  8:
+    neighbors: [7, 14]
+  9:
+    neighbors: [3, 10, 15]
+  10:
+    neighbors: [4, 9, 11, 16]
+  11:
+    neighbors: [5, 10, 17]
+  12:
+    neighbors: [6, 13, 18]
+  13:
+    neighbors: [7, 12, 14, 19]
+  14:
+    neighbors: [8, 13]
+  15:
+    neighbors: [9, 16, 20]
+  16:
+    neighbors: [10, 15, 17, 21]
+  17:
+    neighbors: [11, 16, 22]
+  18:
+    neighbors: [12, 19, 24]
+  19:
+    neighbors: [13, 18, 25]
+  20:
+    neighbors: [15, 21, 26]
+  21:
+    neighbors: [16, 20, 22, 27]
+  22:
+    neighbors: [17, 21, 28]
+  24:
+    neighbors: [18, 25, 30]
+  25:
+    neighbors: [19, 24]
+  26:
+    neighbors: [20, 27, 32]
+  27:
+    neighbors: [21, 26, 28, 33]
+  28:
+    neighbors: [22, 27, 34]
+  30:
+    neighbors: [24, 31]
+  31:
+    neighbors: [30]
+  32:
+    neighbors: [26, 33]
+  33:
+    neighbors: [27, 32, 34]
+  34:
+    neighbors: [28, 33]
