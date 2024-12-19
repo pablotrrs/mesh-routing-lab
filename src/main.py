@@ -71,11 +71,10 @@ if __name__ == "__main__":
 
             from applications.q_routing import SenderQRoutingApplication, IntermediateQRoutingApplication
 
-            first_node_id = next(iter(network.nodes))
             sender_node.install_application(SenderQRoutingApplication)
 
             for node_id, node in network.nodes.items():
-                if node_id != first_node_id:
+                if node_id != sender_node.node_id:
                     node.install_application(IntermediateQRoutingApplication)
 
             simulation.start(args.episodes)
