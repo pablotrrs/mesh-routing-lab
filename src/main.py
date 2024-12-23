@@ -38,7 +38,7 @@ from enum import Enum
 #     con respecto a los pasos tiempo)
 #  4. la q-table es local para cada nodo (solo tiene los state-values correspondientes a los vecinos de ese nodo). 
 #     tendríamos que hacer algo para tener una q-table global (parecido al punto 3.)
-#  4. hacer que se pueda elegir cambiar por los métodos de ruteo dijkstra y bellman ford
+#  5. hacer que se pueda elegir cambiar por los métodos de ruteo dijkstra y bellman ford
 
 class Algorithm(Enum):
     Q_ROUTING = "Q_ROUTING"
