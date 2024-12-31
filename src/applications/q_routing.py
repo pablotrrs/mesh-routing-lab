@@ -4,7 +4,7 @@ import random
 import time
 import yaml
 import os
-from classes import Application
+from classes import Application, PacketType
 
 ALPHA = 0.1
 GAMMA = 0.9
@@ -31,6 +31,7 @@ FUNCTION_SEQ = [NodeFunction.A, NodeFunction.B, NodeFunction.C]
 @dataclass
 class CallbackChainStep:
     previous_hop_node: int  # Next node in the callback chain
+    current_node: int  # Current node in the callback chain
     next_hop_node: int  # Node which we have to calculate the Q-Value for
     send_timestamp: float  # Timestamp del momento en que se realizó el salto to next hop
     estimated_time: float  # Tiempo estimado para completar la secuencia según la Q-table
@@ -78,14 +79,31 @@ class QRoutingApplication(Application):
         self.initialize_or_update_q_table()
         global EPSILON
 
+        next_node = None
+
         if random.random() < EPSILON:
             # Exploración: elegir un vecino aleatorio
             print(f'[Node_ID={self.node.node_id}] Performing exploration with epsilon={EPSILON:.4f}')
-            next_node = random.choice(self.node.network.get_neighbors(self.node.node_id))
+            valid_neighbors = [
+                neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id)
+                if self.node.network.nodes[neighbor].status
+            ]
+            if valid_neighbors:
+                next_node = random.choice(valid_neighbors)
         else:
             # Explotación: elegir la mejor acción
             print(f'[Node_ID={self.node.node_id}] Exploitation with epsilon={EPSILON:.4f}')
             next_node = self.choose_best_action()
+
+        # If exploitation failed, fall back to exploration
+        if next_node is None:
+            print(f'[Node_ID={self.node.node_id}] Exploitation failed, falling back to exploration')
+            valid_neighbors = [
+                neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id)
+                if self.node.network.nodes[neighbor].status
+            ]
+            if valid_neighbors:
+                next_node = random.choice(valid_neighbors)
 
         # Update epsilon after each decision
         EPSILON = max(EPSILON * EPSILON_DECAY, EPSILON_MIN)
@@ -98,7 +116,17 @@ class QRoutingApplication(Application):
         """
         self.initialize_or_update_q_table()
 
-        neighbors_q_values = self.q_table[self.node.node_id]
+        # Filter neighbors based on their status
+        neighbors_q_values = {
+            neighbor: q_value for neighbor, q_value in self.q_table[self.node.node_id].items()
+            if self.node.network.nodes[neighbor].status
+        }
+
+        if not neighbors_q_values:
+            print(f"[Node_ID={self.node.node_id}] No available neighbors with status True")
+
+            return None
+
         return min(neighbors_q_values, key=neighbors_q_values.get)
 
     def initialize_or_update_q_table(self) -> None:
@@ -138,12 +166,33 @@ class QRoutingApplication(Application):
         """
         Envia un paquete al nodo destino utilizando la red.
         """
+
+        if not self.node.is_sender and not self.node.status:
+            print(f'[Node_ID={self.node.node_id}] Node status is False. Packet not sent.')
+            return
+        
         packet.hops += 1
         packet.time += 1
         packet.from_node_id = self.node.node_id
 
         print(f'[Node_ID={self.node.node_id}] Sending packet to Node {to_node_id}\n')
+
+        # Initialize the packet log for the episode if it doesn't exist
+        if packet.episode_number not in self.node.network.packet_log:
+            self.node.network.packet_log[packet.episode_number] = []
+
+        # Log the packet
+        self.node.network.packet_log[packet.episode_number].append({
+            'from': self.node.node_id,
+            'to': to_node_id,
+            'packet': packet
+        })
+
         self.node.network.send(self.node.node_id, to_node_id, packet)
+
+    def get_assigned_function(self):
+        """Returns the function assigned to this node."""
+        return self.assigned_function
 
     def __str__(self) -> str:
         return f"Node(id={self.node.node_id}, neighbors={self.node.network.get_neighbors(self.node.node_id)})"
@@ -171,6 +220,7 @@ class SenderQRoutingApplication(QRoutingApplication):
         estimated_time_remaining = self.estimate_remaining_time(next_node)
 
         callback_chain_step = CallbackChainStep(previous_hop_node=None,
+                                                current_node=self.node.node_id,
                                                 next_hop_node=next_node,
                                                 send_timestamp=get_current_time(),
                                                 estimated_time=estimated_time_remaining)
@@ -182,6 +232,11 @@ class SenderQRoutingApplication(QRoutingApplication):
     def handle_packet_hop(self, packet) -> None:
         next_node = self.select_next_node()
 
+        # Base case to stop recursion if no valid next node is found
+        if next_node is None:
+            print(f'[Node_ID={self.node.node_id}] No valid next node found. Stopping packet hop.')
+            return
+
         estimated_time_remaining = self.estimate_remaining_time(next_node)
 
         self.update_q_table_with_incomplete_info(
@@ -190,6 +245,7 @@ class SenderQRoutingApplication(QRoutingApplication):
         )
 
         callback_chain_step = CallbackChainStep(previous_hop_node=packet.from_node_id,
+                                                current_node=self.node.node_id,
                                                 next_hop_node=next_node,
                                                 send_timestamp=get_current_time(),
                                                 estimated_time=estimated_time_remaining)
@@ -237,6 +293,7 @@ class IntermediateQRoutingApplication(QRoutingApplication):
 
         if packet.is_sequence_completed():
             print(f'[Node_ID={self.node.node_id}] Function sequence is complete! Initiating full echo callback')
+            print(f"*******callback_stack: {self.callback_stack}")
             self.initiate_full_echo_callback(packet)
             return
 
@@ -252,6 +309,7 @@ class IntermediateQRoutingApplication(QRoutingApplication):
             )
 
             callback_chain_step = CallbackChainStep(previous_hop_node=packet.from_node_id,
+                                                    current_node=self.node.node_id,
                                                     next_hop_node=next_node,
                                                     send_timestamp=get_current_time(),
                                                     estimated_time=estimated_time_remaining)
@@ -304,10 +362,6 @@ class IntermediateQRoutingApplication(QRoutingApplication):
 
     def __str__(self):
         return f"IntermediateNode(id={self.node.node_id}, neighbors={self.node.network.get_neighbors(self.node.node_id)})"
-
-class PacketType(Enum):
-    PACKET_HOP = "PACKET_HOP"
-    CALLBACK = "CALLBACK"
 
 class Packet:
     def __init__(self, episode_number, from_node_id, type):

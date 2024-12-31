@@ -30,7 +30,7 @@ import sys
 from enum import Enum
 
 # TODO:
-#  1. hacer que se conecten y desconecten los nodos con distribución exponencial
+#  1. testear la desconexión de los nodos (revisar si logran reconectarse después de x episodios)
 #  2. hacer que se de por perdido el paquete después de 100 hops
 #  3. relevar resultados (integrar con lo que había antes para visualizar, y exportar a un csv como en modelado, 
 #     para comparar y hacer gráficos de cómo cambian los parámetros Latencia Promedio, Consistencia en la Latencia,

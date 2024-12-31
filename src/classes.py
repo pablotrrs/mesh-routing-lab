@@ -2,9 +2,11 @@ from enum import Enum
 from dataclasses import dataclass
 import random
 import time
+import numpy as np
 import yaml
 import os
 from abc import ABC, abstractmethod
+from visualization import animate_network
 
 class Application(ABC):
     def __init__(self, node):
@@ -23,16 +25,52 @@ class Node:
         self.node_id = node_id
         self.network = network
         self.application = None
+        self.is_sender = False
+        self.lifetime = None
+        self.reconnect_time = None
+        self.status = None
 
     def install_application(self, application_class):
         self.application = application_class(self)
         print(f"[Node_ID={self.node_id}] Installed {self.application.__class__.__name__}")
+
+        # Set attributes if the application is not SenderQRoutingApplication
+        if not self.is_sender:
+            self.lifetime = random.randint(1, 5)
+            self.reconnect_time = random.randint(5, 20)
+            self.status = True
+        else:
+            self.lifetime = None
+            self.reconnect_time = None
+            self.status = None
 
     def start_episode(self, episode_number):
         if self.application:
             self.application.start_episode(episode_number)
         else:
             raise RuntimeError(f"[Node_ID={self.node_id}] No application installed")
+
+    def get_assigned_function(self):
+        if self.application and hasattr(self.application, 'get_assigned_function'):
+            return self.application.get_assigned_function()
+        return None
+    
+    def update_status(self):
+        if not self.is_sender:
+            if self.status:
+                self.lifetime -= 1
+
+                if self.lifetime <= 0:
+                    self.status = False
+                    self.reconnect_time = np.random.exponential(scale=10)
+            else:
+                self.reconnect_time -= 1
+
+                if self.reconnect_time <= 0:
+                    self.status = True
+                    self.lifetime = np.random.exponential(scale=20)
+
+        return self.status
 
     def __str__(self) -> str:
         return f"Node(id={self.node_id}, neighbors={self.network.get_neighbors(self.node_id)})"
@@ -56,6 +94,7 @@ class Network:
         self.nodes = {}  # {node_id: Node}
         self.connections = {}  # {node_id: [neighbors]}
         self.active_nodes = set()
+        self.packet_log = {}  # List to store packet logs
 
     def add_node(self, node):
         self.nodes[node.node_id] = node
@@ -106,6 +145,7 @@ class Network:
 
             # Identificar el nodo sender para devolverlo después
             if 'type' in node_info and node_info['type'] == 'sender':
+                node.is_sender = True
                 sender_node = node
 
         if sender_node is None:
@@ -126,8 +166,6 @@ class Network:
             result.append(f"Node {node_id} -> Neighbors: {neighbors}")
         return "\n".join(result)
 
-# TODO: en esta clase es que hay que manejar el tema de que los
-# nodos se desconecten y se reconecten
 class Simulation:
     def __init__(self, network, sender_node):
         self.network = network
@@ -138,4 +176,19 @@ class Simulation:
 
         for episode_number in range(1, episodes_number + 1):
             print(f'\n\n=== Starting episode #{episode_number} ===\n\n')
+
+            for node in self.network.nodes.values():
+                node.update_status()
+                print(f"Node {node.node_id} - Status: {node.status}")
+                print(f"Node {node.node_id} - Lifetime: {node.lifetime}")
+                print(f"Node {node.node_id} - Reconnect Time: {node.reconnect_time}")
+
             self.sender_node.start_episode(episode_number)
+            
+            processed_functions = []  # Update this based on your logic
+            functions_sequence = []  # Update this based on your logic
+            animate_network(
+                episode_number, self.network.packet_log[episode_number], processed_functions, functions_sequence,
+                list(self.network.nodes.keys()), self.network.connections, self.network.active_nodes, {},
+                self.network
+            )
