@@ -372,6 +372,7 @@ class Packet:
         self.function_counters = {func: 0 for func in FUNCTION_SEQ}  # Contadores de funciones asignadas
         self.hops = 0  # Contador de saltos
         self.time = 0  # Tiempo total acumulado del paquete
+        self.max_hops = 8 # Número máximo de saltos permitidos
 
     def increment_function_counter(self, function):
         """

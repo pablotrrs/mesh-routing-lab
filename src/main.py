@@ -30,15 +30,17 @@ import sys
 from enum import Enum
 
 # TODO:
-#  1. testear la desconexión de los nodos (revisar si logran reconectarse después de x episodios)
-#  2. hacer que se de por perdido el paquete después de 100 hops
-#  3. relevar resultados (integrar con lo que había antes para visualizar, y exportar a un csv como en modelado, 
+#  1. Obtener Q-table final y mostrarla.
+#  2. Revisar la animación para una red con más nodos (por ejemplo de 6x6).
+#  3. Generar heat maps para los resultados obtenidos.
+#  4. Revisar que los resultados sean consistentes con los esperados.
+#  5. relevar resultados (integrar con lo que había antes para visualizar, y exportar a un csv como en modelado, 
 #     para comparar y hacer gráficos de cómo cambian los parámetros Latencia Promedio, Consistencia en la Latencia,
 #     Tasa de Éxito, Balanceo de Carga, Overhead de Comunicación, Tiempo de Cómputo, Adaptabilidad a Cambios en la Red
 #     con respecto a los pasos tiempo)
-#  4. la q-table es local para cada nodo (solo tiene los state-values correspondientes a los vecinos de ese nodo). 
+#  6. la q-table es local para cada nodo (solo tiene los state-values correspondientes a los vecinos de ese nodo). 
 #     tendríamos que hacer algo para tener una q-table global (parecido al punto 3.)
-#  5. hacer que se pueda elegir cambiar por los métodos de ruteo dijkstra y bellman ford
+#  7. hacer que se pueda elegir cambiar por los métodos de ruteo dijkstra y bellman ford
 
 class Algorithm(Enum):
     Q_ROUTING = "Q_ROUTING"

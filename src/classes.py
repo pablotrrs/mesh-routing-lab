@@ -62,13 +62,14 @@ class Node:
 
                 if self.lifetime <= 0:
                     self.status = False
-                    self.reconnect_time = np.random.exponential(scale=10)
+                    self.reconnect_time = np.random.exponential(scale=2)
             else:
                 self.reconnect_time -= 1
 
                 if self.reconnect_time <= 0:
+                    print(f"[Node_ID={self.node_id}] Reconnected")
                     self.status = True
-                    self.lifetime = np.random.exponential(scale=20)
+                    self.lifetime = np.random.exponential(scale=2)
 
         return self.status
 
@@ -81,13 +82,6 @@ class Node:
 class PacketType(Enum):
     PACKET_HOP = "PACKET_HOP"
     CALLBACK = "CALLBACK"
-
-class Packet:
-    def __init__(self, episode_number, from_node_id):
-        self.episode_number = episode_number
-        self.from_node_id = from_node_id
-        self.hops = 0
-        self.time = 0
 
 class Network:
     def __init__(self):
@@ -117,9 +111,15 @@ class Network:
         """
         Envía un paquete entre dos nodos dentro de la red.
         """
-        if to_node_id in self.connections.get(from_node_id, []) and to_node_id in self.active_nodes:
+        if  to_node_id in self.connections.get(from_node_id, []) and \
+            to_node_id in self.active_nodes and \
+            packet.hops < packet.max_hops:
+
             print(f"[Network] Sending packet from Node {from_node_id} to Node {to_node_id}")
+            print(f"[Network] Packet hops: {packet.hops} of {packet.max_hops} max hops")
             self.nodes[to_node_id].application.receive_packet(packet)
+        elif packet.hops >= packet.max_hops:            
+            print(f"[Network] Packet from Node {from_node_id} was lost. Max hops reached.")
         else:
             print(f"[Network] Failed to send packet: Node {to_node_id} is not reachable from Node {from_node_id}")
 
