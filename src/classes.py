@@ -6,7 +6,7 @@ import numpy as np
 import yaml
 import os
 from abc import ABC, abstractmethod
-from visualization import animate_network
+from visualization import animate_network, generate_heat_map, print_q_table
 from tabulate import tabulate
 
 class Application(ABC):
@@ -199,9 +199,11 @@ class Simulation:
             #     self.network.connections, self.network
             # )
 
-            for node in self.network.nodes.values():
-                node.application.print_q_table()
+            q_tables = []
 
             for node in self.network.nodes.values():
-                if not node.is_sender:
-                    node.update_status()
+                print_q_table(node.application)
+                q_tables.append(node.application.q_table)
+                node.update_status()
+
+            generate_heat_map(q_tables, episode_number)
