@@ -2,9 +2,8 @@ from enum import Enum
 from dataclasses import dataclass
 import random
 import time
-import yaml
-import os
 from classes import Application, PacketType
+from tabulate import tabulate
 
 ALPHA = 0.1
 GAMMA = 0.9
@@ -193,6 +192,16 @@ class QRoutingApplication(Application):
     def get_assigned_function(self):
         """Returns the function assigned to this node."""
         return self.assigned_function
+    
+    def print_q_table(self):
+        q_table_data = []
+        for state, actions in self.q_table.items():
+            for action, q_value in actions.items():
+                q_table_data.append([state, action, q_value])
+
+        headers = ["State (Node ID)", "Action (Next Node ID)", "Q-Value"]
+        print(f'\n[Node_ID={self.node.node_id}] Q-Table:')
+        print(tabulate(q_table_data, headers=headers, tablefmt="grid"))
 
     def __str__(self) -> str:
         return f"Node(id={self.node.node_id}, neighbors={self.node.network.get_neighbors(self.node.node_id)})"
@@ -268,8 +277,9 @@ class SenderQRoutingApplication(QRoutingApplication):
         if self.callback_stack:
             self.send_packet(callback_data.previous_hop_node, packet)
             return
-
-        print(f'\n[Node_ID={self.node.node_id}] Episode {packet.episode_number} finished. Q-Table: {self.q_table}')
+        
+        self.print_q_table()
+        print(f'\n[Node_ID={self.node.node_id}] Episode {packet.episode_number} finished.')
 
     def __str__(self) -> str:
         return f"SenderNode(id={self.node.node_id}, neighbors={self.node.network.get_neighbors(self.node.node_id)})"
@@ -293,7 +303,7 @@ class IntermediateQRoutingApplication(QRoutingApplication):
 
         if packet.is_sequence_completed():
             print(f'[Node_ID={self.node.node_id}] Function sequence is complete! Initiating full echo callback')
-            print(f"*******callback_stack: {self.callback_stack}")
+            # print(f"*******callback_stack: {self.callback_stack}")
             self.initiate_full_echo_callback(packet)
             return
 
@@ -372,7 +382,7 @@ class Packet:
         self.function_counters = {func: 0 for func in FUNCTION_SEQ}  # Contadores de funciones asignadas
         self.hops = 0  # Contador de saltos
         self.time = 0  # Tiempo total acumulado del paquete
-        self.max_hops = 8 # Número máximo de saltos permitidos
+        self.max_hops = 495 # Número máximo de saltos permitidos
 
     def increment_function_counter(self, function):
         """

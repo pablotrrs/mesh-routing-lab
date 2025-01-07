@@ -74,11 +74,7 @@ os.makedirs(output_folder, exist_ok=True)
 
 #     plt.pause(0.0000001)
 
-def animate_network(
-    episode_number, packet_logs, processed_functions,
-    functions_sequence, nodes, connections, active_nodes, positions,
-    network
-):
+def animate_network(episode_number, packet_logs, nodes, connections, network):
     """Plots the network graph showing the path, applied functions, and missing functions, with progressive colors and active node highlight."""
     G = nx.DiGraph()
     

@@ -30,10 +30,11 @@ import sys
 from enum import Enum
 
 # TODO:
-#  1. Obtener Q-table final y mostrarla.
-#  2. Revisar la animación para una red con más nodos (por ejemplo de 6x6).
-#  3. Generar heat maps para los resultados obtenidos.
-#  4. Revisar que los resultados sean consistentes con los esperados.
+#  1. ¿Fixear "RecursionError: maximum recursion depth exceeded" cuando la cantidad de hops máximos es >= 496?.
+#  2. Obtener Q-table final y mostrarla (pasar a un .csv o .txt por episodio). Revisar que los resultados sean consistentes
+#     con los esperados.
+#  3. Revisar la animación para una red con más nodos (por ejemplo de 6x6).
+#  4. Generar heat maps para los resultados obtenidos.
 #  5. relevar resultados (integrar con lo que había antes para visualizar, y exportar a un csv como en modelado, 
 #     para comparar y hacer gráficos de cómo cambian los parámetros Latencia Promedio, Consistencia en la Latencia,
 #     Tasa de Éxito, Balanceo de Carga, Overhead de Comunicación, Tiempo de Cómputo, Adaptabilidad a Cambios en la Red

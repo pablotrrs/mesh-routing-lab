@@ -7,6 +7,7 @@ import yaml
 import os
 from abc import ABC, abstractmethod
 from visualization import animate_network
+from tabulate import tabulate
 
 class Application(ABC):
     def __init__(self, node):
@@ -36,8 +37,8 @@ class Node:
 
         # Set attributes if the application is not SenderQRoutingApplication
         if not self.is_sender:
-            self.lifetime = random.randint(1, 5)
-            self.reconnect_time = random.randint(5, 20)
+            self.lifetime = np.random.exponential(scale=2)
+            self.reconnect_time = np.random.exponential(scale=2)
             self.status = True
         else:
             self.lifetime = None
@@ -67,7 +68,6 @@ class Node:
                 self.reconnect_time -= 1
 
                 if self.reconnect_time <= 0:
-                    print(f"[Node_ID={self.node_id}] Reconnected")
                     self.status = True
                     self.lifetime = np.random.exponential(scale=2)
 
@@ -112,6 +112,7 @@ class Network:
         Envía un paquete entre dos nodos dentro de la red.
         """
         if  to_node_id in self.connections.get(from_node_id, []) and \
+            from_node_id in self.active_nodes and \
             to_node_id in self.active_nodes and \
             packet.hops < packet.max_hops:
 
@@ -175,20 +176,32 @@ class Simulation:
         # TODO: dynamic_network_change() que cambie los nodos de network
 
         for episode_number in range(1, episodes_number + 1):
-            print(f'\n\n=== Starting episode #{episode_number} ===\n\n')
+            print(f'\n\n=== Starting episode #{episode_number} ===\n')
 
+            node_info = []
             for node in self.network.nodes.values():
-                node.update_status()
-                print(f"Node {node.node_id} - Status: {node.status}")
-                print(f"Node {node.node_id} - Lifetime: {node.lifetime}")
-                print(f"Node {node.node_id} - Reconnect Time: {node.reconnect_time}")
+                if not node.is_sender:
+                    node_info.append([
+                        node.node_id,
+                        node.status,
+                        node.lifetime,
+                        node.reconnect_time
+                    ])
 
+            headers = ["Node ID", "Connected", "Lifetime", "Reconnect Time"]
+            print(tabulate(node_info, headers=headers, tablefmt="grid"))
+            print("\n")
+            
             self.sender_node.start_episode(episode_number)
             
-            processed_functions = []  # Update this based on your logic
-            functions_sequence = []  # Update this based on your logic
-            animate_network(
-                episode_number, self.network.packet_log[episode_number], processed_functions, functions_sequence,
-                list(self.network.nodes.keys()), self.network.connections, self.network.active_nodes, {},
-                self.network
-            )
+            # animate_network(
+            #     episode_number, self.network.packet_log[episode_number], list(self.network.nodes.keys()),
+            #     self.network.connections, self.network
+            # )
+
+            for node in self.network.nodes.values():
+                node.application.print_q_table()
+
+            for node in self.network.nodes.values():
+                if not node.is_sender:
+                    node.update_status()
