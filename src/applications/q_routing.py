@@ -162,31 +162,17 @@ class QRoutingApplication(Application):
         self.q_table[self.node.node_id][next_node] = updated_q
 
     def send_packet(self, to_node_id, packet) -> None:
-        """
-        Envia un paquete al nodo destino utilizando la red.
-        """
 
+        # ensure node is up and running
         if not self.node.is_sender and not self.node.status:
             print(f'[Node_ID={self.node.node_id}] Node status is False. Packet not sent.')
             return
-        
+
         packet.hops += 1
         packet.time += 1
         packet.from_node_id = self.node.node_id
 
         print(f'[Node_ID={self.node.node_id}] Sending packet to Node {to_node_id}\n')
-
-        # Initialize the packet log for the episode if it doesn't exist
-        if packet.episode_number not in self.node.network.packet_log:
-            self.node.network.packet_log[packet.episode_number] = []
-
-        # Log the packet
-        self.node.network.packet_log[packet.episode_number].append({
-            'from': self.node.node_id,
-            'to': to_node_id,
-            'packet': packet
-        })
-
         self.node.network.send(self.node.node_id, to_node_id, packet)
 
     def get_assigned_function(self):

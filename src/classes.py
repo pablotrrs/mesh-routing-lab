@@ -108,10 +108,20 @@ class Network:
         return list(set(neighbor for neighbor in neighbors if neighbor != node_id))
 
     def send(self, from_node_id, to_node_id, packet):
-        """
-        Envía un paquete entre dos nodos dentro de la red.
-        """
-        if  to_node_id in self.connections.get(from_node_id, []) and \
+
+        # Initialize the packet log for the episode if it doesn't exist
+        if packet.episode_number not in self.packet_log:
+            self.packet_log[packet.episode_number] = []
+
+        # Log the packet
+        self.packet_log[packet.episode_number].append({
+            'from': from_node_id,
+            'to': to_node_id,
+            'packet': packet
+        })
+
+        # validate and send
+        if to_node_id in self.connections.get(from_node_id, []) and \
             from_node_id in self.active_nodes and \
             to_node_id in self.active_nodes and \
             packet.hops < packet.max_hops:
@@ -178,6 +188,7 @@ class Simulation:
         for episode_number in range(1, episodes_number + 1):
             print(f'\n\n=== Starting episode #{episode_number} ===\n')
 
+            # print info for logging
             node_info = []
             for node in self.network.nodes.values():
                 if not node.is_sender:
@@ -191,14 +202,16 @@ class Simulation:
             headers = ["Node ID", "Connected", "Lifetime", "Reconnect Time"]
             print(tabulate(node_info, headers=headers, tablefmt="grid"))
             print("\n")
-            
+
+            # perform the simulation
             self.sender_node.start_episode(episode_number)
-            
+
             # animate_network(
             #     episode_number, self.network.packet_log[episode_number], list(self.network.nodes.keys()),
             #     self.network.connections, self.network
             # )
 
+            # print episode results
             for node in self.network.nodes.values():
                 node.application.print_q_table()
 
