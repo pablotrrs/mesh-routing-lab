@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import random
 import time
 from classes import Application, PacketType
-from tabulate import tabulate
+from visualization import print_q_table
 
 ALPHA = 0.1
 GAMMA = 0.9
@@ -179,16 +179,6 @@ class QRoutingApplication(Application):
         """Returns the function assigned to this node."""
         return self.assigned_function
     
-    def print_q_table(self):
-        q_table_data = []
-        for state, actions in self.q_table.items():
-            for action, q_value in actions.items():
-                q_table_data.append([state, action, q_value])
-
-        headers = ["State (Node ID)", "Action (Next Node ID)", "Q-Value"]
-        print(f'\n[Node_ID={self.node.node_id}] Q-Table:')
-        print(tabulate(q_table_data, headers=headers, tablefmt="grid"))
-
     def __str__(self) -> str:
         return f"Node(id={self.node.node_id}, neighbors={self.node.network.get_neighbors(self.node.node_id)})"
 
@@ -264,7 +254,7 @@ class SenderQRoutingApplication(QRoutingApplication):
             self.send_packet(callback_data.previous_hop_node, packet)
             return
         
-        self.print_q_table()
+        print_q_table(self)
         print(f'\n[Node_ID={self.node.node_id}] Episode {packet.episode_number} finished.')
 
     def __str__(self) -> str:
@@ -368,7 +358,7 @@ class Packet:
         self.function_counters = {func: 0 for func in FUNCTION_SEQ}  # Contadores de funciones asignadas
         self.hops = 0  # Contador de saltos
         self.time = 0  # Tiempo total acumulado del paquete
-        self.max_hops = 495 # Número máximo de saltos permitidos
+        self.max_hops = 250 # Número máximo de saltos permitidos
 
     def increment_function_counter(self, function):
         """

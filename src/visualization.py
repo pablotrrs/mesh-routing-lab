@@ -1,10 +1,8 @@
-import random
-import numpy as np
-import matplotlib.pyplot as plt
-import networkx as nx
-import matplotlib.cm as cm
-import os
 from matplotlib.animation import FuncAnimation
+import matplotlib.pyplot as plt
+from tabulate import tabulate
+import networkx as nx
+import os
 
 output_folder = 'simulation_images'
 os.makedirs(output_folder, exist_ok=True)
@@ -18,61 +16,6 @@ os.makedirs(output_folder, exist_ok=True)
 # for i in range(36):
 #     row, col = divmod(i, 6)
 #     positions[f'i{i}'] = ((col + 1) * 2, row * 2)
-
-# def animate_network(path, processed_functions, functions_sequence, episode, nodes, neighbors, node_status, node_functions):
-#     """Plots the network graph showing the path, applied functions, and missing functions, with progressive colors and active node highlight."""
-#     plt.clf()
-
-#     G = nx.DiGraph()
-#     G.add_nodes_from(nodes)
-#     G.add_edges_from([(node1, node2) for node1 in neighbors for node2 in neighbors[node1]])
-
-#     # Base color for nodes (green if alive, gray if dead)
-#     node_colors = ['green' if node_status.get(node, True) else 'gray' for node in nodes]
-#     node_labels = {node: f'{node}\nFunc: {node_functions.get(node, "")}' for node in nodes}
-
-#     nx.draw(G, pos=positions, labels=node_labels, with_labels=True, node_color=node_colors, node_size=500, font_size=8, font_weight='bold', arrows=False)
-
-#     # Create a colormap to vary the color of edges as the agent moves
-#     cmap = cm.get_cmap('plasma')
-
-#     total_hops_in_path = len(path) - 1
-#     min_color = 0.4
-#     max_color = 1.0
-
-#     applied_functions = processed_functions
-#     missing_functions = [func for func in functions_sequence if func not in processed_functions]
-
-#     applied_text = "Applied functions: " + ", ".join(applied_functions) if applied_functions else "No function applied"
-#     missing_text = "Missing functions: " + ", ".join(missing_functions) if missing_functions else "All functions applied"
-
-#     # Create a legend with the applied and missing functions
-#     handles = [
-#         plt.Line2D([0], [0], color='white', label=applied_text),
-#         plt.Line2D([0], [0], color='white', label=missing_text)
-#     ]
-#     plt.legend(handles=handles, loc='upper right', fontsize=8)
-
-#     # Draw each hop with progressively lighter colors
-#     for i in range(total_hops_in_path):
-#         edges_in_path = [(path[i], path[i + 1])]
-
-#         # Compute the color for the current hop
-#         color_index = min_color + (i / total_hops_in_path) * (max_color - min_color)
-#         color = cmap(color_index)
-
-#         # Highlight the destination node of the hop (next_node)
-#         destination_node = path[i + 1]  # Destination of the hop
-#         node_colors = ['red' if node == destination_node else 'green' if node_status.get(node, True) else 'gray' for node in nodes]
-
-#         nx.draw(G, pos=positions, labels=node_labels, with_labels=True, node_color=node_colors, node_size=500, font_size=8, font_weight='bold', arrows=False)
-
-#         nx.draw_networkx_edges(G, pos=positions, edgelist=edges_in_path, edge_color=[color], width=3, arrows=True)
-
-#         plt.title(f'Episode {episode} - Path: {" -> ".join(path[:i + 2])}')
-#         plt.pause(0.001)
-
-#     plt.pause(0.0000001)
 
 def animate_network(episode_number, packet_logs, nodes, connections, network):
     """Plots the network graph showing the path, applied functions, and missing functions, with progressive colors and active node highlight."""
@@ -140,57 +83,70 @@ def animate_network(episode_number, packet_logs, nodes, connections, network):
 
     plt.show()
 
-def plot_q_tables(q_table, episode):
-    cell_size = 30
-    pixels_per_inch = 96
+import matplotlib.pyplot as plt
+import numpy as np
+import os
 
-    for i in range(0, 36):
-        node = f'i{i}'
-        q_values = np.array(list(q_table[node].values()))
-        N = q_values.shape[0] 
-        figure_size_in_pixels = N * cell_size
-        figure_size_in_inches = figure_size_in_pixels / pixels_per_inch
-        fig, ax = plt.subplots(figsize=(figure_size_in_inches, figure_size_in_inches))
-        cax = ax.matshow(q_values, cmap="RdYlGn", vmin=-100, vmax=100)
-        fig.colorbar(cax, ax=ax)
+output_folder = 'simulation_images'
+os.makedirs(output_folder, exist_ok=True)
 
-        for (row, col), val in np.ndenumerate(q_values):
-            ax.text(col, row, f'{val:.1f}', ha='center', va='center', fontsize=8, color='black')
+def generate_heat_map(q_tables, episode_number):
+    q_table_data = []
+    for q_table in q_tables:
+        for state, actions in q_table.items():
+            for action, q_value in actions.items():
+                q_table_data.append((state, action, q_value))
 
-        ax.set_title(f"Q-table: {node} - Episode {episode}", fontsize=10)
-        ax.set_xticks(range(N))
-        ax.set_xticklabels([f'{n}' for n in range(N)], rotation=90, fontsize=8)
-        ax.set_yticks(range(N))
-        ax.set_yticklabels([f'{n}' for n in range(N)], fontsize=8)
-        ax.tick_params(axis='x', which='major', pad=10)
-        ax.tick_params(axis='y', which='major', pad=10)
-        ax.set_aspect('equal')
+    if not q_table_data:
+        print(f"No Q-table data available for episode {episode_number}")
+        return
 
-        plt.tight_layout()
-        plt.savefig(f'{output_folder}/q_table_{node}_episode_{episode}.png')
-        plt.close(fig)
+    # Extract unique states and actions
+    states = sorted(set(state for state, _, _ in q_table_data))
+    actions = sorted(set(action for _, action, _ in q_table_data))
 
-def plot_network(path, nodes, neighbors, node_status, episode):
-    plt.clf()
+    # Create a matrix to hold Q-values
+    q_matrix = np.zeros((len(states), len(actions)))
 
-    G = nx.DiGraph()
-    G.add_nodes_from(nodes)
-    G.add_edges_from([(node1, node2) for node1 in neighbors for node2 in neighbors[node1]])
+    for state, action, q_value in q_table_data:
+        state_index = states.index(state)
+        action_index = actions.index(action)
+        q_matrix[state_index, action_index] = q_value
 
-    node_colors = []
-    for node in nodes:
-        if node == 'tx' or node == 'rx':
-            node_colors.append('green')
-        elif node_status.get(node, True):
-            node_colors.append('green')
-        else:
-            node_colors.append('gray')
+    fig, ax = plt.subplots()
+    cax = ax.imshow(q_matrix, cmap='RdYlGn', aspect='auto', vmin=0, vmax=1)
 
-    nx.draw(G, pos=positions, with_labels=True, node_color=node_colors, node_size=500, font_size=8, font_weight='bold', arrows=False)
+    # Add color bar
+    fig.colorbar(cax)
 
-    edges_in_path = [(path[i], path[i+1]) for i in range(len(path) - 1)]
-    nx.draw_networkx_edges(G, pos=positions, edgelist=edges_in_path, edge_color='blue', width=3, arrows=True)
+    # Set axis labels
+    ax.set_xticks(np.arange(len(actions)))
+    ax.set_yticks(np.arange(len(states)))
+    ax.set_xticklabels(actions)
+    ax.set_yticklabels(states)
 
-    plt.title(f'Episode {episode} - Path: {" -> ".join(path)}')
+    # Annotate each cell with its value
+    for i in range(len(states)):
+        for j in range(len(actions)):
+            ax.text(j, i, f'{q_matrix[i, j]:.2f}', ha='center', va='center', color='black')
 
-    plt.savefig(f'{output_folder}/network_episode_{episode}.png')
+    plt.xlabel('Actions (Next Node ID)')
+    plt.ylabel('States (Node ID)')
+    plt.title(f'Q-Table Heat Map - Episode {episode_number}')
+
+    # Save the heat map as a .png file
+    filename = os.path.join(output_folder, f'q_table_heat_map_episode_{episode_number}.png')
+    plt.savefig(filename)
+    plt.close()
+
+    print(f'Heat map saved to {filename}')
+
+def print_q_table(application):
+    q_table_data = []
+    for state, actions in application.q_table.items():
+        for action, q_value in actions.items():
+            q_table_data.append([state, action, q_value])
+
+    headers = ["State (Node ID)", "Action (Next Node ID)", "Q-Value"]
+    print(f'\n[Node_ID={application.node.node_id}] Q-Table:')
+    print(tabulate(q_table_data, headers=headers, tablefmt="grid"))
