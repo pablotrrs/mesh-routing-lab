@@ -212,10 +212,17 @@ class Simulation:
             # )
 
             # print episode results
-            q_tables = []
 
-            for node in self.network.nodes.values():
-                print_q_table(node.application)
-                q_tables.append(node.application.q_table)
-                node.update_status()
-            generate_heat_map(q_tables, episode_number)
+            # print q table if algorithm is q routing
+            from applications.q_routing import QRoutingApplication
+            if isinstance(self.sender_node, QRoutingApplication):
+                q_tables = []
+
+                for node in self.network.nodes.values():
+                    print_q_table(node.application)
+                    q_tables.append(node.application.q_table)
+                    node.update_status()
+
+                generate_heat_map(q_tables, episode_number)
+
+            # TODO: generar csv con métricas de la red
