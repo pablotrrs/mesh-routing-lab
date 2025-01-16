@@ -101,6 +101,12 @@ class Network:
         neighbors = self.connections.get(node_id, [])
         return list(set(neighbor for neighbor in neighbors if neighbor != node_id))
 
+    def get_nodes(self):
+        """
+        Returns a list of all node IDs in the network.
+        """
+        return list(self.nodes.keys())
+
     def send_dict(self, from_node_id, to_node_id, packet):
 
         # Initialize the packet log for the episode if it doesn't exist

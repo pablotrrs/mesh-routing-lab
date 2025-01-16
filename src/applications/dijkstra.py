@@ -339,11 +339,6 @@ class SenderDijkstraApplication(DijkstraApplication):
                     self.broadcast_state.expected_acks = len(neighbors) - 1
 
             case PacketType.ACK:
-                print("\n\n\n\n")
-                print("PAREN TODO")
-                print("LE LLEGO UN ACK AL NODO SENDEr")
-                print(packet)
-                print("\n\n\n\n")
                 print(f"[Node_ID={self.node.node_id}] Received ACK for message ID {packet['message_id']}")
 
                 if "node_function_map" in packet:
