@@ -22,6 +22,7 @@ class BroadcastState:
         self.received_messages = set()          # Conjunto de mensajes ya recibidos
         self.completed = False                  # Indica si el broadcast se completó
         self.received_acks = set()              # Conjunto de nodos desde los que se recibieron ACKs
+        self.node_function_map = {}
 
     def set_parent_node(self, parent_node: int):
         """Establece el nodo del que se recibió el BROADCAST."""
@@ -96,20 +97,6 @@ class Packet:
         """Elimina la función actual de la secuencia, marcándola como procesada."""
         if self.functions_sequence:
             self.functions_sequence.pop(0)
-
-    # def __str__(self):
-    #     functions_sequence_str = [func.value for func in self.functions_sequence]
-    #     function_counters_str = {func.value: count for func, count in self.function_counters.items()}
-    #     return (
-    #         f"Packet("
-    #         f"type={self.type.value}, "
-    #         f"episode_number={self.episode_number}, "
-    #         f"from_node_id={self.from_node_id}, "
-    #         f"functions_sequence={functions_sequence_str}, "
-    #         f"function_counters={function_counters_str}, "
-    #         f"hops={self.hops}, "
-    #         f"time={self.time})"
-    #     )
 
 class DijkstraApplication(Application):
     def __init__(self, node):
@@ -218,7 +205,10 @@ class SenderDijkstraApplication(DijkstraApplication):
             "message_id": message_id,
             "from_node_id": self.node.node_id,
             "episode_number": 0,
-            "visited_nodes": {self.node.node_id}
+            "visited_nodes": {self.node.node_id},
+            "functions_sequence": FUNCTION_SEQ.copy(),
+            "function_counters": {func: 0 for func in FUNCTION_SEQ},
+            "node_function_map": {}
         }
 
         # Inicializar el estado de broadcast
@@ -228,7 +218,6 @@ class SenderDijkstraApplication(DijkstraApplication):
 
         for neighbor in neighbors:
             self.send_packet(neighbor, broadcast_packet)
-
 
     def compute_shortest_paths(self):
         """
@@ -350,7 +339,17 @@ class SenderDijkstraApplication(DijkstraApplication):
                     self.broadcast_state.expected_acks = len(neighbors) - 1
 
             case PacketType.ACK:
+                print("\n\n\n\n")
+                print("PAREN TODO")
+                print("LE LLEGO UN ACK AL NODO SENDEr")
+                print(packet)
+                print("\n\n\n\n")
                 print(f"[Node_ID={self.node.node_id}] Received ACK for message ID {packet['message_id']}")
+
+                if "node_function_map" in packet:
+                    combined_node_function_map = {**self.broadcast_state.node_function_map, **packet["node_function_map"]}
+                    self.broadcast_state.node_function_map = combined_node_function_map
+                    print(self.broadcast_state.node_function_map)
 
                 if packet["from_node_id"] not in self.broadcast_state.received_acks:
                     self.broadcast_state.increment_acks_received(packet["from_node_id"])
@@ -362,13 +361,20 @@ class SenderDijkstraApplication(DijkstraApplication):
                 # Verificar si se recibieron todos los ACKs esperados
                 if self.broadcast_state.acks_received == self.broadcast_state.expected_acks:
                     print(f"[Node_ID={self.node.node_id}] Broadcast completed successfully.")
+                    print(f"[Node_ID={self.node.node_id}] Final node-function map: {self.broadcast_state.node_function_map}")
                     self.broadcast_state.mark_completed()
                     if self.broadcast_state.parent_node is not None:
                         ack_packet = {
                             "type": PacketType.ACK,
-                            "message_id": packet["message_id"],
-                            "from_node_id": self.node.node_id
+                            "message_id": message_id,
+                            "from_node_id": self.node.node_id,
+                            "node_function_map": {}
                         }
+                        # Solo agregar al mapa si el nodo tiene una función asignada
+                        if self.assigned_function is not None:
+                            ack_packet["node_function_map"][self.node.node_id] = self.assigned_function
+                            self.broadcast_state.node_function_map[self.node.node_id] = self.assigned_function
+
                         self.send_packet(self.broadcast_state.parent_node, ack_packet)
 
             case PacketType.BROKEN_PATH:
@@ -434,8 +440,13 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                     ack_packet = {
                         "type": PacketType.ACK,
                         "message_id": message_id,
-                        "from_node_id": self.node.node_id
+                        "from_node_id": self.node.node_id,
+                        "node_function_map": {}
                     }
+                    # Solo agregar al mapa si el nodo tiene una función asignada
+                    if self.assigned_function is not None:
+                        ack_packet["node_function_map"][self.node.node_id] = self.assigned_function
+                        self.broadcast_state.node_function_map[self.node.node_id] = self.assigned_function
                     self.send_packet(packet["from_node_id"], ack_packet)
                     return
 
@@ -444,6 +455,28 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                     self.broadcast_state = BroadcastState()
                 self.broadcast_state.received_messages.add(message_id)
                 self.broadcast_state.parent_node = packet["from_node_id"]
+
+                # Asignarse una función si no tiene una ya asignada
+                if not self.assigned_function:
+                    # Obtener la siguiente función de la secuencia
+                    function_to_assign = packet["functions_sequence"][0] if packet["functions_sequence"] else None
+                    if function_to_assign:
+                        # Asignar la función al nodo
+                        self.assigned_function = function_to_assign
+
+                        # Incrementar el contador de asignaciones para la función
+                        if function_to_assign not in packet["function_counters"]:
+                            raise ValueError(f"La función {function_to_assign} no es válida.")
+                        packet["function_counters"][function_to_assign] += 1
+
+                        # Eliminar la función procesada de la secuencia
+                        packet["functions_sequence"].pop(0)
+
+                        print(f"[Node_ID={self.node.node_id}] Assigned function: {self.assigned_function}")
+
+                        # Actualizar el diccionario de mapeo de funciones en el broadcast state
+                        self.broadcast_state.node_function_map[self.node.node_id] = self.assigned_function
+                        print(f"[Node_ID={self.node.node_id}] Added function to node function dict: {self.broadcast_state.node_function_map}")
 
                 # Propagar el paquete a vecinos no visitados
                 neighbors = self.node.network.get_neighbors(self.node.node_id)
@@ -461,7 +494,10 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                         "message_id": message_id,
                         "from_node_id": self.node.node_id,
                         "episode_number": packet["episode_number"],
-                        "visited_nodes": packet["visited_nodes"].copy()
+                        "visited_nodes": packet["visited_nodes"].copy(),
+                        "functions_sequence": FUNCTION_SEQ.copy(),
+                        "function_counters": {func: 0 for func in FUNCTION_SEQ},
+                        "node_function_map": packet["node_function_map"]
                     }
                     broadcast_packet["visited_nodes"].add(self.node.node_id)
                     self.send_packet(neighbor, broadcast_packet)
@@ -477,53 +513,52 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                     # Solo agregar al mapa si el nodo tiene una función asignada
                     if self.assigned_function is not None:
                         ack_packet["node_function_map"][self.node.node_id] = self.assigned_function
+                        self.broadcast_state.node_function_map[self.node.node_id] = self.assigned_function
 
                     self.send_packet(self.broadcast_state.parent_node, ack_packet)
 
             case PacketType.ACK:
                 print(f"[Node_ID={self.node.node_id}] Received ACK for message ID {packet['message_id']}")
+                print("printing mf packet to see if has map of mf nodes and mf functions")
+                print(packet)
 
-                # Verificar si el mensaje ID coincide con el broadcast actual
-                    # Incrementar el contador de ACKs recibidos
-                # if self.broadcast_state and packet["message_id"] == self.broadcast_state.message_id:
                 if packet["from_node_id"] not in self.broadcast_state.received_acks:
                     self.broadcast_state.increment_acks_received(packet["from_node_id"])
                     acks_left = self.broadcast_state.expected_acks - self.broadcast_state.acks_received
                     print(f"[Node_ID={self.node.node_id}] {acks_left} ACKs left")
-                # else:
-                #     print(f"[Node_ID={self.node.node_id}] Duplicate ACK received from Node {packet['from_node_id']}. Ignoring.")
+
+                if "node_function_map" not in packet:
+                    packet["node_function_map"] = self.broadcast_state.node_function_map
+                combined_node_function_map = {**self.broadcast_state.node_function_map, **packet["node_function_map"]}
+                if self.assigned_function is not None:
+                    combined_node_function_map[self.node.node_id] = self.assigned_function
+
+                self.broadcast_state.node_function_map = combined_node_function_map
+
+                print(f"[Node_ID={self.node.node_id}] add node function to node function map {self.broadcast_state.node_function_map}")
 
                 # Verificar si se recibieron todos los ACKs esperados
                 if self.broadcast_state.acks_received == self.broadcast_state.expected_acks:
                     print(f"[Node_ID={self.node.node_id}] All ACKs received. Sending ACK to parent node {self.broadcast_state.parent_node}.")
 
+                    message_id = packet["message_id"]
                     # Enviar ACK al nodo padre
                     if self.broadcast_state.parent_node is not None:
+
+                        combined_node_function_map = {**self.broadcast_state.node_function_map, **packet["node_function_map"]}
+                        self.broadcast_state.node_function_map = combined_node_function_map
+
                         ack_packet = {
                             "type": PacketType.ACK,
-                            "message_id": self.broadcast_state.message_id,
-                            "from_node_id": self.node.node_id
+                            "message_id": message_id,
+                            "from_node_id": self.node.node_id,
+                            "node_function_map": self.broadcast_state.node_function_map
                         }
-
-                        if "node_function_map" not in packet:
-                            ack_packet["node_function_map"] = {}
-                        if self.assigned_function is not None:
-                            ack_packet["node_function_map"][self.node.node_id] = self.assigned_function
 
                         self.send_packet(self.broadcast_state.parent_node, ack_packet)
 
                     # Marcar el broadcast como completado
                     self.broadcast_state.mark_completed()
-
-            # case PacketType.PROBE:
-            #     time.sleep(5)
-            #     if not self.assigned_function:
-            #         function_to_assign = packet.next_function()
-            #         self.assigned_function = function_to_assign
-            #         packet.increment_function_counter(function_to_assign)
-            #         print(f"[Node_ID={self.node.node_id}] Assigned function: {self.assigned_function}")
-            #
-            #         self.node.network.nodes[packet.from_node_id].application.probe_responses_received += 1
 
             case PacketType.PACKET_HOP:
                 if not self.assigned_function:
