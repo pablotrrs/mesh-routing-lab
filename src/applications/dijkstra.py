@@ -14,8 +14,8 @@ class NodeFunction(Enum):
 FUNCTION_SEQ = [NodeFunction.A, NodeFunction.B, NodeFunction.C]
 
 class BroadcastState:
-    def __init__(self, message_id: str):
-        self.message_id = message_id            # Identificador único del mensaje de broadcast
+    def __init__(self):
+        self.message_id = None            # Identificador único del mensaje de broadcast
         self.expected_acks = 0                  # Número de ACKs esperados
         self.acks_received = 0                  # Contador de ACKs recibidos
         self.parent_node = None                 # Nodo del que se recibió el BROADCAST originalmente
@@ -175,7 +175,7 @@ class SenderDijkstraApplication(DijkstraApplication):
         # Iniciar el broadcast para recopilar latencias y asignar funciones
         message_id = f"broadcast_{self.node.node_id}_{episode_number}"
 
-        self.broadcast_state = BroadcastState(message_id=message_id)
+        self.broadcast_state = BroadcastState()
         self.start_broadcast(message_id)
 
         # Esperar hasta que se complete el broadcast (ACKs recibidos)
@@ -221,13 +221,14 @@ class SenderDijkstraApplication(DijkstraApplication):
             "visited_nodes": {self.node.node_id}
         }
 
+        # Inicializar el estado de broadcast
+        self.broadcast_state = BroadcastState()
+        self.broadcast_state.expected_acks = len(neighbors)
+        print(f"[Node_ID={self.node.node_id}] Expected ACKs: {self.broadcast_state.expected_acks}")
+
         for neighbor in neighbors:
             self.send_packet(neighbor, broadcast_packet)
 
-        # Inicializar el estado de broadcast
-        self.broadcast_state = BroadcastState(message_id=message_id)
-        self.broadcast_state.expected_acks = len(neighbors)
-        print(f"[Node_ID={self.node.node_id}] Expected ACKs: {self.broadcast_state.expected_acks}")
 
     def compute_shortest_paths(self):
         """
@@ -250,7 +251,7 @@ class SenderDijkstraApplication(DijkstraApplication):
 
         # Esperar hasta que se reciban todas las respuestas de tipo PROBE
         while self.probe_responses_received < self.probe_responses_expected:
-            print(f'aún no recibí todos los paquetes: self.probe_responses_received {self.probe_responses_received}, self.probe_responses_expected {self.probe_responses_expected}')
+            # print(f'aún no recibí todos los paquetes: self.probe_responses_received {self.probe_responses_received}, self.probe_responses_expected {self.probe_responses_expected}')
             pass  # Espera activa (puede mejorarse con threading o eventos)
 
         print('ya recibí todos los paquetes brouston')
@@ -351,24 +352,24 @@ class SenderDijkstraApplication(DijkstraApplication):
             case PacketType.ACK:
                 print(f"[Node_ID={self.node.node_id}] Received ACK for message ID {packet['message_id']}")
 
-                # Verificar si el mensaje ID coincide con el broadcast actual
-                if self.broadcast_state and packet["message_id"] == self.broadcast_state.message_id:
-                    if packet["from_node_id"] not in self.broadcast_state.received_acks:
-                        self.broadcast_state.increment_acks_received(packet["from_node_id"])
-                    else:
-                        print(f"[Node_ID={self.node.node_id}] Duplicate ACK received from Node {packet['from_node_id']}. Ignoring.")
+                if packet["from_node_id"] not in self.broadcast_state.received_acks:
+                    self.broadcast_state.increment_acks_received(packet["from_node_id"])
+                    acks_left = self.broadcast_state.expected_acks - self.broadcast_state.acks_received
+                    print(f"[Node_ID={self.node.node_id}] {acks_left} ACKs left")
+                else:
+                    print(f"[Node_ID={self.node.node_id}] Duplicate ACK received from Node {packet['from_node_id']}. Ignoring.")
 
-                    # Verificar si se recibieron todos los ACKs esperados
-                    if self.broadcast_state.acks_received == self.broadcast_state.expected_acks:
-                        print(f"[Node_ID={self.node.node_id}] Broadcast completed successfully.")
-                        self.broadcast_state.mark_completed()
-                        if self.broadcast_state.parent_node is not None:
-                            ack_packet = {
-                                "type": PacketType.ACK,
-                                "message_id": packet["message_id"],
-                                "from_node_id": self.node.node_id
-                            }
-                            self.send_packet(self.broadcast_state.parent_node, ack_packet)
+                # Verificar si se recibieron todos los ACKs esperados
+                if self.broadcast_state.acks_received == self.broadcast_state.expected_acks:
+                    print(f"[Node_ID={self.node.node_id}] Broadcast completed successfully.")
+                    self.broadcast_state.mark_completed()
+                    if self.broadcast_state.parent_node is not None:
+                        ack_packet = {
+                            "type": PacketType.ACK,
+                            "message_id": packet["message_id"],
+                            "from_node_id": self.node.node_id
+                        }
+                        self.send_packet(self.broadcast_state.parent_node, ack_packet)
 
             case PacketType.BROKEN_PATH:
                 print(f"[Node_ID={self.node.node_id}] Restarting episode {packet.episode_number} because pre calculated shortest path is broken. Packet={packet}")
@@ -440,7 +441,7 @@ class IntermediateDijkstraApplication(DijkstraApplication):
 
                 # Registrar el mensaje recibido
                 if not self.broadcast_state:
-                    self.broadcast_state = BroadcastState(message_id=message_id)
+                    self.broadcast_state = BroadcastState()
                 self.broadcast_state.received_messages.add(message_id)
                 self.broadcast_state.parent_node = packet["from_node_id"]
 
@@ -449,6 +450,10 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                 neighbors_to_broadcast = [
                     n for n in neighbors if n not in packet["visited_nodes"]
                 ]
+
+                # Inicializar contador de ACKs esperados
+                self.broadcast_state.expected_acks = len(neighbors_to_broadcast)
+                print(f"[Node_ID={self.node.node_id}] {self.broadcast_state.expected_acks} expected ACKs from nodes {neighbors_to_broadcast}")
 
                 for neighbor in neighbors_to_broadcast:
                     broadcast_packet = {
@@ -461,45 +466,54 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                     broadcast_packet["visited_nodes"].add(self.node.node_id)
                     self.send_packet(neighbor, broadcast_packet)
 
-                # Inicializar contador de ACKs esperados
-                self.broadcast_state.expected_acks = len(neighbors_to_broadcast)
-                print(f"[Node_ID={self.node.node_id}] Expected ACKs: {self.broadcast_state.expected_acks}")
-
                 # Enviar ACK al nodo padre si no hay vecinos a los que propagar
                 if not neighbors_to_broadcast:
                     ack_packet = {
                         "type": PacketType.ACK,
                         "message_id": message_id,
-                        "from_node_id": self.node.node_id
+                        "from_node_id": self.node.node_id,
+                        "node_function_map": {}
                     }
+                    # Solo agregar al mapa si el nodo tiene una función asignada
+                    if self.assigned_function is not None:
+                        ack_packet["node_function_map"][self.node.node_id] = self.assigned_function
+
                     self.send_packet(self.broadcast_state.parent_node, ack_packet)
 
             case PacketType.ACK:
                 print(f"[Node_ID={self.node.node_id}] Received ACK for message ID {packet['message_id']}")
 
                 # Verificar si el mensaje ID coincide con el broadcast actual
-                if self.broadcast_state and packet["message_id"] == self.broadcast_state.message_id:
                     # Incrementar el contador de ACKs recibidos
-                    if packet["from_node_id"] not in self.broadcast_state.received_acks:
-                        self.broadcast_state.increment_acks_received(packet["from_node_id"])
-                    else:
-                        print(f"[Node_ID={self.node.node_id}] Duplicate ACK received from Node {packet['from_node_id']}. Ignoring.")
+                # if self.broadcast_state and packet["message_id"] == self.broadcast_state.message_id:
+                if packet["from_node_id"] not in self.broadcast_state.received_acks:
+                    self.broadcast_state.increment_acks_received(packet["from_node_id"])
+                    acks_left = self.broadcast_state.expected_acks - self.broadcast_state.acks_received
+                    print(f"[Node_ID={self.node.node_id}] {acks_left} ACKs left")
+                # else:
+                #     print(f"[Node_ID={self.node.node_id}] Duplicate ACK received from Node {packet['from_node_id']}. Ignoring.")
 
-                    # Verificar si se recibieron todos los ACKs esperados
-                    if self.broadcast_state.acks_received == self.broadcast_state.expected_acks:
-                        print(f"[Node_ID={self.node.node_id}] All ACKs received. Sending ACK to parent node {self.broadcast_state.parent_node}.")
+                # Verificar si se recibieron todos los ACKs esperados
+                if self.broadcast_state.acks_received == self.broadcast_state.expected_acks:
+                    print(f"[Node_ID={self.node.node_id}] All ACKs received. Sending ACK to parent node {self.broadcast_state.parent_node}.")
 
-                        # Enviar ACK al nodo padre
-                        if self.broadcast_state.parent_node is not None:
-                            ack_packet = {
-                                "type": PacketType.ACK,
-                                "message_id": self.broadcast_state.message_id,
-                                "from_node_id": self.node.node_id
-                            }
-                            self.send_packet(self.broadcast_state.parent_node, ack_packet)
+                    # Enviar ACK al nodo padre
+                    if self.broadcast_state.parent_node is not None:
+                        ack_packet = {
+                            "type": PacketType.ACK,
+                            "message_id": self.broadcast_state.message_id,
+                            "from_node_id": self.node.node_id
+                        }
 
-                        # Marcar el broadcast como completado
-                        self.broadcast_state.mark_completed()
+                        if "node_function_map" not in packet:
+                            ack_packet["node_function_map"] = {}
+                        if self.assigned_function is not None:
+                            ack_packet["node_function_map"][self.node.node_id] = self.assigned_function
+
+                        self.send_packet(self.broadcast_state.parent_node, ack_packet)
+
+                    # Marcar el broadcast como completado
+                    self.broadcast_state.mark_completed()
 
             # case PacketType.PROBE:
             #     time.sleep(5)
