@@ -1,4 +1,0 @@
-{
-  "typeCheckingMode": "off",
-  "exclude": ["node_modules", ".venv", "__pycache__"]
-}
