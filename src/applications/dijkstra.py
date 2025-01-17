@@ -14,6 +14,8 @@ class NodeFunction(Enum):
 
 FUNCTION_SEQ = [NodeFunction.A, NodeFunction.B, NodeFunction.C]
 
+global_function_counters = {func: 0 for func in FUNCTION_SEQ}
+
 class BroadcastState:
     def __init__(self):
         self.message_id = None            # Identificador único del mensaje de broadcast
@@ -107,25 +109,48 @@ class DijkstraApplication(Application):
     def select_next_function_node(self, packet):
         """
         Selecciona el siguiente nodo que debe procesar la próxima función faltante.
-        Si todos los nodos vecinos no tienen función asignada, elige el nodo con menor peso en la arista.
+        Si todos los nodos vecinos no tienen la función correspondiente en el mapa, elige el nodo con menor peso en la arista.
         """
         next_function = packet["functions_sequence"][0]  # Obtener la próxima función de la secuencia
         neighbors = self.node.network.get_neighbors(self.node.node_id)
 
-        # Filtrar nodos que puedan procesar la próxima función
-        valid_neighbors = [neighbor for neighbor in neighbors if self.node.network.nodes[neighbor].get_assigned_function() == next_function]
+        print(f"[Node_ID={self.node.node_id}] Selecting next node to process function: {next_function}")
+        print(f"[Node_ID={self.node.node_id}] Neighbors: {neighbors}")
+        print(f"[Node_ID={self.node.node_id}] Functions to node map: {packet['node_function_map']}")
+
+        # Filtrar nodos que puedan procesar la próxima función según el mapa functions_to_node_map
+        valid_neighbors = [
+            neighbor for neighbor in neighbors
+            if packet["node_function_map"].get(neighbor) == next_function
+        ]
+
+        print(f"[Node_ID={self.node.node_id}] Valid neighbors for function {next_function}: {valid_neighbors}")
 
         # Si hay nodos que pueden procesar la próxima función, elegir el más cercano
         if valid_neighbors:
-            return min(valid_neighbors, key=lambda n: self.node.network.get_latency(self.node.node_id, n))
+            selected_node = min(valid_neighbors, key=lambda n: self.node.network.get_latency(self.node.node_id, n))
+            print(f"[Node_ID={self.node.node_id}] Selected node {selected_node} to process function {next_function}")
+            return selected_node
 
-        # Si no hay nodos que puedan procesar la función, elegir el más cercano sin función asignada
-        nodes_without_function = [neighbor for neighbor in neighbors if self.node.network.nodes[neighbor].get_assigned_function() is None]
-        if nodes_without_function:
-            return min(nodes_without_function, key=lambda n: self.node.network.get_latency(self.node.node_id, n))
+        # Si no hay vecinos válidos para procesar la función requerida
+        # Considerar solo nodos vecinos que no tienen función asignada
+        neighbors_without_function = [
+            neighbor for neighbor in neighbors
+            if neighbor not in packet["node_function_map"]
+        ]
+
+        print(f"[Node_ID={self.node.node_id}] Neighbors without assigned function: {neighbors_without_function}")
+
+        if neighbors_without_function:
+            selected_node = min(neighbors_without_function, key=lambda n: self.node.network.get_latency(self.node.node_id, n))
+            print(f"[Node_ID={self.node.node_id}] Selected node {selected_node} without assigned function")
+            return selected_node
 
         # Si todos los nodos tienen función asignada pero ninguna coincide, elegir el más cercano
-        return min(neighbors, key=lambda n: self.node.network.get_latency(self.node.node_id, n))
+        print(f"[Node_ID={self.node.node_id}] No valid function match. Selecting closest node.")
+        selected_node = min(neighbors, key=lambda n: self.node.network.get_latency(self.node.node_id, n))
+        print(f"[Node_ID={self.node.node_id}] Selected closest node {selected_node}")
+        return selected_node
 
     def send_packet(self, to_node_id, packet):
 
@@ -186,7 +211,8 @@ class SenderDijkstraApplication(DijkstraApplication):
             "function_counters": {func: 0 for func in FUNCTION_SEQ},  # Contadores de funciones asignadas
             "hops": 0,  # Contador de saltos
             "time": 0,  # Tiempo total acumulado del paquete
-            "max_hops": 250  # Número máximo de saltos permitidos
+            "max_hops": 250,  # Número máximo de saltos permitidos
+            "node_function_map": self.broadcast_state.node_function_map
         }
         next_node = self.select_next_function_node(packet)
 
@@ -294,6 +320,30 @@ class SenderDijkstraApplication(DijkstraApplication):
         print(f"[Node_ID={self.node.node_id}] Received packet {packet}")
 
         match packet["type"]:
+            case PacketType.PACKET_HOP:
+                print(f"[Node_ID={self.node.node_id}] Processing packet at node {self.node}: {packet}")
+
+                # lógica para reenviar el paquete al siguiente nodo si faltan funciones
+                if packet["functions_sequence"]:
+                    print(f"[Node_ID={self.node.node_id}] Remaining functions: {packet['functions_sequence']}")
+                    self.previous_node_id = packet["from_node_id"]
+
+                    # Seleccionar el siguiente nodo
+                    next_node = self.select_next_function_node(packet)
+
+                    # Verificar si el siguiente nodo es válido
+                    if next_node is None or self.node.network.nodes[next_node].status:  # TODO: Crear un método auxiliar is_up o algo similar
+                        episode_number = packet["episode_number"]
+                        print(f"[Node_ID={self.node.node_id}] Restarting episode {episode_number} because pre calculated shortest path is broken. Packet={packet}")
+                        self.start_episode(episode_number)
+                    else:
+                        # Reenviar el paquete al siguiente nodo
+                        self.send_packet(next_node, packet)
+                else:
+                    # Si la secuencia de funciones está completa
+                    print(f"[Node_ID={self.node.node_id}] Function sequence completed.")
+                    print(f"[Node_ID={self.node.node_id}] Episode {packet.episode_number} completed with total time {packet.time}")
+
             case PacketType.SUCCESS:
                 if packet.is_sequence_completed():
                     print(f"[Node_ID={self.node.node_id}] Episode {packet.episode_number} completed with total time {packet.time}")
@@ -362,21 +412,13 @@ class SenderDijkstraApplication(DijkstraApplication):
                         self.send_packet(self.broadcast_state.parent_node, ack_packet)
 
             case PacketType.BROKEN_PATH:
-                print(f"[Node_ID={self.node.node_id}] Restarting episode {packet.episode_number} because pre calculated shortest path is broken. Packet={packet}")
-                self.start_episode(packet.episode_number)
+                episode_number = packet["episode_number"]
+                print(f"[Node_ID={self.node.node_id}] Restarting episode {episode_number} because pre calculated shortest path is broken. Packet={packet}")
+                self.start_episode(episode_number)
 
             case _:
-                print(f"[Node_ID={self.node.node_id}] Received unknown packet type: {packet.type}")
-
-        # else:
-        #     self.previous_node_id = packet.from_node_id
-        #     next_node = self.select_next_function_node(packet)
-        #
-        #     if next_node == None or self.node.network.nodes[next_node].status: # todo: crear un método auxiliar isup o algo así
-        #         print(f"[Node_ID={self.node.node_id}] Restarting episode {packet.episode_number} because pre calculated shortest path is broken. Packet={packet}")
-        #         self.start_episode(packet.episode_number)
-        #
-        #     self.send_packet(next_node, packet)
+                packet_type = packet["type"]
+                print(f"[Node_ID={self.node.node_id}] Received unknown packet type: {packet_type}")
 
     def _log_routes(self):
         """
@@ -451,70 +493,71 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                 self.broadcast_state.received_messages.add(message_id)
                 self.broadcast_state.parent_node = packet["from_node_id"]
 
+                #
                 # Asignarse una función si no tiene una ya asignada
+                #
                 if not self.assigned_function:
                     # Buscar la función menos asignada globalmente
-                    if packet["function_counters"]:
-                        available_functions = list(packet["function_counters"].items())
+                    min_count = min(global_function_counters.values())
+                    least_assigned_functions = [
+                        func for func, count in global_function_counters.items() if count == min_count
+                    ]
 
-                        # Filtrar las funciones menos asignadas
-                        min_count = min(count for _, count in available_functions)
-                        least_assigned_functions = [func for func, count in available_functions if count == min_count]
+                    # Seleccionar una función aleatoriamente de las menos asignadas
+                    function_to_assign = random.choice(least_assigned_functions)
 
-                        # Seleccionar una función aleatoriamente de las menos asignadas
-                        function_to_assign = random.choice(least_assigned_functions)
+                    # Asignar la función al nodo
+                    self.assigned_function = function_to_assign
 
-                        # Asignar la función al nodo
-                        self.assigned_function = function_to_assign
+                    # Incrementar el contador global de asignaciones para la función
+                    global_function_counters[function_to_assign] += 1
 
-                        # Incrementar el contador de asignaciones para la función
-                        packet["function_counters"][function_to_assign] += 1
+                    print(f"[Node_ID={self.node.node_id}] Assigned function: {self.assigned_function}")
 
-                        print(f"[Node_ID={self.node.node_id}] Assigned function: {self.assigned_function}")
+                    # Actualizar el diccionario de mapeo de funciones en el broadcast state
+                    self.broadcast_state.node_function_map[self.node.node_id] = self.assigned_function
+                    packet["node_function_map"][self.node.node_id] = self.assigned_function
 
-                        # Actualizar el diccionario de mapeo de funciones en el broadcast state
+                    print(f"[Node_ID={self.node.node_id}] Added function to node function dict: {self.broadcast_state.node_function_map}")
+
+                # Propagar el paquete a vecinos no visitados
+                neighbors = self.node.network.get_neighbors(self.node.node_id)
+                neighbors_to_broadcast = [
+                    n for n in neighbors if n not in packet["visited_nodes"]
+                ]
+
+                # Inicializar contador de ACKs esperados
+                self.broadcast_state.expected_acks = len(neighbors_to_broadcast)
+                print(f"[Node_ID={self.node.node_id}] {self.broadcast_state.expected_acks} expected ACKs from nodes {neighbors_to_broadcast}")
+
+                for neighbor in neighbors_to_broadcast:
+                    broadcast_packet = {
+                        "type": PacketType.BROADCAST,
+                        "message_id": message_id,
+                        "from_node_id": self.node.node_id,
+                        "episode_number": packet["episode_number"],
+                        "visited_nodes": packet["visited_nodes"].copy(),
+                        "functions_sequence": FUNCTION_SEQ.copy(),
+                        "function_counters": {func: 0 for func in FUNCTION_SEQ},
+                        "node_function_map": packet["node_function_map"]
+                    }
+                    broadcast_packet["visited_nodes"].add(self.node.node_id)
+                    self.send_packet(neighbor, broadcast_packet)
+
+                # Enviar ACK al nodo padre si no hay vecinos a los que propagar
+                if not neighbors_to_broadcast:
+                    ack_packet = {
+                        "type": PacketType.ACK,
+                        "message_id": message_id,
+                        "from_node_id": self.node.node_id,
+                        "node_function_map": {}
+                    }
+                    # Solo agregar al mapa si el nodo tiene una función asignada
+                    if self.assigned_function is not None:
+                        ack_packet["node_function_map"][self.node.node_id] = self.assigned_function
                         self.broadcast_state.node_function_map[self.node.node_id] = self.assigned_function
-                        packet["node_function_map"][self.node.node_id] = self.assigned_function
 
-                        print(f"[Node_ID={self.node.node_id}] Added function to node function dict: {self.broadcast_state.node_function_map}")
-                            # Propagar el paquete a vecinos no visitados
-                        neighbors = self.node.network.get_neighbors(self.node.node_id)
-                        neighbors_to_broadcast = [
-                            n for n in neighbors if n not in packet["visited_nodes"]
-                        ]
-
-                        # Inicializar contador de ACKs esperados
-                        self.broadcast_state.expected_acks = len(neighbors_to_broadcast)
-                        print(f"[Node_ID={self.node.node_id}] {self.broadcast_state.expected_acks} expected ACKs from nodes {neighbors_to_broadcast}")
-
-                        for neighbor in neighbors_to_broadcast:
-                            broadcast_packet = {
-                                "type": PacketType.BROADCAST,
-                                "message_id": message_id,
-                                "from_node_id": self.node.node_id,
-                                "episode_number": packet["episode_number"],
-                                "visited_nodes": packet["visited_nodes"].copy(),
-                                "functions_sequence": FUNCTION_SEQ.copy(),
-                                "function_counters": {func: 0 for func in FUNCTION_SEQ},
-                                "node_function_map": packet["node_function_map"]
-                            }
-                            broadcast_packet["visited_nodes"].add(self.node.node_id)
-                            self.send_packet(neighbor, broadcast_packet)
-
-                        # Enviar ACK al nodo padre si no hay vecinos a los que propagar
-                        if not neighbors_to_broadcast:
-                            ack_packet = {
-                                "type": PacketType.ACK,
-                                "message_id": message_id,
-                                "from_node_id": self.node.node_id,
-                                "node_function_map": {}
-                            }
-                            # Solo agregar al mapa si el nodo tiene una función asignada
-                            if self.assigned_function is not None:
-                                ack_packet["node_function_map"][self.node.node_id] = self.assigned_function
-                                self.broadcast_state.node_function_map[self.node.node_id] = self.assigned_function
-
-                            self.send_packet(self.broadcast_state.parent_node, ack_packet)
+                    self.send_packet(self.broadcast_state.parent_node, ack_packet)
 
             case PacketType.ACK:
                 print(f"[Node_ID={self.node.node_id}] Received ACK for message ID {packet['message_id']}")
@@ -560,27 +603,72 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                     self.broadcast_state.mark_completed()
 
             case PacketType.PACKET_HOP:
-                if not self.assigned_function:
+
+                # Si el nodo tiene una función asignada, procesarla
+                if self.assigned_function:
+                    if packet["functions_sequence"] and packet["functions_sequence"][0] == self.assigned_function:
+                        # Procesar la función asignada
+                        print(f"[Node_ID={self.node.node_id}] Processing assigned function: {self.assigned_function}")
+
+                        # Eliminar la función procesada de la secuencia
+                        packet["functions_sequence"].pop(0)
+                        print(f"[Node_ID={self.node.node_id}] Function {self.assigned_function} removed from sequence. Remaining: {packet['functions_sequence']}")
+                else:
                     function_to_assign = packet.next_function()
                     self.assigned_function = function_to_assign
                     packet.increment_function_counter(function_to_assign)
                     print(f"[Node_ID={self.node.node_id}] Assigned function: {self.assigned_function}")
 
-                print(f"[Node_ID={self.node.node_id}] Processing packet at node {self.node}: {packet}")
+                    print(f"[Node_ID={self.node.node_id}] Processing assigned function: {self.assigned_function}")
+
+                    # Eliminar la función procesada de la secuencia
+                    packet["functions_sequence"].pop(0)
+                    print(f"[Node_ID={self.node.node_id}] Function {self.assigned_function} removed from sequence. Remaining: {packet['functions_sequence']}")
+
                 # lógica para reenviar el paquete al siguiente nodo si faltan funciones
-                if not packet.is_sequence_completed():
-                    self.previous_node_id = packet.from_node_id
+                if packet["functions_sequence"]:
+                    self.previous_node_id = packet["from_node_id"]
+
+                    # Seleccionar el siguiente nodo
                     next_node = self.select_next_function_node(packet)
 
-                    if next_node == None or self.node.network.nodes[next_node].status: # todo: crear un método auxiliar isup o algo así
-                        print(f"[Node_ID={self.node.node_id}] Broken path at node {self.node}: {packet}")
-                        broken_path_packet = PACKET(episode_number, self.node.node_id, PacketType.BROKEN_PATH)
-                        self.send_packet(previous_node_id, broken_path_packet)
+                    print("nodes")
+                    print(self.node.network.nodes)
 
-                    self.send_packet(next_node, packet)
+                    print("node status")
+                    print(self.node.network.nodes[next_node].status)
+
+                    # Verificar si el siguiente nodo es válido
+                    if next_node is None or not self.node.network.nodes[next_node].status:  # TODO: Crear un método auxiliar is_up o algo similar
+                        print(f"[Node_ID={self.node.node_id}] Broken path at node {self.node.node_id}: {packet}")
+
+                        # Crear un paquete BROKEN_PATH como dict
+                        broken_path_packet = {
+                            "type": PacketType.BROKEN_PATH,
+                            "episode_number": packet["episode_number"],
+                            "from_node_id": self.node.node_id,
+                            "hops": packet["hops"] + 1
+                        }
+
+                        # Enviar el paquete BROKEN_PATH al nodo anterior
+                        self.send_packet(self.previous_node_id, broken_path_packet)
+                    else:
+                        # Reenviar el paquete al siguiente nodo
+                        self.send_packet(next_node, packet)
                 else:
-                    success_packet = PACKET(episode_number, self.node.node_id, PacketType.SUCCESS)
-                    self.send_packet(previous_node_id, success_packet)
+                    # Si la secuencia de funciones está completa
+                    print(f"[Node_ID={self.node.node_id}] Function sequence completed.")
+
+                    # Crear un paquete SUCCESS como dict
+                    success_packet = {
+                        "type": PacketType.SUCCESS,
+                        "episode_number": packet["episode_number"],
+                        "from_node_id": self.node.node_id,
+                        "hops": packet["hops"] + 1
+                    }
+
+                    # Enviar el paquete SUCCESS al nodo anterior
+                    self.send_packet(self.previous_node_id, success_packet)
 
             case PacketType.BROKEN_PATH:
                 self.send_packet(previous_node_id, packet)
@@ -593,29 +681,3 @@ class IntermediateDijkstraApplication(DijkstraApplication):
         Devuelve la función asignada a este nodo.
         """
         return [self.assigned_function] if self.assigned_function else []
-
-# Diccionario global para llevar el conteo de funciones asignadas
-GLOBAL_FUNCTION_COUNTER = {func: 0 for func in FUNCTION_SEQ}
-
-def assign_function_to_node(node):
-    """
-    Asigna una función a un nodo basándose en el contador global.
-    """
-    global GLOBAL_FUNCTION_COUNTER
-
-    # Obtener la función menos asignada
-    min_count = min(GLOBAL_FUNCTION_COUNTER.values())
-    least_assigned_functions = [func for func, count in GLOBAL_FUNCTION_COUNTER.items() if count == min_count]
-
-    # Seleccionar una función aleatoriamente de las menos asignadas
-    function_to_assign = random.choice(least_assigned_functions)
-
-    # Asignar la función al nodo y actualizar el contador global
-    node.assigned_function = function_to_assign
-    GLOBAL_FUNCTION_COUNTER[function_to_assign] += 1
-
-    print(f"[Node_ID={node.node_id}] Assigned global function: {function_to_assign}")
-
-    # Actualizar el mapeo en el broadcast state (si aplica)
-    if hasattr(node, 'broadcast_state') and node.broadcast_state:
-        node.broadcast_state.node_function_map[node.node_id] = function_to_assign
