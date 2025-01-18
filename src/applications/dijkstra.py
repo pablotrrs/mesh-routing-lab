@@ -186,28 +186,26 @@ class SenderDijkstraApplication(DijkstraApplication):
         self.routes = {}  # Almacena las rutas más cortas calculadas
         self.previous_node_id = None
 
-    def start_episode(self, episode_number) -> None:
-        """
-        Inicia un episodio calculando las rutas más cortas y enviando el paquete.
-        """
-        print(f"[Node_ID={self.node.node_id}] Starting broadcast for episode {episode_number}")
+    def start_episode(self, episode_number, calculate_shortest_path=False) -> None:
+        if calculate_shortest_path or episode_number == 1:
+            print(f"[Node_ID={self.node.node_id}] Starting broadcast for episode {episode_number}")
 
-        # Iniciar el broadcast para recopilar latencias y asignar funciones
-        message_id = f"broadcast_{self.node.node_id}_{episode_number}"
+            # Iniciar el broadcast para recopilar latencias y asignar funciones
+            message_id = f"broadcast_{self.node.node_id}_{episode_number}"
 
-        self.broadcast_state = BroadcastState()
-        self.start_broadcast(message_id)
+            self.broadcast_state = BroadcastState()
+            self.start_broadcast(message_id)
 
-        # Esperar hasta que se complete el broadcast (ACKs recibidos)
-        while self.broadcast_state.acks_received < self.broadcast_state.expected_acks:
-            pass  # Espera activa; se puede mejorar con eventos o temporizadores
+            # Esperar hasta que se complete el broadcast (ACKs recibidos)
+            while self.broadcast_state.acks_received < self.broadcast_state.expected_acks:
+                pass  # Espera activa; se puede mejorar con eventos o temporizadores
 
-        print(f"[Node_ID={self.node.node_id}] Broadcast completed. Computing shortest paths...")
-        self.compute_shortest_paths()
+            print(f"[Node_ID={self.node.node_id}] Broadcast completed. Computing shortest paths...")
+            self.compute_shortest_paths()
 
-        # Esperar hasta que la bandera paths_computed sea True
-        while not self.paths_computed:
-            pass
+            # Esperar hasta que la bandera paths_computed sea True
+            while not self.paths_computed:
+                pass
 
         print(f"[Node_ID={self.node.node_id}] Starting episode {episode_number}")
         packet = {
@@ -343,7 +341,7 @@ class SenderDijkstraApplication(DijkstraApplication):
                     if next_node is None or self.node.network.nodes[next_node].status:  # TODO: Crear un método auxiliar is_up o algo similar
                         episode_number = packet["episode_number"]
                         print(f"[Node_ID={self.node.node_id}] Restarting episode {episode_number} because pre calculated shortest path is broken. Packet={packet}")
-                        self.start_episode(episode_number)
+                        self.start_episode(episode_number, True)
                     else:
                         # Reenviar el paquete al siguiente nodo
                         self.callback_stack.append(packet["from_node_id"])
@@ -426,7 +424,7 @@ class SenderDijkstraApplication(DijkstraApplication):
             case PacketType.BROKEN_PATH:
                 episode_number = packet["episode_number"]
                 print(f"[Node_ID={self.node.node_id}] Restarting episode {episode_number} because pre calculated shortest path is broken. Packet={packet}")
-                self.start_episode(episode_number)
+                self.start_episode(episode_number, True)
 
             case _:
                 packet_type = packet["type"]
