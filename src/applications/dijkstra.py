@@ -105,6 +105,7 @@ class DijkstraApplication(Application):
     def __init__(self, node):
         super().__init__(node)
         self.routes = {}  # Almacena las rutas más cortas calculadas
+        self.callback_stack = []
 
     def select_next_function_node(self, packet):
         """
@@ -133,10 +134,10 @@ class DijkstraApplication(Application):
             return selected_node
 
         # Si no hay vecinos válidos para procesar la función requerida
-        # Considerar solo nodos vecinos que no tienen función asignada
+        # Considerar solo nodos vecinos que no tienen función asignada, excluyendo explícitamente el nodo 0 (sender)
         neighbors_without_function = [
             neighbor for neighbor in neighbors
-            if neighbor not in packet["node_function_map"]
+            if neighbor not in packet["node_function_map"] and neighbor != 0
         ]
 
         print(f"[Node_ID={self.node.node_id}] Neighbors without assigned function: {neighbors_without_function}")
@@ -146,11 +147,17 @@ class DijkstraApplication(Application):
             print(f"[Node_ID={self.node.node_id}] Selected node {selected_node} without assigned function")
             return selected_node
 
-        # Si todos los nodos tienen función asignada pero ninguna coincide, elegir el más cercano
-        print(f"[Node_ID={self.node.node_id}] No valid function match. Selecting closest node.")
-        selected_node = min(neighbors, key=lambda n: self.node.network.get_latency(self.node.node_id, n))
-        print(f"[Node_ID={self.node.node_id}] Selected closest node {selected_node}")
-        return selected_node
+        # Si todos los nodos tienen función asignada pero ninguna coincide, elegir el más cercano que no sea el nodo 0
+        valid_closest_neighbors = [n for n in neighbors if n != 0]
+
+        if valid_closest_neighbors:
+            selected_node = min(valid_closest_neighbors, key=lambda n: self.node.network.get_latency(self.node.node_id, n))
+            print(f"[Node_ID={self.node.node_id}] Selected closest node {selected_node} (excluding 0)")
+            return selected_node
+
+        # En caso extremo, si solo queda el nodo 0 como opción (por diseño, no debería ocurrir)
+        print(f"[Node_ID={self.node.node_id}] No other nodes available. Defaulting to node 0.")
+        return 0
 
     def send_packet(self, to_node_id, packet):
 
@@ -221,6 +228,7 @@ class SenderDijkstraApplication(DijkstraApplication):
             return
 
         self.send_packet(next_node, packet)
+        return
 
     def start_broadcast(self, message_id):
         """
@@ -338,15 +346,19 @@ class SenderDijkstraApplication(DijkstraApplication):
                         self.start_episode(episode_number)
                     else:
                         # Reenviar el paquete al siguiente nodo
+                        self.callback_stack.append(packet["from_node_id"])
                         self.send_packet(next_node, packet)
                 else:
                     # Si la secuencia de funciones está completa
                     print(f"[Node_ID={self.node.node_id}] Function sequence completed.")
-                    print(f"[Node_ID={self.node.node_id}] Episode {packet.episode_number} completed with total time {packet.time}")
+                    # print(f"[Node_ID={self.node.node_id}] Episode {packet.episode_number} completed with total time {packet.time}")
+                    episode_number = packet["episode_number"]
+                    print(f"[Node_ID={self.node.node_id}] Episode {episode_number} completed")
 
             case PacketType.SUCCESS:
-                if packet.is_sequence_completed():
-                    print(f"[Node_ID={self.node.node_id}] Episode {packet.episode_number} completed with total time {packet.time}")
+                # print(f"[Node_ID={self.node.node_id}] Episode {packet.episode_number} completed with total time {packet.time}")
+                episode_number = packet["episode_number"]
+                print(f"[Node_ID={self.node.node_id}] Episode {episode_number} completed")
 
             case PacketType.BROADCAST:
                 print(f"[Node_ID={self.node.node_id}] Received BROADCAST packet with ID {packet.message_id}")
@@ -632,11 +644,7 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                     # Seleccionar el siguiente nodo
                     next_node = self.select_next_function_node(packet)
 
-                    print("nodes")
-                    print(self.node.network.nodes)
-
-                    print("node status")
-                    print(self.node.network.nodes[next_node].status)
+                    print(next_node is None or not self.node.network.nodes[next_node].status)
 
                     # Verificar si el siguiente nodo es válido
                     if next_node is None or not self.node.network.nodes[next_node].status:  # TODO: Crear un método auxiliar is_up o algo similar
@@ -651,9 +659,10 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                         }
 
                         # Enviar el paquete BROKEN_PATH al nodo anterior
-                        self.send_packet(self.previous_node_id, broken_path_packet)
+                        self.send_packet(packet["from_node_id"], broken_path_packet)
                     else:
                         # Reenviar el paquete al siguiente nodo
+                        self.callback_stack.append(packet["from_node_id"])
                         self.send_packet(next_node, packet)
                 else:
                     # Si la secuencia de funciones está completa
@@ -668,13 +677,16 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                     }
 
                     # Enviar el paquete SUCCESS al nodo anterior
-                    self.send_packet(self.previous_node_id, success_packet)
+                    from_node_id = packet["from_node_id"]
+                    print(f"[Node_ID={self.node.node_id}] Sending SUCCESS packet back to node {from_node_id}.")
+                    self.send_packet(from_node_id, success_packet)
 
             case PacketType.BROKEN_PATH:
                 self.send_packet(previous_node_id, packet)
 
             case PacketType.SUCCESS:
-                self.send_packet(previous_node_id, packet)
+                previous_node = self.callback_stack.pop()
+                self.send_packet(previous_node, packet)
 
     def get_assigned_functions(self):
         """
