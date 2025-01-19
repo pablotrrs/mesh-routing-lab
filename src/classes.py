@@ -1,13 +1,10 @@
-from enum import Enum
-from dataclasses import dataclass
-import random
 import time
 import numpy as np
 import yaml
-import os
 from abc import ABC, abstractmethod
 from visualization import animate_network, generate_heat_map, print_q_table
 from tabulate import tabulate
+import math
 
 class Application(ABC):
     def __init__(self, node):
@@ -22,7 +19,7 @@ class Application(ABC):
         pass
 
 class Node:
-    def __init__(self, node_id, network):
+    def __init__(self, node_id, network, position):
         self.node_id = node_id
         self.network = network
         self.application = None
@@ -30,6 +27,7 @@ class Node:
         self.lifetime = None
         self.reconnect_time = None
         self.status = None
+        self.position = position
 
     def install_application(self, application_class):
         self.application = application_class(self)
@@ -55,7 +53,7 @@ class Node:
         if self.application and hasattr(self.application, 'get_assigned_function'):
             return self.application.get_assigned_function()
         return None
-    
+
     def update_status(self):
         if not self.is_sender:
             if self.status:
@@ -78,10 +76,6 @@ class Node:
 
     def __repr__(self) -> str:
         return self.__str__()
-
-class PacketType(Enum):
-    PACKET_HOP = "PACKET_HOP"
-    CALLBACK = "CALLBACK"
 
 class Network:
     def __init__(self):
@@ -107,6 +101,47 @@ class Network:
         neighbors = self.connections.get(node_id, [])
         return list(set(neighbor for neighbor in neighbors if neighbor != node_id))
 
+    def get_nodes(self):
+        """
+        Returns a list of all node IDs in the network.
+        """
+        return list(self.nodes.keys())
+
+    def send_dict(self, from_node_id, to_node_id, packet):
+
+        # Initialize the packet log for the episode if it doesn't exist
+        if "episode_number" in packet:
+            if packet["episode_number"] not in self.packet_log:
+                self.packet_log[packet["episode_number"]] = []
+
+            # Log the packet
+            self.packet_log[packet["episode_number"]].append({
+                'from': from_node_id,
+                'to': to_node_id,
+                'packet': packet
+            })
+
+        hops = packet["hops"]
+        max_hops = packet["max_hops"]
+
+        # validate and send
+        if to_node_id in self.connections.get(from_node_id, []) and \
+            from_node_id in self.active_nodes and \
+            to_node_id in self.active_nodes and \
+            packet["hops"] < packet["max_hops"]:
+
+            latency = self.get_latency(from_node_id, to_node_id)
+            print(f"[Network] Sending packet from Node {from_node_id} to Node {to_node_id} with latency {latency:.6f} seconds")
+            print(f"[Network] Packet hops: {hops} of {max_hops} max hops")
+
+            time.sleep(latency)
+
+            self.nodes[to_node_id].application.receive_packet(packet)
+        elif hops >= max_hops:
+            print(f"[Network] Packet from Node {from_node_id} was lost. Max hops reached.")
+        else:
+            print(f"[Network] Failed to send packet: Node {to_node_id} is not reachable from Node {from_node_id}")
+
     def send(self, from_node_id, to_node_id, packet):
 
         # Initialize the packet log for the episode if it doesn't exist
@@ -126,10 +161,14 @@ class Network:
             to_node_id in self.active_nodes and \
             packet.hops < packet.max_hops:
 
-            print(f"[Network] Sending packet from Node {from_node_id} to Node {to_node_id}")
+            latency = self.get_latency(from_node_id, to_node_id)
+            print(f"[Network] Sending packet from Node {from_node_id} to Node {to_node_id} with latency {latency:.6f} seconds")
             print(f"[Network] Packet hops: {packet.hops} of {packet.max_hops} max hops")
+
+            time.sleep(latency)
+
             self.nodes[to_node_id].application.receive_packet(packet)
-        elif packet.hops >= packet.max_hops:            
+        elif packet.hops >= packet.max_hops:
             print(f"[Network] Packet from Node {from_node_id} was lost. Max hops reached.")
         else:
             print(f"[Network] Failed to send packet: Node {to_node_id} is not reachable from Node {from_node_id}")
@@ -149,9 +188,10 @@ class Network:
         # Crear y añadir nodos
         for node_id, node_info in data['nodes'].items():
             node_id = int(node_id)
+            position = tuple(node_info['position']) if 'position' in node_info else None
 
-            # Siempre creamos instancias genéricas de Node
-            node = Node(node_id, network)
+            # Crear instancia de Node con posición
+            node = Node(node_id, network, position=position)
             network.add_node(node)
 
             # Identificar el nodo sender para devolverlo después
@@ -170,6 +210,18 @@ class Network:
                 network.connect_nodes(node_id, neighbor_id)
 
         return network, sender_node
+
+    # util methods to calculate latency on send considering positions
+    def get_distance(self, node_id1, node_id2):
+        """Calcula la distancia euclidiana entre dos nodos."""
+        pos1 = self.nodes[node_id1].position
+        pos2 = self.nodes[node_id2].position
+        return math.sqrt((pos1[0] - pos2[0])**2 + (pos1[1] - pos2[1])**2 + (pos1[2] - pos2[2])**2)
+
+    def get_latency(self, node_id1, node_id2, propagation_speed=3e8):
+        """Calcula la latencia de propagación entre dos nodos."""
+        distance = self.get_distance(node_id1, node_id2)
+        return distance / propagation_speed  # Latencia en segundos
 
     def __str__(self) -> str:
         result = ["\nNetwork Topology:"]

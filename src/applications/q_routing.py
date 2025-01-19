@@ -2,7 +2,7 @@ from enum import Enum
 from dataclasses import dataclass
 import random
 import time
-from classes import Application, PacketType
+from classes import Application
 from visualization import print_q_table
 
 ALPHA = 0.1
@@ -19,6 +19,10 @@ EPSILON_MIN = 0.1
 # - Q_x(d, y): Valor Q actual para el nodo actual (x) hacia el vecino (y).
 # - α (alpha): Tasa de aprendizaje.
 BELLMAN_EQ = lambda s, t, q_current: q_current + ALPHA * (s + t - q_current)
+
+class PacketType(Enum):
+    PACKET_HOP = "PACKET_HOP"
+    CALLBACK = "CALLBACK"
 
 class NodeFunction(Enum):
     A = "A"
@@ -85,7 +89,7 @@ class QRoutingApplication(Application):
             print(f'[Node_ID={self.node.node_id}] Performing exploration with epsilon={EPSILON:.4f}')
             valid_neighbors = [
                 neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id)
-                if self.node.network.nodes[neighbor].status
+                if self.node.network.nodes[neighbor].status # TODO: crear un método auxiliar isUp o algo así
             ]
             if valid_neighbors:
                 next_node = random.choice(valid_neighbors)
@@ -164,6 +168,7 @@ class QRoutingApplication(Application):
     def send_packet(self, to_node_id, packet) -> None:
 
         # ensure node is up and running
+        # TODO: me parece que de esto se tendría ya se encarga Network
         if not self.node.is_sender and not self.node.status:
             print(f'[Node_ID={self.node.node_id}] Node status is False. Packet not sent.')
             return
@@ -178,7 +183,7 @@ class QRoutingApplication(Application):
     def get_assigned_function(self):
         """Returns the function assigned to this node."""
         return self.assigned_function
-    
+
     def __str__(self) -> str:
         return f"Node(id={self.node.node_id}, neighbors={self.node.network.get_neighbors(self.node.node_id)})"
 
@@ -253,7 +258,7 @@ class SenderQRoutingApplication(QRoutingApplication):
         if self.callback_stack:
             self.send_packet(callback_data.previous_hop_node, packet)
             return
-        
+
         print_q_table(self)
         print(f'\n[Node_ID={self.node.node_id}] Episode {packet.episode_number} finished.')
 
