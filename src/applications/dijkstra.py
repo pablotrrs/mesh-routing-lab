@@ -6,6 +6,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Set
 import random
+from queue import PriorityQueue
 
 class NodeFunction(Enum):
     A = "A"
@@ -255,7 +256,7 @@ class SenderDijkstraApplication(DijkstraApplication):
     def compute_shortest_paths(self):
         """
         Calcula las rutas más cortas desde el nodo de origen a todos los demás nodos,
-        utilizando las latencias definidas en la clase Network.
+        utilizando una cola de prioridad para manejar eficientemente las latencias definidas en la clase Network.
         """
         self.paths_computed = False  # Inicializar la bandera en False
 
@@ -264,12 +265,14 @@ class SenderDijkstraApplication(DijkstraApplication):
         distances[self.node.node_id] = 0
         previous_nodes = {node_id: None for node_id in self.node.network.get_nodes()}
 
+        # Inicializar la cola de prioridad con el nodo fuente
         priority_queue = PriorityQueue()
-        priority_queue.put((0, self.node.node_id))
+        priority_queue.put((0, self.node.node_id))  # (distancia acumulada, nodo)
 
         visited = set()  # Conjunto de nodos visitados
 
         while not priority_queue.empty():
+            # Extraer el nodo con la menor distancia acumulada
             current_distance, current_node = priority_queue.get()
 
             if current_node in visited:  # Si el nodo ya fue visitado, saltarlo
@@ -279,11 +282,12 @@ class SenderDijkstraApplication(DijkstraApplication):
 
             # Iterar sobre los vecinos del nodo actual
             for neighbor in self.node.network.get_neighbors(current_node):
+                # Calcular la nueva distancia al vecino
                 distance = current_distance + self.node.network.get_latency(current_node, neighbor)
                 if distance < distances[neighbor]:  # Si se encuentra una ruta más corta
                     distances[neighbor] = distance
                     previous_nodes[neighbor] = current_node
-                    priority_queue.put((distance, neighbor))
+                    priority_queue.put((distance, neighbor))  # Insertar el vecino con la nueva distancia
 
         # Reconstruir rutas usando los nodos previos
         self.routes = self._reconstruct_paths(self.node.node_id, previous_nodes)
