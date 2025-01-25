@@ -68,6 +68,8 @@ if __name__ == "__main__":
 
     simulation = Simulation(network, sender_node)
 
+    print(f"Running simulation with {selected_algorithm.value}")
+
     match selected_algorithm:
         case Algorithm.Q_ROUTING:
 
@@ -82,7 +84,15 @@ if __name__ == "__main__":
             simulation.start(args.episodes)
 
         case Algorithm.DIJKSTRA:
-            raise NotImplementedError("Algorithm DIJKSTRA not yet implemented")
+            from applications.dijkstra import SenderDijkstraApplication, IntermediateDijkstraApplication
+
+            sender_node.install_application(SenderDijkstraApplication)
+
+            for node_id, node in network.nodes.items():
+                if node_id != sender_node.node_id:
+                    node.install_application(IntermediateDijkstraApplication)
+
+            simulation.start(args.episodes)
 
         case Algorithm.BELLMAN_FORD:
             from applications.bellman_ford import SenderBellmanFordApplication, IntermediateBellmanFordApplication

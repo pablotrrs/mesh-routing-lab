@@ -8,12 +8,27 @@
 nodes:
   0:
     type: sender
-    neighbors: [1, 2]
+    neighbors:
+      - 1
+      - 2
+    position: [0.0, 0.0, 0.0]
   1:
-    neighbors: [0, 3]
+    neighbors:
+      - 0
+      - 3
+    position: [100.0, 100.0, 0.0]
   2:
-    neighbors: [0, 3]
+    neighbors:
+      - 0
+      - 3
+    position: [100.0, -100.0, 0.0]
   3:
-    neighbors: [1, 2, 4]
+    neighbors:
+      - 1
+      - 2
+      - 4
+    position: [200.0, 0.0, 0.0]
   4:
-    neighbors: [3]
+    neighbors:
+      - 3
+    position: [300.0, 0.0, 0.0]
