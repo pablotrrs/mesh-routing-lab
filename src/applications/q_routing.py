@@ -364,6 +364,7 @@ class Packet:
         self.hops = 0  # Contador de saltos
         self.time = 0  # Tiempo total acumulado del paquete
         self.max_hops = 250 # Número máximo de saltos permitidos
+        self.is_delivered = False
 
     def increment_function_counter(self, function):
         """

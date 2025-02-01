@@ -1,10 +1,5 @@
 from enum import Enum
 from classes import Application
-from queue import PriorityQueue
-from tabulate import tabulate
-import time
-from dataclasses import dataclass, field
-from typing import Set
 import random
 from queue import PriorityQueue
 
@@ -195,7 +190,7 @@ class SenderDijkstraApplication(DijkstraApplication):
             message_id = f"broadcast_{self.node.node_id}_{episode_number}"
 
             self.broadcast_state = BroadcastState()
-            self.start_broadcast(message_id)
+            self.start_broadcast(message_id, episode_number)
 
             # Esperar hasta que se complete el broadcast (ACKs recibidos)
             while self.broadcast_state.acks_received < self.broadcast_state.expected_acks:
@@ -229,7 +224,7 @@ class SenderDijkstraApplication(DijkstraApplication):
         self.send_packet(next_node, packet)
         return
 
-    def start_broadcast(self, message_id):
+    def start_broadcast(self, message_id, episode_number):
         """
         Inicia el proceso de broadcast desde el nodo sender.
         """
@@ -238,11 +233,11 @@ class SenderDijkstraApplication(DijkstraApplication):
             "type": PacketType.BROADCAST,
             "message_id": message_id,
             "from_node_id": self.node.node_id,
-            "episode_number": 0,
+            "episode_number": episode_number,
             "visited_nodes": {self.node.node_id},
             "functions_sequence": FUNCTION_SEQ.copy(),
             "function_counters": {func: 0 for func in FUNCTION_SEQ},
-            "node_function_map": {}
+            "node_function_map": {},
         }
 
         # Inicializar el estado de broadcast
@@ -416,7 +411,8 @@ class SenderDijkstraApplication(DijkstraApplication):
                             "type": PacketType.ACK,
                             "message_id": message_id,
                             "from_node_id": self.node.node_id,
-                            "node_function_map": {}
+                            "node_function_map": {},
+                            "episode_number": packet.episode_number
                         }
                         # Solo agregar al mapa si el nodo tiene una función asignada
                         if self.assigned_function is not None:
@@ -492,7 +488,8 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                         "type": PacketType.ACK,
                         "message_id": message_id,
                         "from_node_id": self.node.node_id,
-                        "node_function_map": {}
+                        "node_function_map": {},
+                        "episode_number": packet["episode_number"]
                     }
                     # Solo agregar al mapa si el nodo tiene una función asignada
                     if self.assigned_function is not None:
@@ -564,7 +561,8 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                         "type": PacketType.ACK,
                         "message_id": message_id,
                         "from_node_id": self.node.node_id,
-                        "node_function_map": {}
+                        "node_function_map": {},
+                        "episode_number": packet["episode_number"]
                     }
                     # Solo agregar al mapa si el nodo tiene una función asignada
                     if self.assigned_function is not None:
@@ -608,7 +606,8 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                             "type": PacketType.ACK,
                             "message_id": message_id,
                             "from_node_id": self.node.node_id,
-                            "node_function_map": self.broadcast_state.node_function_map
+                            "node_function_map": self.broadcast_state.node_function_map,
+                            "episode_number": packet["episode_number"]
                         }
 
                         self.send_packet(self.broadcast_state.parent_node, ack_packet)

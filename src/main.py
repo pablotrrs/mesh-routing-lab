@@ -66,7 +66,7 @@ if __name__ == "__main__":
 
     print(network)
 
-    simulation = Simulation(network, sender_node)
+    simulation = Simulation(network, sender_node, args.episodes)
 
     print(f"Running simulation with {selected_algorithm.value}")
 
@@ -81,7 +81,7 @@ if __name__ == "__main__":
                 if node_id != sender_node.node_id:
                     node.install_application(IntermediateQRoutingApplication)
 
-            simulation.start(args.episodes)
+            simulation.start(selected_algorithm)
 
         case Algorithm.DIJKSTRA:
             from applications.dijkstra import SenderDijkstraApplication, IntermediateDijkstraApplication
@@ -92,7 +92,7 @@ if __name__ == "__main__":
                 if node_id != sender_node.node_id:
                     node.install_application(IntermediateDijkstraApplication)
 
-            simulation.start(args.episodes)
+            simulation.start(selected_algorithm)
 
         case Algorithm.BELLMAN_FORD:
             from applications.bellman_ford import SenderBellmanFordApplication, IntermediateBellmanFordApplication
@@ -103,4 +103,4 @@ if __name__ == "__main__":
                 if node_id != sender_node.node_id:
                     node.install_application(IntermediateBellmanFordApplication)
 
-            simulation.start(args.episodes)
+            simulation.start(selected_algorithm)
