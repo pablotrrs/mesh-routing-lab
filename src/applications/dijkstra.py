@@ -687,7 +687,8 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                     self.send_packet(from_node_id, success_packet)
 
             case PacketType.BROKEN_PATH:
-                self.send_packet(previous_node_id, packet)
+                previous_node = self.callback_stack.pop()
+                self.send_packet(previous_node, packet)
 
             case PacketType.SUCCESS:
                 previous_node = self.callback_stack.pop()

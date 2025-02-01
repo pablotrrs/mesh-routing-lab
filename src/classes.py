@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from visualization import animate_network, generate_heat_map, print_q_table
 from tabulate import tabulate
 import math
+import pandas as pd
 
 class Application(ABC):
     def __init__(self, node):
@@ -376,6 +377,7 @@ class Simulation:
         # Mostrar resultados finales de métricas
         print("\nFinal Metrics:")
         print(self.metrics[algorithm])
+        self.save_results_to_excel()
 
     def generate_dynamic_change_episodes(self, total_episodes, mean_interval):
         """
@@ -408,3 +410,33 @@ class Simulation:
         print("ZZZZAP")
         for node in self.network.nodes.values():
             node.update_status()
+
+    def save_results_to_excel(self, filename="../results/resultados_simulacion.xlsx"):
+        """
+        Guarda los datos de la simulación en un archivo Excel, con una hoja por algoritmo.
+        """
+        with pd.ExcelWriter(filename) as writer:
+            for algorithm, metrics in self.metrics.items():
+                num_episodes = self.episodes_number  # Número total de episodios
+
+                def pad_list(lst, length):
+                    """Asegura que la lista tenga el mismo tamaño que el número de episodios, rellenando con None."""
+                    return lst + [None] * (length - len(lst))
+
+                data = {
+                    "Episodio": list(range(1, num_episodes + 1)),
+                    "Latencia Promedio": pad_list(metrics["latencia_promedio"], num_episodes),
+                    "Consistencia Latencia": pad_list(metrics["consistencia_latencia"], num_episodes),
+                    "Tasa de Éxito": pad_list(metrics["tasa_exito"], num_episodes),
+                    "Cambio Dinámico": ["Sí" if ep in self.dynamic_change_episodes else "No" for ep in range(1, num_episodes + 1)],
+                    "Latencia Pre-Cambio": pad_list(metrics.get("latencia_pre_cambio", []), num_episodes),
+                    "Latencia Post-Cambio": pad_list(metrics.get("latencia_post_cambio", []), num_episodes),
+                    "Tasa de Éxito Pre-Cambio": pad_list(metrics.get("tasa_exito_pre_cambio", []), num_episodes),
+                    "Tasa de Éxito Post-Cambio": pad_list(metrics.get("tasa_exito_post_cambio", []), num_episodes),
+                }
+
+                df = pd.DataFrame(data)
+                sheet_name = algorithm[:31]  # Excel limita los nombres de hojas a 31 caracteres
+                df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+            print(f"\n📁 Resultados guardados en {filename}.")
