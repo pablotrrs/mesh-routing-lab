@@ -284,15 +284,38 @@ class Simulation:
         algorithm = algorithm_enum.name
         print(f"Algorithm is: {algorithm}")
 
+        # Generar episodios con cambios dinámicos antes de iniciar la simulación
+        self.dynamic_change_episodes = self.generate_dynamic_change_episodes(self.episodes_number, mean_interval=5)
+        print(f"[DEBUG] Episodes with Dynamic Changes: {self.dynamic_change_episodes}")
+
         for episode_number in range(1, self.episodes_number + 1):
             print(f'\n\n=== Starting episode #{episode_number} ===\n')
+
+            # Aplicar cambios dinámicos si este episodio está marcado
+            if episode_number in self.dynamic_change_episodes:
+                print(f"\n--- Dynamic Network Change in episode {episode_number} ---\n")
+
+                # Registrar métricas pre-cambio
+                print(f"[DEBUG] Registering pre-change metrics at episode #{episode_number}")
+                pre_latencia = self.metrics[algorithm]["latencia_promedio"][-1] if self.metrics[algorithm]["latencia_promedio"] else None
+                pre_tasa_exito = self.metrics[algorithm]["tasa_exito"][-1] if self.metrics[algorithm]["tasa_exito"] else None
+
+                self.metrics[algorithm].setdefault("latencia_pre_cambio", []).append(pre_latencia)
+                self.metrics[algorithm].setdefault("tasa_exito_pre_cambio", []).append(pre_tasa_exito)
+
+                print(f"[DEBUG] Saved pre-change Latency: {self.metrics[algorithm]['latencia_pre_cambio']}")
+                print(f"[DEBUG] Saved pre-change Success Rate: {self.metrics[algorithm]['tasa_exito_pre_cambio']}")
+
+                # Aplicar cambio dinámico
+                self.dynamic_network_change()
+                print(f"[DEBUG] Network change applied at episode {episode_number}")
 
             # Inicializar métricas del episodio
             latencias = []
             entregados = 0
             total_paquetes = 0
 
-            # print info for logging
+            # Print info for logging
             node_info = []
             for node in self.network.nodes.values():
                 if not node.is_sender:
@@ -307,98 +330,48 @@ class Simulation:
             print(tabulate(node_info, headers=headers, tablefmt="grid"))
             print("\n")
 
-            # perform the simulation
+            # Ejecutar la simulación del episodio
             self.sender_node.start_episode(episode_number)
 
-            # animate_network(
-            #     episode_number, self.network.packet_log[episode_number], list(self.network.nodes.keys()),
-            #     self.network.connections, self.network
-            # )
-
-            # print episode results
-
-            # print q table if algorithm is q routing
+            # Analizar resultados de Q-Routing si corresponde
             from applications.q_routing import QRoutingApplication
             if isinstance(self.sender_node, QRoutingApplication):
                 q_tables = []
-
                 for node in self.network.nodes.values():
                     print_q_table(node.application)
                     q_tables.append(node.application.q_table)
-                    # node.update_status() # TODO: aca se hace el dynamic_network_change
-
                 generate_heat_map(q_tables, episode_number)
 
-        print(f"Packet Log for Episode #{episode_number}: {self.network.packet_log.get(episode_number, [])}")
+            # Recolectar datos del episodio
+            print(f"Packet Log for Episode #{episode_number}: {self.network.packet_log.get(episode_number, [])}")
+            for log in self.network.packet_log.get(episode_number, []):
+                if log['is_delivered']:
+                    latencias.append(log['latency'])
+                    entregados += 1
+                total_paquetes += 1
 
-        # Recolectar datos del episodio
-        for log in self.network.packet_log.get(episode_number, []):
-            if log['is_delivered']:
-                latencias.append(log['latency'])
-                entregados += 1
-            total_paquetes += 1
+            # Calcular métricas
+            latencia_promedio = sum(latencias) / len(latencias) if latencias else None
+            consistencia_latencia = np.std(latencias) if len(latencias) > 1 else None
+            tasa_exito = (entregados / total_paquetes * 100) if total_paquetes > 0 else 0
 
-        # Calcular métricas
-        latencia_promedio = sum(latencias) / len(latencias) if latencias else None
-        consistencia_latencia = np.std(latencias) if len(latencias) > 1 else None
-        tasa_exito = (entregados / total_paquetes * 100) if total_paquetes > 0 else 0
+            print(f"\nEpisode #{episode_number} Metrics:")
+            print(f"  Latencia Promedio: {latencia_promedio}")
+            print(f"  Consistencia Latencia: {consistencia_latencia}")
+            print(f"  Tasa de Éxito: {tasa_exito}%")
 
-        print(f"\nEpisode #{episode_number} Metrics:")
-        print(f"  Latencia Promedio: {latencia_promedio}")
-        print(f"  Consistencia Latencia: {consistencia_latencia}")
-        print(f"  Tasa de Éxito: {tasa_exito}%")
+            # Guardar métricas en el algoritmo correspondiente
+            self.metrics[algorithm]["latencia_promedio"].append(latencia_promedio)
+            self.metrics[algorithm]["consistencia_latencia"].append(consistencia_latencia)
+            self.metrics[algorithm]["tasa_exito"].append(tasa_exito)
 
-        # Guardar métricas en el algoritmo correspondiente
-        self.metrics[algorithm]["latencia_promedio"].append(latencia_promedio)
-        self.metrics[algorithm]["consistencia_latencia"].append(consistencia_latencia)
-        self.metrics[algorithm]["tasa_exito"].append(tasa_exito)
-
-        print("about to evaluate mf por qué mf episode number no está en dynamic change episodes:")
-        print("episode_number")
-        print(episode_number)
-        print("self.dynamic_change_episodes")
-        print(self.dynamic_change_episodes)
-        # Cambios dinámicos en la red
-        if episode_number in self.dynamic_change_episodes:
-            print(f"\n--- Dynamic Network Change in episode {episode_number} ---\n")
-
-            # Debug: Verificar valores antes del cambio
-            print(f"[DEBUG] Episode #{episode_number} - Recording pre-change metrics")
-            print(f"[DEBUG] Current Latency Avg: {latencia_promedio}")
-            print(f"[DEBUG] Current Success Rate: {tasa_exito}")
-
-            # Guardar métricas pre-cambio
-            pre_latencia = latencia_promedio
-            pre_tasa_exito = tasa_exito
-            self.metrics[algorithm].setdefault("latencia_pre_cambio", []).append(pre_latencia)
-            self.metrics[algorithm].setdefault("tasa_exito_pre_cambio", []).append(pre_tasa_exito)
-
-            # Verificar que se haya guardado correctamente
-            print(f"[DEBUG] Saved pre-change Latency: {self.metrics[algorithm]['latencia_pre_cambio']}")
-            print(f"[DEBUG] Saved pre-change Success Rate: {self.metrics[algorithm]['tasa_exito_pre_cambio']}")
-
-            # Aplicar cambio dinámico
-            self.dynamic_network_change()
-
-            # Debug: Confirmar que el cambio se aplicó
-            print(f"[DEBUG] Network change applied at episode {episode_number}")
-
-        # Métricas post-cambio en el siguiente episodio
-        if episode_number - 1 in self.dynamic_change_episodes:
-            print(f"\n--- Recording Post-Change Metrics for episode {episode_number} ---\n")
-
-            # Debug: Verificar valores después del cambio
-            print(f"[DEBUG] Episode #{episode_number} - Recording post-change metrics")
-            print(f"[DEBUG] New Latency Avg: {latencia_promedio}")
-            print(f"[DEBUG] New Success Rate: {tasa_exito}")
-
-            # Guardar métricas post-cambio
-            self.metrics[algorithm].setdefault("latencia_post_cambio", []).append(latencia_promedio)
-            self.metrics[algorithm].setdefault("tasa_exito_post_cambio", []).append(tasa_exito)
-
-            # Verificar que se haya guardado correctamente
-            print(f"[DEBUG] Saved post-change Latency: {self.metrics[algorithm]['latencia_post_cambio']}")
-            print(f"[DEBUG] Saved post-change Success Rate: {self.metrics[algorithm]['tasa_exito_post_cambio']}")
+            # Guardar métricas post-cambio en el siguiente episodio
+            if episode_number - 1 in self.dynamic_change_episodes:
+                print(f"\n--- Recording Post-Change Metrics for episode {episode_number} ---\n")
+                self.metrics[algorithm].setdefault("latencia_post_cambio", []).append(latencia_promedio)
+                self.metrics[algorithm].setdefault("tasa_exito_post_cambio", []).append(tasa_exito)
+                print(f"[DEBUG] Saved post-change Latency: {self.metrics[algorithm]['latencia_post_cambio']}")
+                print(f"[DEBUG] Saved post-change Success Rate: {self.metrics[algorithm]['tasa_exito_post_cambio']}")
 
         # Mostrar resultados finales de métricas
         print("\nFinal Metrics:")

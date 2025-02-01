@@ -415,6 +415,8 @@ class SenderBellmanFordApplication(BellmanFordApplication):
 
                         self.send_packet(self.broadcast_state.parent_node, ack_packet)
 
+            # TODO: cuando detecta un broken path, va a seguir forever así porque el cambio dinámico en la red
+            # y la reconexión de los nodos que se cayeron no se da sino hasta que se inicie un nuevo episodios
             case PacketType.BROKEN_PATH:
                 episode_number = packet["episode_number"]
                 print(f"[Node_ID={self.node.node_id}] Restarting episode {episode_number} because pre calculated shortest path is broken. Packet={packet}")
@@ -677,7 +679,8 @@ class IntermediateBellmanFordApplication(BellmanFordApplication):
                     self.send_packet(from_node_id, success_packet)
 
             case PacketType.BROKEN_PATH:
-                self.send_packet(previous_node_id, packet)
+                previous_node = self.callback_stack.pop()
+                self.send_packet(previous_node, packet)
 
             case PacketType.SUCCESS:
                 previous_node = self.callback_stack.pop()

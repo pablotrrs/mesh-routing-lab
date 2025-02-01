@@ -49,7 +49,7 @@ class Algorithm(Enum):
     BELLMAN_FORD = "BELLMAN_FORD"
 
 if __name__ == "__main__":
-    sys.setrecursionlimit(2000)
+    sys.setrecursionlimit(20000)
 
     parser = argparse.ArgumentParser(description='Run network simulation.')
     parser.add_argument('--episodes', type=int, default=1, help='Number of episodes to run the simulation (default: 1)')
