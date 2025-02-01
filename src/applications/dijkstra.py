@@ -12,6 +12,8 @@ FUNCTION_SEQ = [NodeFunction.A, NodeFunction.B, NodeFunction.C]
 
 global_function_counters = {func: 0 for func in FUNCTION_SEQ}
 
+broken_path = False
+
 class BroadcastState:
     def __init__(self):
         self.message_id = None            # Identificador único del mensaje de broadcast
@@ -182,8 +184,9 @@ class SenderDijkstraApplication(DijkstraApplication):
         self.routes = {}  # Almacena las rutas más cortas calculadas
         self.previous_node_id = None
 
-    def start_episode(self, episode_number, calculate_shortest_path=False) -> None:
-        if calculate_shortest_path or episode_number == 1:
+    def start_episode(self, episode_number) -> None:
+        global broken_path
+        if broken_path or episode_number == 1:
             print(f"[Node_ID={self.node.node_id}] Starting broadcast for episode {episode_number}")
 
             # Iniciar el broadcast para recopilar latencias y asignar funciones
@@ -423,8 +426,9 @@ class SenderDijkstraApplication(DijkstraApplication):
 
             case PacketType.BROKEN_PATH:
                 episode_number = packet["episode_number"]
-                print(f"[Node_ID={self.node.node_id}] Restarting episode {episode_number} because pre calculated shortest path is broken. Packet={packet}")
-                self.start_episode(episode_number, True)
+                print(f"[Node_ID={self.node.node_id}] Episode {episode_number} detected a broken path. Packet={packet}")
+                global broken_path
+                broken_path = True
 
             case _:
                 packet_type = packet["type"]
