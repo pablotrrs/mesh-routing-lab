@@ -1,5 +1,6 @@
 import numpy as np
 from os import pardir
+import os
 import time
 import numpy as np
 import yaml
@@ -8,6 +9,8 @@ from visualization import animate_network, generate_heat_map, print_q_table
 from tabulate import tabulate
 import math
 import pandas as pd
+import pandas as pd
+import matplotlib.pyplot as plt
 
 class Application(ABC):
     def __init__(self, node):
@@ -378,6 +381,7 @@ class Simulation:
         print("\nFinal Metrics:")
         print(self.metrics[algorithm])
         self.save_results_to_excel()
+        self.generar_graficos_desde_excel()
 
     def generate_dynamic_change_episodes(self, total_episodes, mean_interval):
         """
@@ -440,3 +444,55 @@ class Simulation:
                 df.to_excel(writer, sheet_name=sheet_name, index=False)
 
             print(f"\n📁 Resultados guardados en {filename}.")
+
+    def generar_graficos_desde_excel(self, filename="../results/resultados_simulacion.xlsx"):
+        """
+        Genera gráficos para cada algoritmo usando matplotlib y guarda las imágenes en ../results/.
+        """
+        os.makedirs("../results", exist_ok=True)  # Crear la carpeta si no existe
+
+        # Cargar el archivo Excel
+        xls = pd.ExcelFile(filename)
+
+        for sheet_name in xls.sheet_names:
+            df = pd.read_excel(xls, sheet_name=sheet_name)
+
+            # Crear figura para gráficos
+            fig, axs = plt.subplots(2, 3, figsize=(18, 10))  # 2 filas, 3 columnas de gráficos
+            fig.suptitle(f"Análisis del Algoritmo: {sheet_name}\nTotal Episodios: {len(df)} - Cambios Dinámicos: {df['Cambio Dinámico'].tolist().count('Sí')}", fontsize=14, fontweight="bold")
+
+            # Identificar episodios con cambios dinámicos
+            cambios = df[df["Cambio Dinámico"] == "Sí"]["Episodio"]
+
+            # 📊 Gráfico 1: Latencia Promedio vs Episodio
+            axs[0, 0].plot(df["Episodio"], df["Latencia Promedio"], label="Latencia Promedio", marker="o", color="blue")
+            for cambio in cambios:
+                axs[0, 0].axvline(x=cambio, color="red", linestyle="--", alpha=0.5)
+            axs[0, 0].set_title("Latencia Promedio vs Episodio")
+            axs[0, 0].set_xlabel("Episodio")
+            axs[0, 0].set_ylabel("Latencia")
+            axs[0, 0].grid()
+            axs[0, 0].legend()
+
+            # 📊 Gráfico 2: Tasa de Éxito vs Episodio
+            axs[0, 1].plot(df["Episodio"], df["Tasa de Éxito"], label="Tasa de Éxito (%)", marker="s", color="green")
+            axs[0, 1].set_title("Tasa de Éxito vs Episodio")
+            axs[0, 1].set_xlabel("Episodio")
+            axs[0, 1].set_ylabel("Tasa de Éxito (%)")
+            axs[0, 1].grid()
+            axs[0, 1].legend()
+
+            # 📊 Gráfico 3: Consistencia en la Latencia vs Episodio
+            axs[0, 2].plot(df["Episodio"], df["Consistencia Latencia"], label="Consistencia Latencia", marker="^", color="purple")
+            axs[0, 2].set_title("Consistencia en la Latencia vs Episodio")
+            axs[0, 2].set_xlabel("Episodio")
+            axs[0, 2].set_ylabel("Desviación Estándar")
+            axs[0, 2].grid()
+            axs[0, 2].legend()
+
+            # 📊 Guardar la imagen en ../results/
+            plt.tight_layout(rect=[0, 0, 1, 0.96])
+            plt.savefig(f"../results/{sheet_name}.png")
+            plt.close()
+
+        print("\n📊 Gráficos generados en '../results/'.")
