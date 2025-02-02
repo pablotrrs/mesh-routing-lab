@@ -48,59 +48,108 @@ class Algorithm(Enum):
     DIJKSTRA = "DIJKSTRA"
     BELLMAN_FORD = "BELLMAN_FORD"
 
+dummy_topology_file_path = os.path.join(os.path.dirname(__file__), "../resources/dummy_topology.yaml")
+grid_topology_file_path = os.path.join(os.path.dirname(__file__), "../resources/dummy_topology.yaml")
+
 if __name__ == "__main__":
     sys.setrecursionlimit(20000)
 
     parser = argparse.ArgumentParser(description='Run network simulation.')
     parser.add_argument('--episodes', type=int, default=1, help='Number of episodes to run the simulation (default: 1)')
-    parser.add_argument('--algorithm', type=str, default='Q_ROUTING', choices=[alg.value for alg in Algorithm],
+    parser.add_argument('--algorithm', type=str, choices=[alg.value for alg in Algorithm],
                         help='Algorithm for performing routing (default: Q_ROUTING)')
     args = parser.parse_args()
 
-    selected_algorithm = Algorithm(args.algorithm)
+    if args.algorithm:
+        selected_algorithm = Algorithm(args.algorithm)
+    else:
+        selected_algorithm = None
 
     from classes import Network, Simulation
 
-    topology_file_path = os.path.join(os.path.dirname(__file__), "../resources/dummy_topology.yaml")
-    network, sender_node = Network.from_yaml(topology_file_path)
+    network, sender_node = Network.from_yaml(grid_topology_file_path)
 
     print(network)
 
     simulation = Simulation(network, sender_node, args.episodes)
 
-    print(f"Running simulation with {selected_algorithm.value}")
+    if selected_algorithm:
 
-    match selected_algorithm:
-        case Algorithm.Q_ROUTING:
+        print(f"Running simulation with {selected_algorithm.value}")
 
-            from applications.q_routing import SenderQRoutingApplication, IntermediateQRoutingApplication
+        match selected_algorithm:
+            case Algorithm.Q_ROUTING:
 
-            sender_node.install_application(SenderQRoutingApplication)
+                from applications.q_routing import SenderQRoutingApplication, IntermediateQRoutingApplication
 
-            for node_id, node in network.nodes.items():
-                if node_id != sender_node.node_id:
-                    node.install_application(IntermediateQRoutingApplication)
+                sender_node.install_application(SenderQRoutingApplication)
 
-            simulation.start(selected_algorithm)
+                for node_id, node in network.nodes.items():
+                    if node_id != sender_node.node_id:
+                        node.install_application(IntermediateQRoutingApplication)
 
-        case Algorithm.DIJKSTRA:
-            from applications.dijkstra import SenderDijkstraApplication, IntermediateDijkstraApplication
+                simulation.start(selected_algorithm)
 
-            sender_node.install_application(SenderDijkstraApplication)
+            case Algorithm.DIJKSTRA:
+                from applications.dijkstra import SenderDijkstraApplication, IntermediateDijkstraApplication
 
-            for node_id, node in network.nodes.items():
-                if node_id != sender_node.node_id:
-                    node.install_application(IntermediateDijkstraApplication)
+                sender_node.install_application(SenderDijkstraApplication)
 
-            simulation.start(selected_algorithm)
+                for node_id, node in network.nodes.items():
+                    if node_id != sender_node.node_id:
+                        node.install_application(IntermediateDijkstraApplication)
 
-        case Algorithm.BELLMAN_FORD:
-            from applications.bellman_ford import SenderBellmanFordApplication, IntermediateBellmanFordApplication
+                simulation.start(selected_algorithm)
 
-            sender_node.install_application(SenderBellmanFordApplication)
+            case Algorithm.BELLMAN_FORD:
+                from applications.bellman_ford import SenderBellmanFordApplication, IntermediateBellmanFordApplication
 
-            for node_id, node in network.nodes.items():
-                if node_id != sender_node.node_id:
-                    node.install_application(IntermediateBellmanFordApplication)
+                sender_node.install_application(SenderBellmanFordApplication)
 
-            simulation.start(selected_algorithm)
+                for node_id, node in network.nodes.items():
+                    if node_id != sender_node.node_id:
+                        node.install_application(IntermediateBellmanFordApplication)
+
+                simulation.start(selected_algorithm)
+    else:
+        print(f"Running simulation with Q_ROUTING")
+
+        selected_algorithm = Algorithm.Q_ROUTING
+
+        from applications.q_routing import SenderQRoutingApplication, IntermediateQRoutingApplication
+
+        sender_node.install_application(SenderQRoutingApplication)
+
+        for node_id, node in network.nodes.items():
+            if node_id != sender_node.node_id:
+                node.install_application(IntermediateQRoutingApplication)
+
+        simulation.start(selected_algorithm)
+
+        print(f"Running simulation with DIJKSTRA")
+
+        selected_algorithm = Algorithm.DIJKSTRA
+
+        from applications.dijkstra import SenderDijkstraApplication, IntermediateDijkstraApplication
+
+        sender_node.install_application(SenderDijkstraApplication)
+
+        for node_id, node in network.nodes.items():
+            if node_id != sender_node.node_id:
+                node.install_application(IntermediateDijkstraApplication)
+
+        simulation.start(selected_algorithm)
+
+        print(f"Running simulation with BELLMAN_FORD")
+
+        selected_algorithm = Algorithm.BELLMAN_FORD
+
+        from applications.bellman_ford import SenderBellmanFordApplication, IntermediateBellmanFordApplication
+
+        sender_node.install_application(SenderBellmanFordApplication)
+
+        for node_id, node in network.nodes.items():
+            if node_id != sender_node.node_id:
+                node.install_application(IntermediateBellmanFordApplication)
+
+        simulation.start(selected_algorithm)
