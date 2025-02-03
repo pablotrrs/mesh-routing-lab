@@ -157,7 +157,11 @@ class DijkstraApplication(Application):
         print(f"[Node_ID={self.node.node_id}] No other nodes available. Defaulting to node 0.")
         return 0
 
-    def send_packet(self, to_node_id, packet):
+    def send_packet(self, to_node_id, packet, lost_packet=False):
+
+        if lost_packet:
+            self.node.network.send_dict(None, None, None, True)
+            return
 
         if "hops" in packet:
             packet["hops"] += 1
@@ -429,6 +433,9 @@ class SenderDijkstraApplication(DijkstraApplication):
                 print(f"[Node_ID={self.node.node_id}] Episode {episode_number} detected a broken path. Packet={packet}")
                 global broken_path
                 broken_path = True
+                self.send_packet(None, None, True)
+                # TODO: acá habría que revisar que el paquete quede como que no fue entregado
+                # self.start_episode(episode_number, True)
 
             case _:
                 packet_type = packet["type"]

@@ -49,7 +49,8 @@ class Algorithm(Enum):
     BELLMAN_FORD = "BELLMAN_FORD"
 
 dummy_topology_file_path = os.path.join(os.path.dirname(__file__), "../resources/dummy_topology.yaml")
-grid_topology_file_path = os.path.join(os.path.dirname(__file__), "../resources/dummy_topology.yaml")
+grid_topology_file_path = os.path.join(os.path.dirname(__file__), "../resources/6x6_grid_topology.yaml")
+# TODO: hacer que se le pueda pasar esto por arg
 
 if __name__ == "__main__":
     sys.setrecursionlimit(20000)
@@ -114,8 +115,6 @@ if __name__ == "__main__":
     else:
         print(f"Running simulation with Q_ROUTING")
 
-        selected_algorithm = Algorithm.Q_ROUTING
-
         from applications.q_routing import SenderQRoutingApplication, IntermediateQRoutingApplication
 
         sender_node.install_application(SenderQRoutingApplication)
@@ -124,11 +123,9 @@ if __name__ == "__main__":
             if node_id != sender_node.node_id:
                 node.install_application(IntermediateQRoutingApplication)
 
-        simulation.start(selected_algorithm)
+        simulation.start(Algorithm.Q_ROUTING)
 
         print(f"Running simulation with DIJKSTRA")
-
-        selected_algorithm = Algorithm.DIJKSTRA
 
         from applications.dijkstra import SenderDijkstraApplication, IntermediateDijkstraApplication
 
@@ -138,11 +135,9 @@ if __name__ == "__main__":
             if node_id != sender_node.node_id:
                 node.install_application(IntermediateDijkstraApplication)
 
-        simulation.start(selected_algorithm)
+        simulation.start(Algorithm.DIJKSTRA)
 
         print(f"Running simulation with BELLMAN_FORD")
-
-        selected_algorithm = Algorithm.BELLMAN_FORD
 
         from applications.bellman_ford import SenderBellmanFordApplication, IntermediateBellmanFordApplication
 
@@ -152,4 +147,4 @@ if __name__ == "__main__":
             if node_id != sender_node.node_id:
                 node.install_application(IntermediateBellmanFordApplication)
 
-        simulation.start(selected_algorithm)
+        simulation.start(Algorithm.BELLMAN_FORD)

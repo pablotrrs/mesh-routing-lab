@@ -113,25 +113,41 @@ class Network:
         """
         return list(self.nodes.keys())
 
-    def send_dict(self, from_node_id, to_node_id, packet):
-        # Calculate initial latency for this hop
+    def send_dict(self, from_node_id, to_node_id, packet, lost_packet=False):
+        # Si el paquete está marcado como perdido, registrarlo y salir
+        if lost_packet:
+            print(f"[Network] Packet marked as lost on demand.")
+            if packet and "episode_number" in packet:
+                if packet["episode_number"] not in self.packet_log:
+                    self.packet_log[packet["episode_number"]] = []
+
+                # Registrar el paquete perdido
+                self.packet_log[packet["episode_number"]].append({
+                    'from': from_node_id,
+                    'to': to_node_id,
+                    'packet': packet,
+                    'is_delivered': False,  # Marcado como no entregado
+                    'latency': None  # Latencia indefinida para paquetes perdidos
+                })
+            return
+
+        # Validar y calcular la latencia solo si no se marca como perdido
         latency = self.get_latency(from_node_id, to_node_id)
 
-        # Initialize the packet log for the episode if it doesn't exist
         if "episode_number" in packet:
             if packet["episode_number"] not in self.packet_log:
                 self.packet_log[packet["episode_number"]] = []
 
-            # Log the packet with latency and default delivery status
+            # Registrar el paquete con estado por defecto
             self.packet_log[packet["episode_number"]].append({
                 'from': from_node_id,
                 'to': to_node_id,
                 'packet': packet,
-                'is_delivered': False,  # Default to False
+                'is_delivered': False,  # Estado inicial
                 'latency': latency
             })
 
-        # Validate and send
+        # Validar y enviar
         hops = packet["hops"]
         max_hops = packet["max_hops"]
 
@@ -145,7 +161,7 @@ class Network:
 
             time.sleep(latency)
 
-            # Update delivery status directly in the log
+            # Actualizar el estado de entrega directamente en el registro
             episode_number = packet["episode_number"]
             self.packet_log[episode_number][-1]['is_delivered'] = True
 
@@ -155,24 +171,39 @@ class Network:
         else:
             print(f"[Network] Failed to send packet: Node {to_node_id} is not reachable from Node {from_node_id}")
 
-    def send(self, from_node_id, to_node_id, packet):
-        # Initialize the packet log for the episode if it doesn't exist
+    def send(self, from_node_id, to_node_id, packet, lost_packet=False):
+        # Si el paquete está marcado como perdido, registrarlo y salir
+        if lost_packet:
+            print(f"[Network] Packet marked as lost on demand.")
+            if packet and "episode_number" in packet:
+                if packet["episode_number"] not in self.packet_log:
+                    self.packet_log[packet["episode_number"]] = []
+
+                # Registrar el paquete perdido
+                self.packet_log[packet["episode_number"]].append({
+                    'from': from_node_id,
+                    'to': to_node_id,
+                    'packet': packet,
+                    'is_delivered': False,  # Marcado como no entregado
+                    'latency': None  # Latencia indefinida para paquetes perdidos
+                })
+            return
+
+        # Validar y calcular la latencia solo si no se marca como perdido
+        latency = self.get_latency(from_node_id, to_node_id)
+
         if packet.episode_number not in self.packet_log:
             self.packet_log[packet.episode_number] = []
 
-        # Calculate initial latency for this hop
-        latency = self.get_latency(from_node_id, to_node_id)
-
-        # Log the packet with latency and default delivery status
+        # Registrar el paquete con estado por defecto
         self.packet_log[packet.episode_number].append({
             'from': from_node_id,
             'to': to_node_id,
             'packet': packet,
-            'is_delivered': False,  # Default to False
+            'is_delivered': False,  # Estado inicial
             'latency': latency
         })
 
-        # Validate and send
         if to_node_id in self.connections.get(from_node_id, []) and \
             from_node_id in self.active_nodes and \
             to_node_id in self.active_nodes and \
@@ -183,7 +214,7 @@ class Network:
 
             time.sleep(latency)
 
-            # Update delivery status directly in the log
+            # Actualizar el estado de entrega directamente en el registro
             self.packet_log[packet.episode_number][-1]['is_delivered'] = True
 
             self.nodes[to_node_id].application.receive_packet(packet)

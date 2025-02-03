@@ -114,7 +114,7 @@ class QRoutingApplication(Application):
             else:
                 # Si no hay vecinos conectados, no se puede enviar el paquete
                 print(f'[Node_ID={self.node.node_id}] No available neighbors to send the packet. Dropping packet.')
-                return  # No se envía el paquete si no hay ningún nodo disponible
+                return None
                 # TODO: acá habría que revisar que el paquete quede como que no fue entregado
 
         # Update epsilon after each decision
@@ -174,10 +174,13 @@ class QRoutingApplication(Application):
 
         self.q_table[self.node.node_id][next_node] = updated_q
 
-    def send_packet(self, to_node_id, packet) -> None:
+    def send_packet(self, to_node_id, packet, lost_packet=False) -> None:
+
+        if lost_packet:
+            self.node.network.send_dict(None, None, None, True)
+            return
 
         # ensure node is up and running
-        # TODO: me parece que de esto se tendría ya se encarga Network
         if not self.node.is_sender and not self.node.status:
             print(f'[Node_ID={self.node.node_id}] Node status is False. Packet not sent.')
             return
@@ -215,6 +218,11 @@ class SenderQRoutingApplication(QRoutingApplication):
         self.initialize_or_update_q_table()
 
         next_node = self.select_next_node()
+
+        if next_node is None:
+            print(f'[Node_ID={self.node.node_id}] No valid next node found. Can\'t initiate episode!.')
+            self.send_packet(None, None, True)
+            return
 
         estimated_time_remaining = self.estimate_remaining_time(next_node)
 

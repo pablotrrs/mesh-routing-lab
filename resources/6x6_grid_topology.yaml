@@ -1,69 +1,295 @@
 # 6x6 irregular grid
 nodes:
   0:
+    neighbors:
+    - 1
+    - 6
+    position:
+    - 0
+    - 500
+    - 0
     type: sender
-    neighbors: [1, 6]
   1:
-    neighbors: [0, 2, 7]
+    neighbors:
+    - 0
+    - 2
+    - 7
+    position:
+    - 100
+    - 500
+    - 0
   2:
-    neighbors: [1, 3]
+    neighbors:
+    - 1
+    - 3
+    position:
+    - 200
+    - 500
+    - 0
   3:
-    neighbors: [2, 4, 9]
+    neighbors:
+    - 2
+    - 4
+    - 9
+    position:
+    - 300
+    - 500
+    - 0
   4:
-    neighbors: [3, 5, 10]
+    neighbors:
+    - 3
+    - 5
+    - 10
+    position:
+    - 400
+    - 500
+    - 0
   5:
-    neighbors: [4, 11]
+    neighbors:
+    - 4
+    - 11
+    position:
+    - 500
+    - 500
+    - 0
   6:
-    neighbors: [0, 7, 12]
+    neighbors:
+    - 0
+    - 7
+    - 12
+    position:
+    - 0
+    - 400
+    - 0
   7:
-    neighbors: [1, 6, 8, 13]
+    neighbors:
+    - 1
+    - 6
+    - 8
+    - 13
+    position:
+    - 100
+    - 400
+    - 0
   8:
-    neighbors: [7, 14]
+    neighbors:
+    - 7
+    - 14
+    position:
+    - 200
+    - 400
+    - 0
   9:
-    neighbors: [3, 10, 15]
+    neighbors:
+    - 3
+    - 10
+    - 15
+    position:
+    - 300
+    - 400
+    - 0
   10:
-    neighbors: [4, 9, 11, 16]
+    neighbors:
+    - 4
+    - 9
+    - 11
+    - 16
+    position:
+    - 400
+    - 400
+    - 0
   11:
-    neighbors: [5, 10, 17]
+    neighbors:
+    - 5
+    - 10
+    - 17
+    position:
+    - 500
+    - 400
+    - 0
   12:
-    neighbors: [6, 13, 18]
+    neighbors:
+    - 6
+    - 13
+    - 18
+    position:
+    - 0
+    - 300
+    - 0
   13:
-    neighbors: [7, 12, 14, 19]
+    neighbors:
+    - 7
+    - 12
+    - 14
+    - 19
+    position:
+    - 100
+    - 300
+    - 0
   14:
-    neighbors: [8, 13]
+    neighbors:
+    - 8
+    - 13
+    position:
+    - 200
+    - 300
+    - 0
   15:
-    neighbors: [9, 16, 20]
+    neighbors:
+    - 9
+    - 16
+    - 20
+    position:
+    - 300
+    - 300
+    - 0
   16:
-    neighbors: [10, 15, 17, 21]
+    neighbors:
+    - 10
+    - 15
+    - 17
+    - 21
+    position:
+    - 400
+    - 300
+    - 0
   17:
-    neighbors: [11, 16, 22]
+    neighbors:
+    - 11
+    - 16
+    - 22
+    position:
+    - 500
+    - 300
+    - 0
   18:
-    neighbors: [12, 19, 24]
+    neighbors:
+    - 12
+    - 19
+    - 24
+    position:
+    - 0
+    - 200
+    - 0
   19:
-    neighbors: [13, 18, 25]
+    neighbors:
+    - 13
+    - 18
+    - 25
+    position:
+    - 100
+    - 200
+    - 0
   20:
-    neighbors: [15, 21, 26]
+    neighbors:
+    - 15
+    - 21
+    - 26
+    position:
+    - 300
+    - 200
+    - 0
   21:
-    neighbors: [16, 20, 22, 27]
+    neighbors:
+    - 16
+    - 20
+    - 22
+    - 27
+    position:
+    - 400
+    - 200
+    - 0
   22:
-    neighbors: [17, 21, 28]
+    neighbors:
+    - 17
+    - 21
+    - 28
+    position:
+    - 500
+    - 200
+    - 0
   24:
-    neighbors: [18, 25, 30]
+    neighbors:
+    - 18
+    - 25
+    - 30
+    position:
+    - 0
+    - 100
+    - 0
   25:
-    neighbors: [19, 24]
+    neighbors:
+    - 19
+    - 24
+    position:
+    - 100
+    - 100
+    - 0
   26:
-    neighbors: [20, 27, 32]
+    neighbors:
+    - 20
+    - 27
+    - 32
+    position:
+    - 300
+    - 100
+    - 0
   27:
-    neighbors: [21, 26, 28, 33]
+    neighbors:
+    - 21
+    - 26
+    - 28
+    - 33
+    position:
+    - 400
+    - 100
+    - 0
   28:
-    neighbors: [22, 27, 34]
+    neighbors:
+    - 22
+    - 27
+    - 34
+    position:
+    - 500
+    - 100
+    - 0
   30:
-    neighbors: [24, 31]
+    neighbors:
+    - 24
+    - 31
+    position:
+    - 0
+    - 0
+    - 0
   31:
-    neighbors: [30]
+    neighbors:
+    - 30
+    position:
+    - 100
+    - 0
+    - 0
   32:
-    neighbors: [26, 33]
+    neighbors:
+    - 26
+    - 33
+    position:
+    - 300
+    - 0
+    - 0
   33:
-    neighbors: [27, 32, 34]
+    neighbors:
+    - 27
+    - 32
+    - 34
+    position:
+    - 400
+    - 0
+    - 0
   34:
-    neighbors: [28, 33]
+    neighbors:
+    - 28
+    - 33
+    position:
+    - 500
+    - 0
+    - 0
