@@ -1,5 +1,5 @@
 from enum import Enum
-from classes import Application
+from classes.base import Application
 import random
 from queue import PriorityQueue
 

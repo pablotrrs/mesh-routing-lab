@@ -2,7 +2,7 @@ from enum import Enum
 from dataclasses import dataclass
 import random
 import time
-from classes import Application
+from classes.base import Application
 from visualization import print_q_table
 
 ALPHA = 0.1

@@ -66,9 +66,10 @@ if __name__ == "__main__":
     else:
         selected_algorithm = None
 
-    from classes import Network, Simulation
+    from classes.network import Network
+    from classes.simulation import Simulation
 
-    network, sender_node = Network.from_yaml(grid_topology_file_path)
+    network, sender_node = Network.from_yaml(dummy_topology_file_path)
 
     print(network)
 
