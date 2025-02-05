@@ -95,4 +95,12 @@ if __name__ == "__main__":
             simulation.start(args.episodes)
 
         case Algorithm.BELLMAN_FORD:
-            raise NotImplementedError("Algorithm BELLMAN_FORD not yet implemented")
+            from applications.bellman_ford import SenderBellmanFordApplication, IntermediateBellmanFordApplication
+
+            sender_node.install_application(SenderBellmanFordApplication)
+
+            for node_id, node in network.nodes.items():
+                if node_id != sender_node.node_id:
+                    node.install_application(IntermediateBellmanFordApplication)
+
+            simulation.start(args.episodes)
