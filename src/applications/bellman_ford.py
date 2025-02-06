@@ -1,5 +1,7 @@
 from enum import Enum
-from classes.base import Application
+import sys
+sys.path.insert(1, 'src/classes')
+from base import Application
 import random
 
 class NodeFunction(Enum):

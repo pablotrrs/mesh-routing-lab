@@ -3,6 +3,8 @@ import time
 import yaml
 import math
 import threading
+import sys
+sys.path.insert(1, 'src/classes')
 
 class Network:
     def __init__(self):
@@ -247,7 +249,7 @@ class Network:
         network = cls()
         sender_node = None
 
-        from classes.base import Node
+        from base import Node
 
         # Crear y añadir nodos
         for node_id, node_info in data['nodes'].items():

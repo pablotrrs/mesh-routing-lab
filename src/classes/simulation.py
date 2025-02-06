@@ -185,7 +185,7 @@ class Simulation:
 
         # **Guardar Resultados**
         self.save_results_to_excel()
-        self.generar_individual_graphs_from_excel()
+        # self.generar_individual_graphs_from_excel()
 
     def save_results_to_excel(self, filename="../results/resultados_simulacion.xlsx"):
         """

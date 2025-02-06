@@ -2,9 +2,11 @@ from enum import Enum
 from dataclasses import dataclass
 import random
 import time
-from classes.base import Application
+import sys
+sys.path.insert(1, 'src/classes')
+from base import Application
 from visualization import print_q_table
-from classes.base import NodeFunction
+from base import NodeFunction
 
 ALPHA = 0.1
 GAMMA = 0.9

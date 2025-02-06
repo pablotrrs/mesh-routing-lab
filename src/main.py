@@ -24,17 +24,19 @@
 # The source code for this project is available at:
 # https://github.com/pablotrrs/py-q-mesh-routing
 
-import argparse
+
 import os
 import sys
+import argparse
 from enum import Enum
-from classes.base import NodeFunction
+sys.path.insert(1, 'src/classes')
+from base import NodeFunction
 
 # TODO:
-#  2. Obtener Q-table final y mostrarla (pasar a un .csv o .txt por episodio). Revisar que los resultados sean consistentes
+#  1. Obtener Q-table final y mostrarla (pasar a un .csv o .txt por episodio). Revisar que los resultados sean consistentes
 #     con los esperados.
-#  3. Revisar la animación para una red con más nodos (por ejemplo de 6x6).
-#  5. relevar resultados (integrar con lo que había antes para visualizar, y exportar a un csv como en modelado, 
+#  2. Revisar la animación para una red con más nodos (por ejemplo de 6x6).
+#  3. relevar resultados (integrar con lo que había antes para visualizar, y exportar a un csv como en modelado, 
 #     para comparar y hacer gráficos de cómo cambian los parámetros Latencia Promedio, Consistencia en la Latencia,
 #     Tasa de Éxito, Balanceo de Carga, Overhead de Comunicación, Tiempo de Cómputo, Adaptabilidad a Cambios en la Red
 #     con respecto a los pasos tiempo)
@@ -85,8 +87,8 @@ if __name__ == "__main__":
     else:
         selected_algorithm = None
 
-    from classes.network import Network
-    from classes.simulation import Simulation
+    from network import Network
+    from simulation import Simulation
 
     topology_file_path = os.path.join(os.path.dirname(__file__), args.topology_file)
     # topology_file_path = os.path.join(os.path.dirname(__file__), "../resources/6x6_grid_topology.yaml")
