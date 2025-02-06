@@ -1,5 +1,5 @@
 from enum import Enum
-from classes import Application
+from classes.base import Application
 import random
 
 class NodeFunction(Enum):
@@ -7,9 +7,11 @@ class NodeFunction(Enum):
     B = "B"
     C = "C"
 
-FUNCTION_SEQ = [NodeFunction.A, NodeFunction.B, NodeFunction.C]
+FUNCTION_SEQ = None
 
-global_function_counters = {func: 0 for func in FUNCTION_SEQ}
+global_function_counters = None
+
+broken_path = False
 
 class BroadcastState:
     def __init__(self):
@@ -154,7 +156,11 @@ class BellmanFordApplication(Application):
         print(f"[Node_ID={self.node.node_id}] No other nodes available. Defaulting to node 0.")
         return 0
 
-    def send_packet(self, to_node_id, packet):
+    def send_packet(self, to_node_id, packet, lost_packet=False):
+
+        if lost_packet:
+            self.node.network.send_dict(None, None, None, True)
+            return
 
         if "hops" in packet:
             packet["hops"] += 1
@@ -180,16 +186,28 @@ class SenderBellmanFordApplication(BellmanFordApplication):
         super().__init__(node)
         self.routes = {}  # Almacena las rutas más cortas calculadas
         self.previous_node_id = None
+        self.max_hops = None
+        self.functions_sequence = None
 
-    def start_episode(self, episode_number, calculate_shortest_path=False) -> None:
-        if calculate_shortest_path or episode_number == 1:
+    def start_episode(self, episode_number, max_hops, functions_sequence):
+        self.max_hops=max_hops
+
+        global FUNCTION_SEQ
+        FUNCTION_SEQ=functions_sequence
+
+        global global_function_counters
+        global_function_counters = {func: 0 for func in FUNCTION_SEQ}
+
+        global broken_path
+        if broken_path or episode_number == 1:
+            broken_path = False
             print(f"[Node_ID={self.node.node_id}] Starting broadcast for episode {episode_number}")
 
             # Iniciar el broadcast para recopilar latencias y asignar funciones
             message_id = f"broadcast_{self.node.node_id}_{episode_number}"
 
             self.broadcast_state = BroadcastState()
-            self.start_broadcast(message_id)
+            self.start_broadcast(message_id, episode_number)
 
             # Esperar hasta que se complete el broadcast (ACKs recibidos)
             while self.broadcast_state.acks_received < self.broadcast_state.expected_acks:
@@ -223,7 +241,7 @@ class SenderBellmanFordApplication(BellmanFordApplication):
         self.send_packet(next_node, packet)
         return
 
-    def start_broadcast(self, message_id):
+    def start_broadcast(self, message_id, episode_number):
         """
         Inicia el proceso de broadcast desde el nodo sender.
         """
@@ -232,11 +250,11 @@ class SenderBellmanFordApplication(BellmanFordApplication):
             "type": PacketType.BROADCAST,
             "message_id": message_id,
             "from_node_id": self.node.node_id,
-            "episode_number": 0,
+            "episode_number": episode_number,
             "visited_nodes": {self.node.node_id},
             "functions_sequence": FUNCTION_SEQ.copy(),
             "function_counters": {func: 0 for func in FUNCTION_SEQ},
-            "node_function_map": {}
+            "node_function_map": {},
         }
 
         # Inicializar el estado de broadcast
@@ -405,7 +423,8 @@ class SenderBellmanFordApplication(BellmanFordApplication):
                             "type": PacketType.ACK,
                             "message_id": message_id,
                             "from_node_id": self.node.node_id,
-                            "node_function_map": {}
+                            "node_function_map": {},
+                            "episode_number": packet.episode_number
                         }
                         # Solo agregar al mapa si el nodo tiene una función asignada
                         if self.assigned_function is not None:
@@ -416,8 +435,12 @@ class SenderBellmanFordApplication(BellmanFordApplication):
 
             case PacketType.BROKEN_PATH:
                 episode_number = packet["episode_number"]
-                print(f"[Node_ID={self.node.node_id}] Restarting episode {episode_number} because pre calculated shortest path is broken. Packet={packet}")
-                self.start_episode(episode_number, True)
+                print(f"[Node_ID={self.node.node_id}] Episode {episode_number} detected a broken path. Packet={packet}")
+                global broken_path
+                broken_path = True
+                self.send_packet(None, None, True)
+                # TODO: acá habría que revisar que el paquete quede como que no fue entregado
+                # self.start_episode(episode_number, True)
 
             case _:
                 packet_type = packet["type"]
@@ -481,7 +504,8 @@ class IntermediateBellmanFordApplication(BellmanFordApplication):
                         "type": PacketType.ACK,
                         "message_id": message_id,
                         "from_node_id": self.node.node_id,
-                        "node_function_map": {}
+                        "node_function_map": {},
+                        "episode_number": packet["episode_number"]
                     }
                     # Solo agregar al mapa si el nodo tiene una función asignada
                     if self.assigned_function is not None:
@@ -553,7 +577,8 @@ class IntermediateBellmanFordApplication(BellmanFordApplication):
                         "type": PacketType.ACK,
                         "message_id": message_id,
                         "from_node_id": self.node.node_id,
-                        "node_function_map": {}
+                        "node_function_map": {},
+                        "episode_number": packet["episode_number"]
                     }
                     # Solo agregar al mapa si el nodo tiene una función asignada
                     if self.assigned_function is not None:
@@ -597,7 +622,8 @@ class IntermediateBellmanFordApplication(BellmanFordApplication):
                             "type": PacketType.ACK,
                             "message_id": message_id,
                             "from_node_id": self.node.node_id,
-                            "node_function_map": self.broadcast_state.node_function_map
+                            "node_function_map": self.broadcast_state.node_function_map,
+                            "episode_number": packet["episode_number"]
                         }
 
                         self.send_packet(self.broadcast_state.parent_node, ack_packet)
@@ -673,7 +699,8 @@ class IntermediateBellmanFordApplication(BellmanFordApplication):
                     self.send_packet(from_node_id, success_packet)
 
             case PacketType.BROKEN_PATH:
-                self.send_packet(previous_node_id, packet)
+                previous_node = self.callback_stack.pop()
+                self.send_packet(previous_node, packet)
 
             case PacketType.SUCCESS:
                 previous_node = self.callback_stack.pop()
