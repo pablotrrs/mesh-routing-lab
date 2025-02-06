@@ -1,5 +1,5 @@
 from enum import Enum
-from classes import Application
+from classes.base import Application
 import random
 
 class NodeFunction(Enum):
@@ -7,9 +7,9 @@ class NodeFunction(Enum):
     B = "B"
     C = "C"
 
-FUNCTION_SEQ = [NodeFunction.A, NodeFunction.B, NodeFunction.C]
+FUNCTION_SEQ = None
 
-global_function_counters = {func: 0 for func in FUNCTION_SEQ}
+global_function_counters = None
 
 broken_path = False
 
@@ -186,8 +186,18 @@ class SenderBellmanFordApplication(BellmanFordApplication):
         super().__init__(node)
         self.routes = {}  # Almacena las rutas más cortas calculadas
         self.previous_node_id = None
+        self.max_hops = None
+        self.functions_sequence = None
 
-    def start_episode(self, episode_number) -> None:
+    def start_episode(self, episode_number, max_hops, functions_sequence):
+        self.max_hops=max_hops
+
+        global FUNCTION_SEQ
+        FUNCTION_SEQ=functions_sequence
+
+        global global_function_counters
+        global_function_counters = {func: 0 for func in FUNCTION_SEQ}
+
         global broken_path
         if broken_path or episode_number == 1:
             broken_path = False
