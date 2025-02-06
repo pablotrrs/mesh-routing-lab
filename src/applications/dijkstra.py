@@ -1,6 +1,7 @@
 from enum import Enum
 from classes import Application
 import random
+from queue import PriorityQueue
 
 class NodeFunction(Enum):
     A = "A"
@@ -98,7 +99,7 @@ class Packet:
         if self.functions_sequence:
             self.functions_sequence.pop(0)
 
-class BellmanFordApplication(Application):
+class DijkstraApplication(Application):
     def __init__(self, node):
         super().__init__(node)
         self.routes = {}  # Almacena las rutas más cortas calculadas
@@ -181,7 +182,7 @@ class BellmanFordApplication(Application):
         print(f'\n[Node_ID={self.node.node_id}] Sending packet to Node {to_node_id}\n')
         self.node.network.send_dict(self.node.node_id, to_node_id, packet)
 
-class SenderBellmanFordApplication(BellmanFordApplication):
+class SenderDijkstraApplication(DijkstraApplication):
     def __init__(self, node):
         super().__init__(node)
         self.routes = {}  # Almacena las rutas más cortas calculadas
@@ -190,7 +191,6 @@ class SenderBellmanFordApplication(BellmanFordApplication):
     def start_episode(self, episode_number) -> None:
         global broken_path
         if broken_path or episode_number == 1:
-            broken_path = False
             print(f"[Node_ID={self.node.node_id}] Starting broadcast for episode {episode_number}")
 
             # Iniciar el broadcast para recopilar latencias y asignar funciones
@@ -258,7 +258,7 @@ class SenderBellmanFordApplication(BellmanFordApplication):
     def compute_shortest_paths(self):
         """
         Calcula las rutas más cortas desde el nodo de origen a todos los demás nodos,
-        utilizando el algoritmo de Bellman-Ford.
+        utilizando una cola de prioridad para manejar eficientemente las latencias definidas en la clase Network.
         """
         self.paths_computed = False  # Inicializar la bandera en False
 
@@ -267,24 +267,29 @@ class SenderBellmanFordApplication(BellmanFordApplication):
         distances[self.node.node_id] = 0
         previous_nodes = {node_id: None for node_id in self.node.network.get_nodes()}
 
-        # Recopilar todas las aristas del grafo
-        edges = []
-        for node_id in self.node.network.get_nodes():
-            for neighbor in self.node.network.get_neighbors(node_id):
-                weight = self.node.network.get_latency(node_id, neighbor)
-                edges.append((node_id, neighbor, weight))  # (nodo_origen, nodo_destino, peso)
+        # Inicializar la cola de prioridad con el nodo fuente
+        priority_queue = PriorityQueue()
+        priority_queue.put((0, self.node.node_id))  # (distancia acumulada, nodo)
 
-        # Relajar todas las aristas |V| - 1 veces
-        for _ in range(len(self.node.network.get_nodes()) - 1):
-            for u, v, weight in edges:
-                if distances[u] + weight < distances[v]:
-                    distances[v] = distances[u] + weight
-                    previous_nodes[v] = u
+        visited = set()  # Conjunto de nodos visitados
 
-        # Detección de ciclos negativos
-        for u, v, weight in edges:
-            if distances[u] + weight < distances[v]:
-                raise ValueError("El grafo contiene un ciclo negativo")
+        while not priority_queue.empty():
+            # Extraer el nodo con la menor distancia acumulada
+            current_distance, current_node = priority_queue.get()
+
+            if current_node in visited:  # Si el nodo ya fue visitado, saltarlo
+                continue
+
+            visited.add(current_node)  # Marcar el nodo como visitado
+
+            # Iterar sobre los vecinos del nodo actual
+            for neighbor in self.node.network.get_neighbors(current_node):
+                # Calcular la nueva distancia al vecino
+                distance = current_distance + self.node.network.get_latency(current_node, neighbor)
+                if distance < distances[neighbor]:  # Si se encuentra una ruta más corta
+                    distances[neighbor] = distance
+                    previous_nodes[neighbor] = current_node
+                    priority_queue.put((distance, neighbor))  # Insertar el vecino con la nueva distancia
 
         # Reconstruir rutas usando los nodos previos
         self.routes = self._reconstruct_paths(self.node.node_id, previous_nodes)
@@ -469,7 +474,7 @@ class SenderBellmanFordApplication(BellmanFordApplication):
         print("Routes calculated:")
         print(tabulate(table, headers=["Route", "Path", "Functions", "Total Latency"], tablefmt="grid"))
 
-class IntermediateBellmanFordApplication(BellmanFordApplication):
+class IntermediateDijkstraApplication(DijkstraApplication):
     def __init__(self, node):
         super().__init__(node)
         self.assigned_function = None

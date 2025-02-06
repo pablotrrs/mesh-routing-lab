@@ -101,12 +101,21 @@ class QRoutingApplication(Application):
         # If exploitation failed, fall back to exploration
         if next_node is None:
             print(f'[Node_ID={self.node.node_id}] Exploitation failed, falling back to exploration')
+
+            # Obtener vecinos válidos (que estén conectados)
             valid_neighbors = [
                 neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id)
-                if self.node.network.nodes[neighbor].status
+                if neighbor in self.node.network.nodes and self.node.network.nodes[neighbor].status
             ]
+
             if valid_neighbors:
                 next_node = random.choice(valid_neighbors)
+                print(f'[Node_ID={self.node.node_id}] Exploration selected Node {next_node}')
+            else:
+                # Si no hay vecinos conectados, no se puede enviar el paquete
+                print(f'[Node_ID={self.node.node_id}] No available neighbors to send the packet. Dropping packet.')
+                return None
+                # TODO: acá habría que revisar que el paquete quede como que no fue entregado
 
         # Update epsilon after each decision
         EPSILON = max(EPSILON * EPSILON_DECAY, EPSILON_MIN)
@@ -165,10 +174,13 @@ class QRoutingApplication(Application):
 
         self.q_table[self.node.node_id][next_node] = updated_q
 
-    def send_packet(self, to_node_id, packet) -> None:
+    def send_packet(self, to_node_id, packet, lost_packet=False) -> None:
+
+        if lost_packet:
+            self.node.network.send_dict(None, None, None, True)
+            return
 
         # ensure node is up and running
-        # TODO: me parece que de esto se tendría ya se encarga Network
         if not self.node.is_sender and not self.node.status:
             print(f'[Node_ID={self.node.node_id}] Node status is False. Packet not sent.')
             return
@@ -206,6 +218,11 @@ class SenderQRoutingApplication(QRoutingApplication):
         self.initialize_or_update_q_table()
 
         next_node = self.select_next_node()
+
+        if next_node is None:
+            print(f'[Node_ID={self.node.node_id}] No valid next node found. Can\'t initiate episode!.')
+            self.send_packet(None, None, True)
+            return
 
         estimated_time_remaining = self.estimate_remaining_time(next_node)
 
@@ -255,7 +272,7 @@ class SenderQRoutingApplication(QRoutingApplication):
             t=callback_data.estimated_time,
         )
 
-        if self.callback_stack:
+        if self.callback_stack and callback_data.previous_hop_node:
             self.send_packet(callback_data.previous_hop_node, packet)
             return
 
@@ -364,6 +381,7 @@ class Packet:
         self.hops = 0  # Contador de saltos
         self.time = 0  # Tiempo total acumulado del paquete
         self.max_hops = 250 # Número máximo de saltos permitidos
+        self.is_delivered = False
 
     def increment_function_counter(self, function):
         """
