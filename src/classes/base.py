@@ -1,14 +1,48 @@
 import numpy as np
-import numpy as np
 from abc import ABC, abstractmethod
-import pandas as pd
+from enum import Enum
+
+class NodeFunction(Enum):
+    A = "A"
+    B = "B"
+    C = "C"
+    D = "D"
+    E = "E"
+    F = "F"
+    G = "G"
+    H = "H"
+    I = "I"
+    J = "J"
+    K = "K"
+    L = "L"
+    M = "M"
+    N = "N"
+    O = "O"
+    P = "P"
+    Q = "Q"
+    R = "R"
+    S = "S"
+    T = "T"
+    U = "U"
+    V = "V"
+    W = "W"
+    X = "X"
+    Y = "Y"
+    Z = "Z"
+
+    @staticmethod
+    def from_string(value: str):
+        try:
+            return NodeFunction(value)
+        except ValueError:
+            raise ValueError(f"'{value}' is not a valid NodeFunction. Valid values: {[f.value for f in NodeFunction]}")
 
 class Application(ABC):
     def __init__(self, node):
         self.node = node
 
     @abstractmethod
-    def start_episode(self, episode_number):
+    def start_episode(self, episode_number, max_hops, functions_sequence):
         pass
 
     @abstractmethod
@@ -40,9 +74,9 @@ class Node:
             self.reconnect_time = None
             self.status = None
 
-    def start_episode(self, episode_number):
+    def start_episode(self, episode_number, max_hops, functions_sequence):
         if self.application:
-            self.application.start_episode(episode_number)
+            self.application.start_episode(episode_number, max_hops, functions_sequence)
         else:
             raise RuntimeError(f"[Node_ID={self.node_id}] No application installed")
 

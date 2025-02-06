@@ -5,7 +5,7 @@ import math
 import threading
 
 class Network:
-    def __init__(self, mean_interval_ms=50):
+    def __init__(self):
         self.nodes = {}  # {node_id: Node}
         self.connections = {}  # {node_id: [neighbors]}
         self.active_nodes = set()
@@ -14,7 +14,18 @@ class Network:
         self.simulation_clock = 0  # Reloj central en ms
         self.running = False  # Control del hilo
         self.lock = threading.Lock()  # Para acceso seguro al reloj y nodos
-        self.mean_interval_ms=mean_interval_ms
+        self.mean_interval_ms = None
+        self.reconnect_interval_ms = None
+        self.max_hops = None
+
+    def set_max_hops(self, max_hops):
+        self.max_hops = max_hops
+
+    def set_mean_interval_ms(self, mean_interval_ms):
+        self.mean_interval_ms = mean_interval_ms
+
+    def set_reconnect_interval_ms(self, reconnect_interval_ms):
+        self.reconnect_interval_ms = reconnect_interval_ms
 
     def set_simulation_clock(self, clock_reference):
         """Sincroniza el reloj central con el de la simulación."""
@@ -30,11 +41,18 @@ class Network:
         Returns:
             int: Tiempo (ms) para el próximo cambio dinámico.
         """
-        return int(np.random.exponential(self.mean_interval_ms))
+        if self.mean_interval_ms == float('inf'):
+            # No generar cambios dinámicos; retorna un tiempo muy alto
+            return int(1e12)  # Un valor grande que nunca será alcanzado en la simulación
+        else:
+            # Generar el próximo cambio dinámico normalmente
+            return int(np.random.exponential(self.mean_interval_ms))
 
     def start_dynamic_changes(self):
         """Inicia un hilo que aplica los cambios dinámicos en función del reloj central."""
         self.running = True
+        current_time = self.simulation_clock.get_current_time()
+        print(f"[Network] clock starts: {current_time}")
         threading.Thread(target=self._monitor_dynamic_changes, daemon=True).start()
 
     def stop_dynamic_changes(self):
@@ -46,10 +64,11 @@ class Network:
         next_event_time = self.simulation_clock.get_current_time() + self.generate_next_dynamic_change()
         while self.running:
             current_time = self.simulation_clock.get_current_time()
+            # print(f"[Network] clock tics: {current_time}")
             with self.lock:
                 if current_time >= next_event_time:
-                    print("ZZZAP")
-                    print(f"[Network] Dynamic Change triggered at {current_time} ms")
+                    print("\n⚡ZZZAP⚡")
+                    # print(f"[Network] Dynamic Change triggered at {current_time} ms")
                     self.trigger_dynamic_change()
                     self.dynamic_change_events.append(current_time)
                     next_event_time = current_time + self.generate_next_dynamic_change()
@@ -63,7 +82,7 @@ class Network:
         for node_id in list(self.active_nodes):
             if np.random.rand() < 0.3:  # 30% de probabilidad de desconexión
                 self.nodes[node_id].status = False
-                self.nodes[node_id].reconnect_time = np.random.exponential(scale=5000)  # 5 segundos
+                self.nodes[node_id].reconnect_time = np.random.exponential(scale=self.reconnect_interval_ms)
                 print(f"[Network] Node {node_id} disconnected.")
 
     def validate_connection(self, from_node_id, to_node_id):
@@ -143,15 +162,14 @@ class Network:
 
         # Validar y enviar
         hops = packet["hops"]
-        max_hops = packet["max_hops"]
 
         if to_node_id in self.connections.get(from_node_id, []) and \
             from_node_id in self.active_nodes and \
             to_node_id in self.active_nodes and \
-            hops < max_hops:
+            hops < self.max_hops:
 
             print(f"[Network] Sending packet from Node {from_node_id} to Node {to_node_id} with latency {latency:.6f} seconds")
-            print(f"[Network] Packet hops: {hops} of {max_hops} max hops")
+            print(f"[Network] Packet hops: {hops} of {self.max_hops} max hops")
 
             time.sleep(latency)
 
@@ -160,7 +178,7 @@ class Network:
             self.packet_log[episode_number][-1]['is_delivered'] = True
 
             self.nodes[to_node_id].application.receive_packet(packet)
-        elif hops >= max_hops:
+        elif hops >= self.max_hops:
             print(f"[Network] Packet from Node {from_node_id} was lost. Max hops reached.")
         else:
             print(f"[Network] Failed to send packet: Node {to_node_id} is not reachable from Node {from_node_id}")
@@ -201,10 +219,10 @@ class Network:
         if to_node_id in self.connections.get(from_node_id, []) and \
             from_node_id in self.active_nodes and \
             to_node_id in self.active_nodes and \
-            packet.hops < packet.max_hops:
+            packet.hops < self.max_hops:
 
             print(f"[Network] Sending packet from Node {from_node_id} to Node {to_node_id} with latency {latency:.6f} seconds")
-            print(f"[Network] Packet hops: {packet.hops} of {packet.max_hops} max hops")
+            print(f"[Network] Packet hops: {packet.hops} of {self.max_hops} max hops")
 
             time.sleep(latency)
 
@@ -212,7 +230,7 @@ class Network:
             self.packet_log[packet.episode_number][-1]['is_delivered'] = True
 
             self.nodes[to_node_id].application.receive_packet(packet)
-        elif packet.hops >= packet.max_hops:
+        elif packet.hops >= self.max_hops:
             print(f"[Network] Packet from Node {from_node_id} was lost. Max hops reached.")
         else:
             print(f"[Network] Failed to send packet: Node {to_node_id} is not reachable from Node {from_node_id}")

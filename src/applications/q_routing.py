@@ -4,6 +4,7 @@ import random
 import time
 from classes.base import Application
 from visualization import print_q_table
+from classes.base import NodeFunction
 
 ALPHA = 0.1
 GAMMA = 0.9
@@ -24,12 +25,7 @@ class PacketType(Enum):
     PACKET_HOP = "PACKET_HOP"
     CALLBACK = "CALLBACK"
 
-class NodeFunction(Enum):
-    A = "A"
-    B = "B"
-    C = "C"
-
-FUNCTION_SEQ = [NodeFunction.A, NodeFunction.B, NodeFunction.C]
+FUNCTION_SEQ = None
 
 @dataclass
 class CallbackChainStep:
@@ -45,6 +41,8 @@ class QRoutingApplication(Application):
         self.q_table = {}
         self.assigned_function = None
         self.callback_stack = []
+        self.max_hops = None
+        self.functions_sequence = None
 
     def receive_packet(self, packet):
         print(f'[Node_ID={self.node.node_id}] Received packet {packet}')
@@ -206,8 +204,12 @@ class SenderQRoutingApplication(QRoutingApplication):
     def __init__(self, node):
         super().__init__(node)
 
-    def start_episode(self, episode_number) -> None:
+    def start_episode(self, episode_number, max_hops=None, functions_sequence=None) -> None:
         """Initiates an episode by creating a packet and sending it to chosen node."""
+        self.max_hops=max_hops
+
+        global FUNCTION_SEQ
+        FUNCTION_SEQ=functions_sequence
 
         packet = Packet(
             episode_number=episode_number,

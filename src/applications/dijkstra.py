@@ -8,9 +8,9 @@ class NodeFunction(Enum):
     B = "B"
     C = "C"
 
-FUNCTION_SEQ = [NodeFunction.A, NodeFunction.B, NodeFunction.C]
+FUNCTION_SEQ = None
 
-global_function_counters = {func: 0 for func in FUNCTION_SEQ}
+global_function_counters = None
 
 broken_path = False
 
@@ -187,10 +187,21 @@ class SenderDijkstraApplication(DijkstraApplication):
         super().__init__(node)
         self.routes = {}  # Almacena las rutas más cortas calculadas
         self.previous_node_id = None
+        self.max_hops = None
+        self.functions_sequence = None
 
-    def start_episode(self, episode_number) -> None:
+    def start_episode(self, episode_number, max_hops, functions_sequence):
+        self.max_hops=max_hops
+
+        global FUNCTION_SEQ
+        FUNCTION_SEQ=functions_sequence
+
+        global global_function_counters
+        global_function_counters = {func: 0 for func in FUNCTION_SEQ}
+
         global broken_path
         if broken_path or episode_number == 1:
+            broken_path = False
             print(f"[Node_ID={self.node.node_id}] Starting broadcast for episode {episode_number}")
 
             # Iniciar el broadcast para recopilar latencias y asignar funciones
@@ -520,6 +531,7 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                 #
                 if not self.assigned_function:
                     # Buscar la función menos asignada globalmente
+                    # global global_function_counters
                     min_count = min(global_function_counters.values())
                     least_assigned_functions = [
                         func for func, count in global_function_counters.items() if count == min_count
