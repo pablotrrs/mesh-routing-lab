@@ -95,7 +95,6 @@ class Simulation:
 
             # Registrar inicio del episodio con el reloj global
             start_time = self.get_current_time()
-
             # Estado inicial de la red
             node_info = [
                 [node.node_id, node.status, node.lifetime, node.reconnect_time]
@@ -151,6 +150,8 @@ class Simulation:
             # if episode_number not in self.metrics[algorithm]:
             #     self.metrics[algorithm][episode_number] = {}
             self.metrics[algorithm][episode_number] = {
+                "start_time": start_time,
+                "end_time": end_time,
                 "episode_duration": episode_duration,
                 "delivered_packets": delivered_packets,
                 "total_packets": total_packets,
@@ -170,9 +171,10 @@ class Simulation:
 
             # **Mostrar Métricas del Episodio**
             print(f"\nEpisode #{episode_number} Metrics:")
+            print(f"  Comienzo del episodio en el tiempo: {start_time} ms")
             print(f"  Duración total del episodio: {episode_duration} ms")
             print(f"  Paquetes entregados: {delivered_packets} / {total_packets}")
-            print(f"  Tasa de paquetes entregados por segundo: {tasa_paquetes_por_segundo:.2f} pkt/s")
+            print(f"  Tasa de paquetes entregados por segundo: {tasa_paquetes_por_segundo:.8f} pkt/s")
             print(f"  Hops promedio por paquete: {hops_promedio}")
             print(f"  Cambios dinámicos ocurridos en este episodio: {cambios_dinamicos_en_episodio}")
 
@@ -185,7 +187,7 @@ class Simulation:
 
         # **Guardar Resultados**
         self.save_results_to_excel()
-        # self.generar_individual_graphs_from_excel()
+        self.generar_individual_graphs_from_excel()
 
     def save_results_to_excel(self, filename="../results/resultados_simulacion.xlsx"):
         """
