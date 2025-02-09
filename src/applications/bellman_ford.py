@@ -8,6 +8,7 @@ class NodeFunction(Enum):
     C = "C"
 
 FUNCTION_SEQ = None
+MAX_HOPS = 0
 
 global_function_counters = None
 
@@ -51,7 +52,7 @@ class PacketType(Enum):
     PACKET_HOP = "PACKET_HOP"
     BROKEN_PATH = "BROKEN_PATH"
     SUCCESS = "SUCCESS"
-    PROBE = "PROBE"
+    MAX_HOPS = "MAX_HOPS"
 
 class Packet:
     def __init__(self, episode_number, from_node_id, type):
@@ -190,7 +191,10 @@ class SenderBellmanFordApplication(BellmanFordApplication):
         self.functions_sequence = None
 
     def start_episode(self, episode_number, max_hops, functions_sequence):
-        self.max_hops=max_hops
+        # self.max_hops=max_hops
+
+        global MAX_HOPS
+        MAX_HOPS=max_hops
 
         global FUNCTION_SEQ
         FUNCTION_SEQ=functions_sequence
@@ -229,7 +233,7 @@ class SenderBellmanFordApplication(BellmanFordApplication):
             "function_counters": {func: 0 for func in FUNCTION_SEQ},  # Contadores de funciones asignadas
             "hops": 0,  # Contador de saltos
             "time": 0,  # Tiempo total acumulado del paquete
-            "max_hops": 250,  # Número máximo de saltos permitidos
+            "max_hops": MAX_HOPS,  # Número máximo de saltos permitidos
             "node_function_map": self.broadcast_state.node_function_map
         }
         next_node = self.select_next_function_node(packet)
@@ -337,6 +341,14 @@ class SenderBellmanFordApplication(BellmanFordApplication):
         print(f"[Node_ID={self.node.node_id}] Received packet {packet}")
 
         match packet["type"]:
+
+            case PacketType.MAX_HOPS:
+                episode_number = packet["episode_number"]
+                print(f"\n[Node_ID={self.node.node_id}] Episode {episode_number} failed.")
+
+                self.mark_episode_result(packet, success=False)
+                return
+
             case PacketType.PACKET_HOP:
                 print(f"[Node_ID={self.node.node_id}] Processing packet at node {self.node}: {packet}")
 
@@ -367,6 +379,7 @@ class SenderBellmanFordApplication(BellmanFordApplication):
             case PacketType.SUCCESS:
                 # print(f"[Node_ID={self.node.node_id}] Episode {packet.episode_number} completed with total time {packet.time}")
                 episode_number = packet["episode_number"]
+                self.mark_episode_result(packet, success=True)
                 print(f"[Node_ID={self.node.node_id}] Episode {episode_number} completed")
 
             case PacketType.BROADCAST:
@@ -445,6 +458,26 @@ class SenderBellmanFordApplication(BellmanFordApplication):
             case _:
                 packet_type = packet["type"]
                 print(f"[Node_ID={self.node.node_id}] Received unknown packet type: {packet_type}")
+
+    def mark_episode_result(self, packet, success=True):
+        """
+        Marca un episodio como exitoso o fallido y lo notifica a la red.
+
+        Args:
+            packet (Packet): El paquete asociado al episodio.
+            success (bool): `True` si el episodio fue exitoso, `False` si falló.
+        """
+        status_text = "SUCCESS" if success else "FAILURE"
+        episode_number = packet["episode_number"]
+        print(f"\n[Node_ID={self.node.node_id}] Marking Episode {episode_number} as {status_text}.")
+
+        # Llamar a la red para registrar el estado del episodio
+        self.node.network.send_dict(
+            from_node_id=self.node.node_id, 
+            to_node_id=None,  # No es necesario enviar el paquete a otro nodo en este caso
+            packet_dict=packet, 
+            episode_success=success
+        )
 
     def _log_routes(self):
         """
@@ -631,7 +664,29 @@ class IntermediateBellmanFordApplication(BellmanFordApplication):
                     # Marcar el broadcast como completado
                     self.broadcast_state.mark_completed()
 
+            case PacketType.MAX_HOPS:
+                previous_node = self.callback_stack.pop()
+                self.send_packet(previous_node, packet)
+
             case PacketType.PACKET_HOP:
+
+                global MAX_HOPS
+                if packet["hops"] > MAX_HOPS:
+                    print(f'[Node_ID={self.node.node_id}] Max hops reached. Initiating callback')
+                    # print(f"*******callback_stack: {self.callback_stack}")
+
+                    failure_packet = {
+                        "type": PacketType.MAX_HOPS,
+                        "episode_number": packet["episode_number"],
+                        "from_node_id": self.node.node_id,
+                        "hops": packet["hops"] + 1,
+                        "max_hops": MAX_HOPS,
+                    }
+
+                    from_node_id = packet["from_node_id"]
+                    print(f"[Node_ID={self.node.node_id}] Sending MAX_HOPS packet back to node {from_node_id}.")
+                    self.send_packet(from_node_id, failure_packet)
+                    return
 
                 # Si el nodo tiene una función asignada, procesarla
                 if self.assigned_function:

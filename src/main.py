@@ -70,6 +70,9 @@ if __name__ == "__main__":
     parser.add_argument('--functions_sequence', type=str, nargs='+', default=["A", "B", "C"],
                         help=f"Sequence of functions for routing (default: A -> B -> C). Valid options: {[f.value for f in NodeFunction]}")
 
+    parser.add_argument('--penalty', type=float, default=0.0,
+                        help='Penalty for Q-Values of hops that cause a packet to lose (Only for Q_ROUTING)')
+
     args = parser.parse_args()
 
     try:
@@ -115,9 +118,17 @@ if __name__ == "__main__":
         match selected_algorithm:
             case Algorithm.Q_ROUTING:
 
+                print(f"Penalty: {args.penalty}")
+
                 from applications.q_routing import SenderQRoutingApplication, IntermediateQRoutingApplication
 
+                # app = SenderQRoutingApplication(sender_node)
+                # app.set_penalty(args.penalty)
+                #
+                # sender_node.install_application(app)
+
                 sender_node.install_application(SenderQRoutingApplication)
+                sender_node.application.set_penalty(args.penalty)
 
                 for node_id, node in network.nodes.items():
                     if node_id != sender_node.node_id:
@@ -152,11 +163,18 @@ if __name__ == "__main__":
         print(f"Mean interval for dynamic changes: {args.mean_interval_ms} ms")
         print(f"Topology file: {args.topology_file}")
         print(f"Functions sequence: {functions_sequence}")
+        print(f"Penalty: {args.penalty}")
         print(f"Running simulation with Q_ROUTING")
 
         from applications.q_routing import SenderQRoutingApplication, IntermediateQRoutingApplication
 
+        # app = SenderQRoutingApplication(sender_node)
+        # app.set_penalty(args.penalty)
+        #
+        # sender_node.install_application(app)
+
         sender_node.install_application(SenderQRoutingApplication)
+        sender_node.application.set_penalty(args.penalty)
 
         for node_id, node in network.nodes.items():
             if node_id != sender_node.node_id:

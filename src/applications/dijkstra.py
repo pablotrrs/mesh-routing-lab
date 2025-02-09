@@ -9,6 +9,7 @@ class NodeFunction(Enum):
     C = "C"
 
 FUNCTION_SEQ = None
+MAX_HOPS = 0
 
 global_function_counters = None
 
@@ -52,52 +53,7 @@ class PacketType(Enum):
     PACKET_HOP = "PACKET_HOP"
     BROKEN_PATH = "BROKEN_PATH"
     SUCCESS = "SUCCESS"
-    PROBE = "PROBE"
-
-class Packet:
-    def __init__(self, episode_number, from_node_id, type):
-        self.type = type
-        self.episode_number = episode_number  # Número de episodio al que pertenece este paquete
-        self.from_node_id = from_node_id  # Nodo anterior por el que pasó el paquete
-        self.functions_sequence = FUNCTION_SEQ.copy()  # Secuencia de funciones a procesar
-        self.function_counters = {func: 0 for func in FUNCTION_SEQ}  # Contadores de funciones asignadas
-        self.processed_functions = []  # Funciones ya procesadas
-        self.hops = 0  # Contador de saltos
-        self.time = 0  # Tiempo total acumulado del paquete
-        self.max_hops = 250  # Número máximo de saltos permitidos
-
-    def __init__(self, episode_number, from_node_id, type, message_id):
-        self.type = type
-        self.episode_number = episode_number  # Número de episodio al que pertenece este paquete
-        self.from_node_id = from_node_id  # Nodo anterior por el que pasó el paquete
-        self.functions_sequence = FUNCTION_SEQ.copy()  # Secuencia de funciones a procesar
-        self.function_counters = {func: 0 for func in FUNCTION_SEQ}  # Contadores de funciones asignadas
-        self.processed_functions = []  # Funciones ya procesadas
-        self.hops = 0  # Contador de saltos
-        self.time = 0  # Tiempo total acumulado del paquete
-        self.max_hops = 250  # Número máximo de saltos permitidos
-        self.message_id = message_id
-
-    def increment_function_counter(self, function):
-        """
-        Incrementa el contador de asignaciones para una función específica.
-        """
-        if function not in self.function_counters:
-            raise ValueError(f"La función {function} no es válida.")
-        self.function_counters[function] += 1
-
-    def is_sequence_completed(self):
-        """Revisa si la secuencia de funciones ha sido completamente procesada."""
-        return len(self.functions_sequence) == 0
-
-    def next_function(self):
-        """Obtiene la próxima función en la secuencia, si existe."""
-        return self.functions_sequence[0] if self.functions_sequence else None
-
-    def remove_next_function(self):
-        """Elimina la función actual de la secuencia, marcándola como procesada."""
-        if self.functions_sequence:
-            self.functions_sequence.pop(0)
+    MAX_HOPS = "MAX_HOPS"
 
 class DijkstraApplication(Application):
     def __init__(self, node):
@@ -191,7 +147,10 @@ class SenderDijkstraApplication(DijkstraApplication):
         self.functions_sequence = None
 
     def start_episode(self, episode_number, max_hops, functions_sequence):
-        self.max_hops=max_hops
+        # self.max_hops=max_hops
+
+        global MAX_HOPS
+        MAX_HOPS=max_hops
 
         global FUNCTION_SEQ
         FUNCTION_SEQ=functions_sequence
@@ -222,6 +181,7 @@ class SenderDijkstraApplication(DijkstraApplication):
                 pass
 
         print(f"[Node_ID={self.node.node_id}] Starting episode {episode_number}")
+
         packet = {
             "type": PacketType.PACKET_HOP,
             "episode_number": episode_number,
@@ -230,7 +190,7 @@ class SenderDijkstraApplication(DijkstraApplication):
             "function_counters": {func: 0 for func in FUNCTION_SEQ},  # Contadores de funciones asignadas
             "hops": 0,  # Contador de saltos
             "time": 0,  # Tiempo total acumulado del paquete
-            "max_hops": 250,  # Número máximo de saltos permitidos
+            "max_hops": MAX_HOPS,
             "node_function_map": self.broadcast_state.node_function_map
         }
         next_node = self.select_next_function_node(packet)
@@ -343,6 +303,14 @@ class SenderDijkstraApplication(DijkstraApplication):
         print(f"[Node_ID={self.node.node_id}] Received packet {packet}")
 
         match packet["type"]:
+
+            case PacketType.MAX_HOPS:
+                episode_number = packet["episode_number"]
+                print(f"\n[Node_ID={self.node.node_id}] Episode {episode_number} failed.")
+
+                self.mark_episode_result(packet, success=False)
+                return
+
             case PacketType.PACKET_HOP:
                 print(f"[Node_ID={self.node.node_id}] Processing packet at node {self.node}: {packet}")
 
@@ -373,6 +341,7 @@ class SenderDijkstraApplication(DijkstraApplication):
             case PacketType.SUCCESS:
                 # print(f"[Node_ID={self.node.node_id}] Episode {packet.episode_number} completed with total time {packet.time}")
                 episode_number = packet["episode_number"]
+                self.mark_episode_result(packet, success=True)
                 print(f"[Node_ID={self.node.node_id}] Episode {episode_number} completed")
 
             case PacketType.BROADCAST:
@@ -451,6 +420,26 @@ class SenderDijkstraApplication(DijkstraApplication):
             case _:
                 packet_type = packet["type"]
                 print(f"[Node_ID={self.node.node_id}] Received unknown packet type: {packet_type}")
+
+    def mark_episode_result(self, packet, success=True):
+        """
+        Marca un episodio como exitoso o fallido y lo notifica a la red.
+
+        Args:
+            packet (Packet): El paquete asociado al episodio.
+            success (bool): `True` si el episodio fue exitoso, `False` si falló.
+        """
+        status_text = "SUCCESS" if success else "FAILURE"
+        episode_number = packet["episode_number"]
+        print(f"\n[Node_ID={self.node.node_id}] Marking Episode {episode_number} as {status_text}.")
+
+        # Llamar a la red para registrar el estado del episodio
+        self.node.network.send_dict(
+            from_node_id=self.node.node_id, 
+            to_node_id=None,  # No es necesario enviar el paquete a otro nodo en este caso
+            packet_dict=packet, 
+            episode_success=success
+        )
 
     def _log_routes(self):
         """
@@ -638,7 +627,29 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                     # Marcar el broadcast como completado
                     self.broadcast_state.mark_completed()
 
+            case PacketType.MAX_HOPS:
+                previous_node = self.callback_stack.pop()
+                self.send_packet(previous_node, packet)
+
             case PacketType.PACKET_HOP:
+
+                global MAX_HOPS
+                if packet["hops"] > MAX_HOPS:
+                    print(f'[Node_ID={self.node.node_id}] Max hops reached. Initiating callback')
+                    # print(f"*******callback_stack: {self.callback_stack}")
+
+                    failure_packet = {
+                        "type": PacketType.MAX_HOPS,
+                        "episode_number": packet["episode_number"],
+                        "from_node_id": self.node.node_id,
+                        "hops": packet["hops"] + 1,
+                        "max_hops": MAX_HOPS,
+                    }
+
+                    from_node_id = packet["from_node_id"]
+                    print(f"[Node_ID={self.node.node_id}] Sending MAX_HOPS packet back to node {from_node_id}.")
+                    self.send_packet(from_node_id, failure_packet)
+                    return
 
                 # Si el nodo tiene una función asignada, procesarla
                 if self.assigned_function:

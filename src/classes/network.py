@@ -126,112 +126,134 @@ class Network:
         """
         return list(self.nodes.keys())
 
-    def send_dict(self, from_node_id, to_node_id, packet, lost_packet=False):
-        # Si el paquete está marcado como perdido, registrarlo y salir
-        if lost_packet:
-            print(f"[Network] Packet marked as lost on demand.")
-            if packet and "episode_number" in packet:
-                if packet["episode_number"] not in self.packet_log:
-                    self.packet_log[packet["episode_number"]] = []
+    def send_dict(self, from_node_id, to_node_id, packet_dict, lost_packet=False, episode_success=False):
+        """
+        Registra el envío de un paquete en el packet_log y maneja la lógica de transmisión 
+        utilizando un diccionario en lugar de una instancia de la clase Packet.
 
-                # Registrar el paquete perdido
-                self.packet_log[packet["episode_number"]].append({
-                    'from': from_node_id,
-                    'to': to_node_id,
-                    'packet': packet,
-                    'is_delivered': False,  # Marcado como no entregado
-                    'latency': None  # Latencia indefinida para paquetes perdidos
-                })
+        Args:
+            from_node_id (int): Nodo de origen.
+            to_node_id (int): Nodo de destino (puede ser None si el paquete ha llegado al nodo original).
+            packet_dict (dict): Paquete representado como un diccionario.
+            lost_packet (bool): Indica si el paquete debe marcarse como perdido.
+            episode_success (bool): Indica si el episodio fue exitoso.
+        """
+        episode_number = packet_dict.get("episode_number")
+
+        # Inicializar registro del episodio si aún no existe
+        if episode_number not in self.packet_log:
+            self.packet_log[episode_number] = {
+                "episode_success": None,  # Se actualizará al final del episodio
+                "episode_duration": None,
+                "route": []
+            }
+
+        # Caso: Paquete marcado como perdido
+        if lost_packet:
+            print(f"[Network] Packet lost on demand.")
+            self.packet_log[episode_number]["episode_success"] = False
             return
 
-        # Validar y calcular la latencia solo si no se marca como perdido
-        latency = self.get_latency(from_node_id, to_node_id)
+        # Caso: El paquete ha regresado al nodo original, terminando el episodio
+        if to_node_id is None:
+            print(f"[Network] Packet reached final destination at Node {from_node_id}. Marking episode completion.")
+            to_node_id = "N/A"  # Marcar destino como N/A en el log
+            self.packet_log[episode_number]["episode_success"] = episode_success  # Marcar resultado del episodio
+            print(f"[Network] Episode {episode_number} {'SUCCESS' if episode_success else 'FAILURE'} at Node {from_node_id}.")
+            return
 
-        if "episode_number" in packet:
-            if packet["episode_number"] not in self.packet_log:
-                self.packet_log[packet["episode_number"]] = []
+        # Calcular latencia
+        latency = self.get_latency(from_node_id, to_node_id) if to_node_id != "N/A" else 0
 
-            # Registrar el paquete con estado por defecto
-            self.packet_log[packet["episode_number"]].append({
-                'from': from_node_id,
-                'to': to_node_id,
-                'packet': packet,
-                'is_delivered': False,  # Estado inicial
-                'latency': latency
-            })
+        # Registrar información del hop
+        self.packet_log[episode_number]["route"].append({
+            "from": from_node_id,
+            "to": to_node_id,
+            "function": self.nodes[from_node_id].get_assigned_function() if self.nodes[from_node_id].get_assigned_function() else None,
+            "node_status": "active" if from_node_id in self.active_nodes else "inactive",
+            "latency": latency
+        })
 
-        # Validar y enviar
-        hops = packet["hops"]
+        # Si el paquete ha regresado al nodo inicial, finaliza aquí
+        if to_node_id == "N/A":
+            return
 
+        # Verificar si el nodo de destino es alcanzable
         if to_node_id in self.connections.get(from_node_id, []) and \
-            from_node_id in self.active_nodes and \
-            to_node_id in self.active_nodes and \
-            hops < self.max_hops:
+                from_node_id in self.active_nodes and \
+                to_node_id in self.active_nodes:
 
             print(f"[Network] Sending packet from Node {from_node_id} to Node {to_node_id} with latency {latency:.6f} seconds")
-            print(f"[Network] Packet hops: {hops} of {self.max_hops} max hops")
+            print(f"[Network] Packet hops: {packet_dict.get('hops', 0)} of {self.max_hops} max hops")
 
-            time.sleep(latency)
+            time.sleep(latency)  # Simulación de la latencia
 
-            # Actualizar el estado de entrega directamente en el registro
-            episode_number = packet["episode_number"]
-            self.packet_log[episode_number][-1]['is_delivered'] = True
-
-            self.nodes[to_node_id].application.receive_packet(packet)
-        elif hops >= self.max_hops:
-            print(f"[Network] Packet from Node {from_node_id} was lost. Max hops reached.")
+            self.nodes[to_node_id].application.receive_packet(packet_dict)
         else:
             print(f"[Network] Failed to send packet: Node {to_node_id} is not reachable from Node {from_node_id}")
 
-    def send(self, from_node_id, to_node_id, packet, lost_packet=False):
-        # Si el paquete está marcado como perdido, registrarlo y salir
-        if lost_packet:
-            print(f"[Network] Packet marked as lost on demand.")
-            if packet and "episode_number" in packet:
-                if packet["episode_number"] not in self.packet_log:
-                    self.packet_log[packet["episode_number"]] = []
+    def send(self, from_node_id, to_node_id, packet, lost_packet=False, episode_success=False):
+        """
+        Envía un paquete entre nodos de la red, registrando su trazabilidad y manejando errores de conectividad.
 
-                # Registrar el paquete perdido
-                self.packet_log[packet["episode_number"]].append({
-                    'from': from_node_id,
-                    'to': to_node_id,
-                    'packet': packet,
-                    'is_delivered': False,  # Marcado como no entregado
-                    'latency': None  # Latencia indefinida para paquetes perdidos
-                })
+        Args:
+            from_node_id (int): Nodo de origen.
+            to_node_id (int): Nodo de destino (puede ser None si el paquete ha llegado al nodo original).
+            packet (Packet): Instancia de la clase Packet.
+            lost_packet (bool): Indica si el paquete se debe marcar como perdido.
+            episode_success (bool): Indica si el episodio fue exitoso.
+        """
+        episode_number = packet.episode_number
+
+        # Inicializar registro del episodio si aún no existe
+        if episode_number not in self.packet_log:
+            self.packet_log[episode_number] = {
+                "episode_success": None,  # Se actualizará al final del episodio
+                "episode_duration": None,
+                "route": []
+            }
+
+        # Caso: Paquete marcado como perdido
+        if lost_packet:
+            print(f"[Network] Packet lost on demand.")
+            self.packet_log[episode_number]["episode_success"] = False
             return
 
-        # Validar y calcular la latencia solo si no se marca como perdido
-        latency = self.get_latency(from_node_id, to_node_id)
+        # Caso: El paquete ha regresado al nodo original, terminando el episodio
+        if to_node_id is None:
+            print(f"[Network] Packet reached final destination at Node {from_node_id}. Marking episode completion.")
+            to_node_id = "N/A"  # Marcar destino como N/A en el log
+            self.packet_log[episode_number]["episode_success"] = episode_success  # Marcar resultado del episodio
+            print(f"[Network] Episode {episode_number} {'SUCCESS' if episode_success else 'FAILURE'} at Node {from_node_id}.")
+            return
 
-        if packet.episode_number not in self.packet_log:
-            self.packet_log[packet.episode_number] = []
+        # Calcular latencia
+        latency = self.get_latency(from_node_id, to_node_id) if to_node_id != "N/A" else 0
 
-        # Registrar el paquete con estado por defecto
-        self.packet_log[packet.episode_number].append({
-            'from': from_node_id,
-            'to': to_node_id,
-            'packet': packet,
-            'is_delivered': False,  # Estado inicial
-            'latency': latency
+        # Registrar información del hop
+        self.packet_log[episode_number]["route"].append({
+            "from": from_node_id,
+            "to": to_node_id,
+            "function": self.nodes[from_node_id].get_assigned_function() if self.nodes[from_node_id].get_assigned_function() else None,
+            "node_status": "active" if from_node_id in self.active_nodes else "inactive",
+            "latency": latency
         })
 
+        # Si el paquete ha regresado al nodo inicial, finaliza aquí
+        if to_node_id == "N/A":
+            return
+
+        # Verificar si el nodo de destino es alcanzable
         if to_node_id in self.connections.get(from_node_id, []) and \
-            from_node_id in self.active_nodes and \
-            to_node_id in self.active_nodes and \
-            packet.hops < self.max_hops:
+                from_node_id in self.active_nodes and \
+                to_node_id in self.active_nodes:
 
             print(f"[Network] Sending packet from Node {from_node_id} to Node {to_node_id} with latency {latency:.6f} seconds")
             print(f"[Network] Packet hops: {packet.hops} of {self.max_hops} max hops")
 
-            time.sleep(latency)
-
-            # Actualizar el estado de entrega directamente en el registro
-            self.packet_log[packet.episode_number][-1]['is_delivered'] = True
+            time.sleep(latency)  # Simulación de la latencia
 
             self.nodes[to_node_id].application.receive_packet(packet)
-        elif packet.hops >= self.max_hops:
-            print(f"[Network] Packet from Node {from_node_id} was lost. Max hops reached.")
         else:
             print(f"[Network] Failed to send packet: Node {to_node_id} is not reachable from Node {from_node_id}")
 
