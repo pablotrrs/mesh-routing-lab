@@ -122,11 +122,6 @@ if __name__ == "__main__":
 
                 from applications.q_routing import SenderQRoutingApplication, IntermediateQRoutingApplication
 
-                # app = SenderQRoutingApplication(sender_node)
-                # app.set_penalty(args.penalty)
-                #
-                # sender_node.install_application(app)
-
                 sender_node.install_application(SenderQRoutingApplication)
                 sender_node.application.set_penalty(args.penalty)
 
@@ -134,7 +129,7 @@ if __name__ == "__main__":
                     if node_id != sender_node.node_id:
                         node.install_application(IntermediateQRoutingApplication)
 
-                simulation.start(selected_algorithm, args.episodes, functions_sequence)
+                simulation.start(selected_algorithm, args.episodes, functions_sequence, args.mean_interval_ms, args.reconnect_interval_ms, args.topology_file, args.penalty)
 
             case Algorithm.DIJKSTRA:
                 from applications.dijkstra import SenderDijkstraApplication, IntermediateDijkstraApplication
@@ -145,7 +140,7 @@ if __name__ == "__main__":
                     if node_id != sender_node.node_id:
                         node.install_application(IntermediateDijkstraApplication)
 
-                simulation.start(selected_algorithm, args.episodes, functions_sequence)
+                simulation.start(selected_algorithm, args.episodes, functions_sequence, args.mean_interval_ms, args.reconnect_interval_ms, args.topology_file, args.penalty)
 
             case Algorithm.BELLMAN_FORD:
                 from applications.bellman_ford import SenderBellmanFordApplication, IntermediateBellmanFordApplication
@@ -156,7 +151,7 @@ if __name__ == "__main__":
                     if node_id != sender_node.node_id:
                         node.install_application(IntermediateBellmanFordApplication)
 
-                simulation.start(selected_algorithm, args.episodes, functions_sequence)
+                simulation.start(selected_algorithm, args.episodes, functions_sequence, args.mean_interval_ms, args.reconnect_interval_ms, args.topology_file, args.penalty)
     else:
         print(f"Running {args.episodes} episodes using all algorithms.")
         print(f"Maximum hops: {args.max_hops}")
@@ -168,11 +163,6 @@ if __name__ == "__main__":
 
         from applications.q_routing import SenderQRoutingApplication, IntermediateQRoutingApplication
 
-        # app = SenderQRoutingApplication(sender_node)
-        # app.set_penalty(args.penalty)
-        #
-        # sender_node.install_application(app)
-
         sender_node.install_application(SenderQRoutingApplication)
         sender_node.application.set_penalty(args.penalty)
 
@@ -180,7 +170,7 @@ if __name__ == "__main__":
             if node_id != sender_node.node_id:
                 node.install_application(IntermediateQRoutingApplication)
 
-        simulation.start(Algorithm.Q_ROUTING, args.episodes, functions_sequence)
+        simulation.start(Algorithm.Q_ROUTING, args.episodes, functions_sequence, args.mean_interval_ms, args.reconnect_interval_ms, args.topology_file, args.penalty)
 
         print(f"Running simulation with DIJKSTRA")
 
@@ -192,7 +182,7 @@ if __name__ == "__main__":
             if node_id != sender_node.node_id:
                 node.install_application(IntermediateDijkstraApplication)
 
-        simulation.start(Algorithm.DIJKSTRA, args.episodes, functions_sequence)
+        simulation.start(Algorithm.DIJKSTRA, args.episodes, functions_sequence, args.mean_interval_ms, args.reconnect_interval_ms, args.topology_file, args.penalty)
 
         print(f"Running simulation with BELLMAN_FORD")
 
@@ -204,4 +194,4 @@ if __name__ == "__main__":
             if node_id != sender_node.node_id:
                 node.install_application(IntermediateBellmanFordApplication)
 
-        simulation.start(Algorithm.BELLMAN_FORD, args.episodes, functions_sequence)
+        simulation.start(Algorithm.BELLMAN_FORD, args.episodes, functions_sequence, args.mean_interval_ms, args.reconnect_interval_ms, args.topology_file, args.penalty)

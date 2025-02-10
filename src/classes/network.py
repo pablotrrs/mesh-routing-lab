@@ -169,9 +169,10 @@ class Network:
         self.packet_log[episode_number]["route"].append({
             "from": from_node_id,
             "to": to_node_id,
-            "function": self.nodes[from_node_id].get_assigned_function() if self.nodes[from_node_id].get_assigned_function() else None,
+            "function": self.nodes[from_node_id].get_assigned_function().value if self.nodes[from_node_id].get_assigned_function() else None,
             "node_status": "active" if from_node_id in self.active_nodes else "inactive",
-            "latency": latency
+            "latency": latency,
+            "packet_type": packet_dict["type"].value
         })
 
         # Si el paquete ha regresado al nodo inicial, finaliza aquí
@@ -234,9 +235,10 @@ class Network:
         self.packet_log[episode_number]["route"].append({
             "from": from_node_id,
             "to": to_node_id,
-            "function": self.nodes[from_node_id].get_assigned_function() if self.nodes[from_node_id].get_assigned_function() else None,
+            "function": self.nodes[from_node_id].get_assigned_function().value if self.nodes[from_node_id].get_assigned_function() else None,
             "node_status": "active" if from_node_id in self.active_nodes else "inactive",
-            "latency": latency
+            "latency": latency,
+            "packet_type": packet.type.value
         })
 
         # Si el paquete ha regresado al nodo inicial, finaliza aquí

@@ -8,6 +8,7 @@ from tabulate import tabulate
 import pandas as pd
 import matplotlib.pyplot as plt
 import threading
+import datetime
 
 class Simulation:
     def __init__(self, network, sender_node):
@@ -19,9 +20,20 @@ class Simulation:
         self.sender_node = sender_node
         self.max_hops = None
         self.metrics = {
-            "Q_ROUTING": {},
-            "DIJKSTRA": {},
-            "BELLMAN_FORD": {}
+            "simulation_id": 1,
+            "parameters": {
+                "max_hops": None,
+                "algorithms": [],  # Se llenará en `start()`
+                "mean_interval_ms": None,
+                "reconnect_interval_ms": None,
+                "topology_file": None,
+                "functions_sequence": None
+            },
+            "total_time": None,
+            "runned_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "DIJKSTRA": {"success_rate": None, "episodes": []},
+            "BELLMAN_FORD": {"success_rate": None, "episodes": []},
+            "Q_ROUTING": {"success_rate": None, "penalty": None, "episodes": []}
         }
 
     def set_max_hops(self, max_hops):
@@ -66,37 +78,65 @@ class Simulation:
         """Devuelve el tiempo actual del reloj central."""
         return self.clock
 
-    def start(self, algorithm_enum, episodes, functions_sequence):
+    def reset_simulation(self):
+        self.metrics["simulation_id"] = self.metrics["simulation_id"] + 1
+
+        self.metrics = {
+            "parameters": {
+                "max_hops": None,
+                "algorithms": [],
+                "mean_interval_ms": None,
+                "reconnect_interval_ms": None,
+                "topology_file": None,
+                "functions_sequence": None
+            },
+            "total_time": None,
+            "runned_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "DIJKSTRA": {"success_rate": None, "episodes": []},
+            "BELLMAN_FORD": {"success_rate": None, "episodes": []},
+            "Q_ROUTING": {"success_rate": None, "penalty": None, "episodes": []}
+        }
+
+    def start(self, algorithm_enum, episodes, functions_sequence, mean_interval_ms, reconnect_interval_ms, topology_file, penalty):
         """
         Inicia la simulación con el algoritmo seleccionado y registra métricas basadas en tiempo.
         """
         algorithm = algorithm_enum.name
-
         self.network.set_simulation_clock(self)
         self.start_clock()
         self.network.start_dynamic_changes()
 
-        # Almacenar parámetros iniciales
-        self.global_metrics = {
-            "parameters": {
-                "max_hops": self.max_hops,
-                "algorithm": algorithm,
-                "mean_interval_ms": self.network.mean_interval_ms,
-                "topology_file": self.topology_file,
-                "functions_sequence": self.functions_sequence
-            },
-            "total_time": None
-        }
+        if algorithm_enum.name not in self.metrics["parameters"]["algorithms"]:
+            self.metrics["parameters"]["algorithms"].append(algorithm_enum.name)
 
-        self.episode_metrics = {}
+        # **Inicializar estructura global de métricas**
+        self.metrics["parameters"]["max_hops"] = self.max_hops
+        self.metrics["parameters"]["mean_interval_ms"] = mean_interval_ms
+        self.metrics["parameters"]["reconnect_interval_ms"] = reconnect_interval_ms
+        self.metrics["parameters"]["topology_file"] = topology_file
+        self.metrics["parameters"]["functions_sequence"] = [func.value for func in functions_sequence]
 
-        # Iterar sobre los episodios
+        # **Inicializar estructura de métricas por algoritmo si no existe**
+        if algorithm not in self.metrics:
+            self.metrics["algorithms"].append(algorithm)
+            self.metrics[algorithm] = {
+                "success_rate": 0.0,
+                "episodes": [],  # Aquí inicializamos correctamente la lista de episodios
+                "penalty": penalty if algorithm == "Q_ROUTING" else None  # Agregar penalty solo en Q-Routing
+            }
+
+        if algorithm == "Q_ROUTING":
+            self.metrics[algorithm]["penalty"] = penalty if penalty else 0.0
+
+        successful_episodes = 0  # Contador de episodios exitosos
+
+        # **Iterar sobre los episodios**
         for episode_number in range(1, episodes + 1):
-            print(f'\n\n=== Starting Episode #{episode_number} ===\n')
+            print(f'\n\n=== Starting Episode #{episode_number} ({algorithm}) ===\n')
 
             start_time = self.get_current_time()
 
-            # Estado inicial de la red
+            # **Estado inicial de la red**
             node_info = [
                 [node.node_id, node.status, node.lifetime, node.reconnect_time]
                 for node in self.network.nodes.values()
@@ -104,72 +144,76 @@ class Simulation:
             headers = ["Node ID", "Connected", "Lifetime", "Reconnect Time"]
             print(tabulate(node_info, headers=headers, tablefmt="grid"))
 
+            # **Ejecutar episodio**
             self.sender_node.start_episode(episode_number, self.max_hops, functions_sequence)
 
             end_time = self.get_current_time()
             episode_duration = end_time - start_time
 
-            # Agregar el tiempo de duración del episodio en el packet_log
+            # **Recolección de datos**
             if episode_number in self.network.packet_log:
                 self.network.packet_log[episode_number]["episode_duration"] = episode_duration
 
-            # **Recolección de Métricas**
             episode_data = self.network.packet_log.get(episode_number, {})
             episode_success = episode_data.get("episode_success", False)
             route = episode_data.get("route", [])
-
-            delivered_packets = 1 if episode_success else 0
-            total_packets = 1  # Siempre hay un intento de entrega por episodio
-
-            # Calcular la latencia total y la cantidad de hops efectivos
-            # total_latency = sum(hop["latency"] for hop in route)
             total_hops = len(route)
-
-            # Tasa de paquetes por segundo (solo si el episodio fue exitoso)
-            # tasa_paquetes_por_segundo = (
-            #     delivered_packets / (episode_duration / 1000) if episode_duration > 0 else 0
-            # )
-
-            # Promedio de latencia por hop
-            # avg_latency_per_hop = total_latency / total_hops if total_hops > 0 else None
-
-            # Número de cambios dinámicos durante el episodio
-            cambios_dinamicos_en_episodio = self.network.get_dynamic_changes_by_episode(self.episode_times).get(
-                episode_number, []
-            )
-
-            print(f'packet log: \n{self.network.packet_log[episode_number]}')
+            dynamic_changes = self.network.get_dynamic_changes_by_episode(self.episode_times).get(episode_number, [])
 
             # **Guardar métricas del episodio**
-            self.episode_metrics[episode_number] = {
+            self.metrics[algorithm]["episodes"].append({
+                "episode_number": episode_number,
                 "start_time": start_time,
                 "end_time": end_time,
                 "episode_duration": episode_duration,
                 "episode_success": episode_success,
+                "route": route,
                 "total_hops": total_hops,
-                "dynamic_changes": cambios_dinamicos_en_episodio
-            }
+                "dynamic_changes": dynamic_changes
+            })
+
+            if episode_success:
+                successful_episodes += 1  # Contar episodios exitosos
 
             # **Mostrar métricas en consola**
-            print(f"\n Episode #{episode_number} Metrics:")
+            print(f"\n Episode #{episode_number} Metrics ({algorithm}):")
             print(f"  - Duración total del episodio: {episode_duration} ms")
             print(f"  - Episodio {'Éxito' if episode_success else 'Fallo'}")
-            # print(f"  - Paquetes entregados: {delivered_packets} / {total_packets}")
+            print(f"  - Ruta seguida: {route}")
             print(f"  - Hops efectivos: {total_hops}")
-            # print(f"  - Tasa de paquetes entregados por segundo: {tasa_paquetes_por_segundo:.2f} pkt/s")
-            # print(f"  - Latencia promedio por hop: {avg_latency_per_hop:.6f} ms")
-            print(f"  - Cambios dinámicos en este episodio: {cambios_dinamicos_en_episodio}")
+            print(f"  - Cambios dinámicos en este episodio: {len(dynamic_changes)}")
+
+        # **Calcular tasa de éxito del algoritmo**
+        self.metrics[algorithm]["success_rate"] = successful_episodes / episodes if episodes > 0 else 0.0
 
         # **Detener reloj al finalizar la simulación**
         self.stop_clock()
         self.network.stop_dynamic_changes()
-        self.global_metrics["total_time"] = self.get_current_time()
+        self.metrics["total_time"] = self.get_current_time()
 
         print("\n[Simulation] Simulation finished and clock stopped.")
 
-        # **Guardar Resultados**
-        self.save_results_to_excel()
+        print(json.dumps(self.metrics, indent=4))
+
+        self.save_metrics_to_file()
+        # self.save_results_to_excel()
         # self.generar_individual_graphs_from_excel()
+
+    def save_metrics_to_file(self, directory="../results/logs"):
+        """
+        Guarda las métricas de la simulación en un archivo JSON con el simulation_id en el nombre.
+        Crea la carpeta `../results/simulations` si no existe.
+        """
+        os.makedirs(directory, exist_ok=True)  # Crear directorio si no existe
+
+        filename = f"{directory}/simulation_{self.metrics['simulation_id']}.json"
+
+        try:
+            with open(filename, "w", encoding="utf-8") as file:
+                json.dump(self.metrics, file, indent=4)
+            print(f"\nMétricas de la simulación guardadas en {filename}")
+        except Exception as e:
+            print(f"\nError al guardar las métricas: {e}")
 
     def save_results_to_excel(self, filename="../results/resultados_simulacion.xlsx"):
         """
