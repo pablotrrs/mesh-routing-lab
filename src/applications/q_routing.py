@@ -4,7 +4,6 @@ import random
 import time
 from classes.base import Application
 from visualization import print_q_table
-from classes.base import NodeFunction
 
 ALPHA = 0.1
 GAMMA = 0.9
@@ -183,7 +182,7 @@ class QRoutingApplication(Application):
     def send_packet(self, to_node_id, packet, lost_packet=False) -> None:
 
         if lost_packet:
-            self.node.network.send_dict(None, None, None, True)
+            self.node.network.send(self.node.node_id, None, packet, lost_packet=True)
             return
 
         # ensure node is up and running
@@ -191,6 +190,7 @@ class QRoutingApplication(Application):
             print(f'[Node_ID={self.node.node_id}] Node status is False. Packet not sent.')
             return
 
+        # TODO: hacer que acá (también) se sepa cuando se alcanzó el max_hops
         packet.hops += 1
         packet.time += 1
         packet.from_node_id = self.node.node_id
@@ -241,20 +241,21 @@ class SenderQRoutingApplication(QRoutingApplication):
 
         if next_node is None:
             print(f'[Node_ID={self.node.node_id}] No valid next node found. Can\'t initiate episode!.')
-            self.send_packet(None, None, True)
-            return
+            self.send_packet(None, packet, True)
+            # si no se puede empezar el episodio, se sigue intentando hasta que se pueda
+            self.start_episode(episode_number, max_hops, functions_sequence, penalty)
+        else:
+            estimated_time_remaining = self.estimate_remaining_time(next_node)
 
-        estimated_time_remaining = self.estimate_remaining_time(next_node)
+            callback_chain_step = CallbackChainStep(previous_hop_node=None,
+                                                    current_node=self.node.node_id,
+                                                    next_hop_node=next_node,
+                                                    send_timestamp=get_current_time(),
+                                                    estimated_time=estimated_time_remaining)
 
-        callback_chain_step = CallbackChainStep(previous_hop_node=None,
-                                                current_node=self.node.node_id,
-                                                next_hop_node=next_node,
-                                                send_timestamp=get_current_time(),
-                                                estimated_time=estimated_time_remaining)
+            self.callback_stack.append(callback_chain_step)
 
-        self.callback_stack.append(callback_chain_step)
-
-        self.send_packet(next_node, packet)
+            self.send_packet(next_node, packet)
 
     def handle_packet_hop(self, packet) -> None:
         next_node = self.select_next_node()
@@ -262,6 +263,7 @@ class SenderQRoutingApplication(QRoutingApplication):
         # Base case to stop recursion if no valid next node is found
         if next_node is None:
             print(f'[Node_ID={self.node.node_id}] No valid next node found. Stopping packet hop.')
+            self.send_packet(None, packet, True)
             return
 
         estimated_time_remaining = self.estimate_remaining_time(next_node)
@@ -359,8 +361,8 @@ class IntermediateQRoutingApplication(QRoutingApplication):
             return
 
         next_node = self.select_next_node()
-        print(f'[Node_ID={self.node.node_id}] Next node is {next_node}')
 
+        print(f'[Node_ID={self.node.node_id}] Next node is {next_node}')
         if next_node is not None:
             estimated_time_remaining = self.estimate_remaining_time(next_node)
 
@@ -380,6 +382,10 @@ class IntermediateQRoutingApplication(QRoutingApplication):
             print(f'[Node_ID={self.node.node_id}] Adding step to callback chain stack: {callback_chain_step}')
 
             self.send_packet(next_node, packet)
+        else:
+            self.send_packet(None, packet, lost_packet=True)
+            self.handle_packet_hop(packet)
+            # TODO: acá debería volver al sender y empezar de vuelta el episodio? o debería seguir probando con el mismo packet hop?
 
     def handle_echo_callback(self, packet):
         """Maneja el callback cuando regresa el paquete."""

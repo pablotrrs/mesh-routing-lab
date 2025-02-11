@@ -16,7 +16,6 @@ class Simulation:
         self.clock = 0  # Tiempo en milisegundos
         self.running = False  # Control del reloj
         self.lock = threading.Lock()  # Para sincronizar accesos al reloj
-        self.episode_times = {}  # Para registrar los tiempos de inicio y fin de cada episodio
         self.sender_node = sender_node
         self.max_hops = None
         self.metrics = {
@@ -88,7 +87,8 @@ class Simulation:
                 "mean_interval_ms": None,
                 "reconnect_interval_ms": None,
                 "topology_file": None,
-                "functions_sequence": None
+                "functions_sequence": None,
+                "disconnect_probability": None
             },
             "total_time": None,
             "runned_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -97,7 +97,7 @@ class Simulation:
             "Q_ROUTING": {"success_rate": None, "penalty": None, "episodes": []}
         }
 
-    def start(self, algorithm_enum, episodes, functions_sequence, mean_interval_ms, reconnect_interval_ms, topology_file, penalty):
+    def start(self, algorithm_enum, episodes, functions_sequence, mean_interval_ms, reconnect_interval_ms, topology_file, penalty, disconnect_probability):
         """
         Inicia la simulación con el algoritmo seleccionado y registra métricas basadas en tiempo.
         """
@@ -115,6 +115,7 @@ class Simulation:
         self.metrics["parameters"]["reconnect_interval_ms"] = reconnect_interval_ms
         self.metrics["parameters"]["topology_file"] = topology_file
         self.metrics["parameters"]["functions_sequence"] = [func.value for func in functions_sequence]
+        self.metrics["parameters"]["disconnect_probability"] = disconnect_probability
 
         # **Inicializar estructura de métricas por algoritmo si no existe**
         if algorithm not in self.metrics:
@@ -158,7 +159,7 @@ class Simulation:
             episode_success = episode_data.get("episode_success", False)
             route = episode_data.get("route", [])
             total_hops = len(route)
-            dynamic_changes = self.network.get_dynamic_changes_by_episode(self.episode_times).get(episode_number, [])
+            dynamic_changes = self.network.get_dynamic_changes_by_episode(start_time, end_time)
 
             # **Guardar métricas del episodio**
             self.metrics[algorithm]["episodes"].append({
@@ -169,7 +170,8 @@ class Simulation:
                 "episode_success": episode_success,
                 "route": route,
                 "total_hops": total_hops,
-                "dynamic_changes": dynamic_changes
+                "dynamic_changes": dynamic_changes,
+                "dynamic_changes_count": len(dynamic_changes)
             })
 
             if episode_success:
@@ -195,11 +197,11 @@ class Simulation:
 
         print(json.dumps(self.metrics, indent=4))
 
-        self.save_metrics_to_file()
+        # self.save_metrics_to_file()
         # self.save_results_to_excel()
         # self.generar_individual_graphs_from_excel()
 
-    def save_metrics_to_file(self, directory="../results/logs"):
+    def save_metrics_to_file(self, directory="../results/single-run"):
         """
         Guarda las métricas de la simulación en un archivo JSON con el simulation_id en el nombre.
         Crea la carpeta `../results/simulations` si no existe.

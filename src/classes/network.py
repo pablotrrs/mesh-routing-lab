@@ -22,10 +22,13 @@ class Network:
         self.max_hops = max_hops
 
     def set_mean_interval_ms(self, mean_interval_ms):
-        self.mean_interval_ms = mean_interval_ms
+        self.mean_interval_ms = mean_interval_ms * 1000
 
     def set_reconnect_interval_ms(self, reconnect_interval_ms):
         self.reconnect_interval_ms = reconnect_interval_ms
+
+    def set_disconnect_probability(self, disconnect_probability):
+        self.disconnect_probability = disconnect_probability
 
     def set_simulation_clock(self, clock_reference):
         """Sincroniza el reloj central con el de la simulación."""
@@ -80,7 +83,7 @@ class Network:
         Ejemplo: desconexión aleatoria de nodos.
         """
         for node_id in list(self.active_nodes):
-            if np.random.rand() < 0.3:  # 30% de probabilidad de desconexión
+            if np.random.rand() < self.disconnect_probability:
                 self.nodes[node_id].status = False
                 self.nodes[node_id].reconnect_time = np.random.exponential(scale=self.reconnect_interval_ms)
                 print(f"[Network] Node {node_id} disconnected.")
@@ -317,26 +320,15 @@ class Network:
             result.append(f"Node {node_id} -> Neighbors: {neighbors}")
         return "\n".join(result)
 
-    def get_dynamic_changes_by_episode(self, episode_times):
+    def get_dynamic_changes_by_episode(self, start_time, end_time):
         """
-        Asocia los cambios dinámicos en la red con los episodios en los que ocurrieron.
+        Filtra los cambios dinámicos que ocurrieron dentro de un rango de tiempo específico.
 
         Args:
-            episode_times (dict): Diccionario con el tiempo de inicio y fin de cada episodio.
+            start_time (int): Tiempo de inicio del intervalo.
+            end_time (int): Tiempo de fin del intervalo.
 
         Returns:
-            dict: Un diccionario donde las claves son los números de episodio y los valores son listas
-                  de tiempos en los que ocurrieron cambios dinámicos dentro de ese episodio.
+            list: Lista de tiempos en los que ocurrieron cambios dinámicos dentro del intervalo dado.
         """
-        cambios_por_episodio = {episode: [] for episode in episode_times}
-
-        for cambio in self.dynamic_change_events:
-            for episode, times in episode_times.items():
-                start_time = times["start_time"]
-                end_time = times["end_time"]
-
-                # Si el cambio ocurrió dentro del intervalo del episodio, lo agregamos
-                if start_time <= cambio <= end_time:
-                    cambios_por_episodio[episode].append(cambio)
-
-        return cambios_por_episodio
+        return [cambio for cambio in self.dynamic_change_events if start_time <= cambio <= end_time]

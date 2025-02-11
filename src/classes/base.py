@@ -2,6 +2,11 @@ import numpy as np
 from abc import ABC, abstractmethod
 from enum import Enum
 
+class Algorithm(Enum):
+    Q_ROUTING = "Q_ROUTING"
+    DIJKSTRA = "DIJKSTRA"
+    BELLMAN_FORD = "BELLMAN_FORD"
+
 class NodeFunction(Enum):
     A = "A"
     B = "B"

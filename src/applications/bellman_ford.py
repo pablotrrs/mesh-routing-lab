@@ -160,7 +160,7 @@ class BellmanFordApplication(Application):
     def send_packet(self, to_node_id, packet, lost_packet=False):
 
         if lost_packet:
-            self.node.network.send_dict(None, None, None, True)
+            self.node.network.send_dict(self.node.node_id, None, packet, lost_packet=True)
             return
 
         if "hops" in packet:
@@ -451,7 +451,7 @@ class SenderBellmanFordApplication(BellmanFordApplication):
                 print(f"[Node_ID={self.node.node_id}] Episode {episode_number} detected a broken path. Packet={packet}")
                 global broken_path
                 broken_path = True
-                self.send_packet(None, None, True)
+                self.send_packet(None, packet, True)
                 # TODO: acá habría que revisar que el paquete quede como que no fue entregado
                 # self.start_episode(episode_number, True)
 
