@@ -70,12 +70,13 @@ class Network:
             # print(f"[Network] clock tics: {current_time}")
             with self.lock:
                 if current_time >= next_event_time:
-                    print("\n⚡ZZZAP⚡")
+                    print("\033[93m\n⚡ZZZAP⚡\n\033[0m")
                     # print(f"[Network] Dynamic Change triggered at {current_time} ms")
                     self.trigger_dynamic_change()
                     self.dynamic_change_events.append(current_time)
                     next_event_time = current_time + self.generate_next_dynamic_change()
-            time.sleep(0.01)  # Chequeos periódicos (10 ms)
+
+                self._handle_reconnections(current_time)
 
     def trigger_dynamic_change(self):
         """
@@ -86,7 +87,24 @@ class Network:
             if np.random.rand() < self.disconnect_probability:
                 self.nodes[node_id].status = False
                 self.nodes[node_id].reconnect_time = np.random.exponential(scale=self.reconnect_interval_ms)
-                print(f"[Network] Node {node_id} disconnected.")
+
+                current_time = self.simulation_clock.get_current_time()
+                print(f"\033[91m\n⚡[Network] Node {node_id} disconnected at {current_time:.2f}. ⚡\n\033[0m")
+
+        return
+
+    def _handle_reconnections(self, current_time):
+        """
+        Verifica qué nodos desconectados pueden reconectarse y los reactiva.
+        """
+        for node_id, node in self.nodes.items():
+            if not node.status and node.reconnect_time is not None and current_time >= node.reconnect_time:
+                node.status = True
+                node.reconnect_time = None
+
+                current_time = self.simulation_clock.get_current_time()
+                print(f"\033[92m\n⚡ [Network] Node {node_id} reconnected at {current_time:.2f}. ⚡\n\033[0m")
+                return
 
     def validate_connection(self, from_node_id, to_node_id):
         """
@@ -143,7 +161,7 @@ class Network:
         """
         episode_number = packet_dict.get("episode_number")
 
-        # Inicializar registro del episodio si aún no existe
+        # **Siempre inicializar packet_log**
         if episode_number not in self.packet_log:
             self.packet_log[episode_number] = {
                 "episode_success": None,  # Se actualizará al final del episodio
@@ -151,24 +169,30 @@ class Network:
                 "route": []
             }
 
-        # Caso: Paquete marcado como perdido
+        # **Caso: Paquete perdido**
         if lost_packet:
-            print(f"[Network] Packet lost on demand.")
-            self.packet_log[episode_number]["episode_success"] = False
-            return
+            print(f"[Network] Packet from {from_node_id} to {to_node_id} lost.")
+            self.packet_log[episode_number]["route"].append({
+                "from": from_node_id,
+                "to": to_node_id if to_node_id is not None else "N/A",
+                "function": "N/A",
+                "node_status": "inactive",
+                "latency": 0,
+                "packet_type": packet_dict["type"].value
+            })
+            return  # No seguir procesando
 
-        # Caso: El paquete ha regresado al nodo original, terminando el episodio
+        # **Caso: Fin del episodio (llegó al nodo original)**
         if to_node_id is None:
             print(f"[Network] Packet reached final destination at Node {from_node_id}. Marking episode completion.")
-            to_node_id = "N/A"  # Marcar destino como N/A en el log
-            self.packet_log[episode_number]["episode_success"] = episode_success  # Marcar resultado del episodio
-            print(f"[Network] Episode {episode_number} {'SUCCESS' if episode_success else 'FAILURE'} at Node {from_node_id}.")
-            return
+            to_node_id = "N/A"  # Marcar destino como N/A
+            self.packet_log[episode_number]["episode_success"] = episode_success
+            return  # No seguir procesando
 
-        # Calcular latencia
+        # **Calcular latencia**
         latency = self.get_latency(from_node_id, to_node_id) if to_node_id != "N/A" else 0
 
-        # Registrar información del hop
+        # **Registrar información del hop en packet_log**
         self.packet_log[episode_number]["route"].append({
             "from": from_node_id,
             "to": to_node_id,
@@ -178,11 +202,7 @@ class Network:
             "packet_type": packet_dict["type"].value
         })
 
-        # Si el paquete ha regresado al nodo inicial, finaliza aquí
-        if to_node_id == "N/A":
-            return
-
-        # Verificar si el nodo de destino es alcanzable
+        # **Validar si el nodo destino es alcanzable**
         if to_node_id in self.connections.get(from_node_id, []) and \
                 from_node_id in self.active_nodes and \
                 to_node_id in self.active_nodes:
@@ -191,7 +211,6 @@ class Network:
             print(f"[Network] Packet hops: {packet_dict.get('hops', 0)} of {self.max_hops} max hops")
 
             time.sleep(latency)  # Simulación de la latencia
-
             self.nodes[to_node_id].application.receive_packet(packet_dict)
         else:
             print(f"[Network] Failed to send packet: Node {to_node_id} is not reachable from Node {from_node_id}")
@@ -209,32 +228,38 @@ class Network:
         """
         episode_number = packet.episode_number
 
-        # Inicializar registro del episodio si aún no existe
+        # **Siempre inicializar packet_log**
         if episode_number not in self.packet_log:
             self.packet_log[episode_number] = {
-                "episode_success": None,  # Se actualizará al final del episodio
+                "episode_success": None,
                 "episode_duration": None,
                 "route": []
             }
 
-        # Caso: Paquete marcado como perdido
+        # **Caso: Paquete perdido**
         if lost_packet:
-            print(f"[Network] Packet lost on demand.")
-            self.packet_log[episode_number]["episode_success"] = False
-            return
+            print(f"[Network] Packet from {from_node_id} to {to_node_id} lost.")
+            self.packet_log[episode_number]["route"].append({
+                "from": from_node_id,
+                "to": to_node_id if to_node_id is not None else "N/A",
+                "function": "N/A",
+                "node_status": "inactive",
+                "latency": 0,
+                "packet_type": packet.type.value
+            })
+            return  # No seguir procesando
 
-        # Caso: El paquete ha regresado al nodo original, terminando el episodio
+        # **Caso: Fin del episodio (llegó al nodo original)**
         if to_node_id is None:
             print(f"[Network] Packet reached final destination at Node {from_node_id}. Marking episode completion.")
-            to_node_id = "N/A"  # Marcar destino como N/A en el log
-            self.packet_log[episode_number]["episode_success"] = episode_success  # Marcar resultado del episodio
-            print(f"[Network] Episode {episode_number} {'SUCCESS' if episode_success else 'FAILURE'} at Node {from_node_id}.")
-            return
+            to_node_id = "N/A"  # Marcar destino como N/A
+            self.packet_log[episode_number]["episode_success"] = episode_success
+            return  # No seguir procesando
 
-        # Calcular latencia
+        # **Calcular latencia**
         latency = self.get_latency(from_node_id, to_node_id) if to_node_id != "N/A" else 0
 
-        # Registrar información del hop
+        # **Registrar información del hop en packet_log**
         self.packet_log[episode_number]["route"].append({
             "from": from_node_id,
             "to": to_node_id,
@@ -244,11 +269,7 @@ class Network:
             "packet_type": packet.type.value
         })
 
-        # Si el paquete ha regresado al nodo inicial, finaliza aquí
-        if to_node_id == "N/A":
-            return
-
-        # Verificar si el nodo de destino es alcanzable
+        # **Validar si el nodo destino es alcanzable**
         if to_node_id in self.connections.get(from_node_id, []) and \
                 from_node_id in self.active_nodes and \
                 to_node_id in self.active_nodes:
@@ -257,7 +278,6 @@ class Network:
             print(f"[Network] Packet hops: {packet.hops} of {self.max_hops} max hops")
 
             time.sleep(latency)  # Simulación de la latencia
-
             self.nodes[to_node_id].application.receive_packet(packet)
         else:
             print(f"[Network] Failed to send packet: Node {to_node_id} is not reachable from Node {from_node_id}")
