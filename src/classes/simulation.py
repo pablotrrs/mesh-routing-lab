@@ -191,6 +191,7 @@ class Simulation:
         # **Detener reloj al finalizar la simulación**
         self.stop_clock()
         self.network.stop_dynamic_changes()
+        self.network.packet_log = {}
         self.metrics["total_time"] = self.get_current_time()
 
         print("\n[Simulation] Simulation finished and clock stopped.")

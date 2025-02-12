@@ -13,6 +13,10 @@ EPSILON_MIN = 0.1
 
 PENALTY = 0.0
 
+MAX_HOPS = None
+
+CURRENT_HOP_COUNT = 0
+
 # Ecuación de Bellman:
 # ΔQ_x(d, y) = α * (s + t - Q_x(d, y))
 # Donde:
@@ -120,7 +124,6 @@ class QRoutingApplication(Application):
                 # Si no hay vecinos conectados, no se puede enviar el paquete
                 print(f'[Node_ID={self.node.node_id}] No available neighbors to send the packet. Dropping packet.')
                 return None
-                # TODO: acá habría que revisar que el paquete quede como que no fue entregado
 
         # Update epsilon after each decision
         EPSILON = max(EPSILON * EPSILON_DECAY, EPSILON_MIN)
@@ -180,23 +183,22 @@ class QRoutingApplication(Application):
         self.q_table[self.node.node_id][next_node] = updated_q
 
     def send_packet(self, to_node_id, packet, lost_packet=False) -> None:
+        packet.hops += 1
+        packet.time += 1
 
         if lost_packet:
             self.node.network.send(self.node.node_id, None, packet, lost_packet=True)
-            return
+        else:
+            packet.from_node_id = self.node.node_id
 
-        # ensure node is up and running
-        if not self.node.is_sender and not self.node.status:
-            print(f'[Node_ID={self.node.node_id}] Node status is False. Packet not sent.')
-            return
+            print(f'[Node_ID={self.node.node_id}] Sending packet to Node {to_node_id}\n')
+            self.node.network.send(self.node.node_id, to_node_id, packet)
 
-        # TODO: hacer que acá (también) se sepa cuando se alcanzó el max_hops
-        packet.hops += 1
-        packet.time += 1
-        packet.from_node_id = self.node.node_id
-
-        print(f'[Node_ID={self.node.node_id}] Sending packet to Node {to_node_id}\n')
-        self.node.network.send(self.node.node_id, to_node_id, packet)
+        if packet.hops > MAX_HOPS:
+            print(f'[Node_ID={self.node.node_id}] Max hops reached. Initiating full echo callback')
+            return False
+        else:
+            return True
 
     def get_assigned_function(self):
         """Returns the function assigned to this node."""
@@ -218,9 +220,12 @@ class SenderQRoutingApplication(QRoutingApplication):
         PENALTY = penalty
         print(f'penalty setted to {PENALTY}')
 
-    def start_episode(self, episode_number, max_hops=None, functions_sequence=None, penalty=0.0) -> None:
+    def start_episode(self, episode_number, max_hops=None, functions_sequence=None, penalty=0.0, current_hop_count=0) -> None:
         """Initiates an episode by creating a packet and sending it to chosen node."""
         self.max_hops=max_hops
+
+        global MAX_HOPS
+        MAX_HOPS=max_hops
 
         global PENALTY
         PENALTY = penalty
@@ -232,7 +237,8 @@ class SenderQRoutingApplication(QRoutingApplication):
             episode_number=episode_number,
             type=PacketType.PACKET_HOP,
             from_node_id=self.node.node_id,
-            max_hops=max_hops
+            max_hops=max_hops,
+            hops=current_hop_count
         )
 
         self.initialize_or_update_q_table()
@@ -241,20 +247,27 @@ class SenderQRoutingApplication(QRoutingApplication):
 
         if next_node is None:
             print(f'[Node_ID={self.node.node_id}] No valid next node found. Can\'t initiate episode!.')
+            # movement: none
+            print(f'mf current packet count hops : {packet.hops}')
             self.send_packet(None, packet, True)
+            packet.hops += 1
+            print(f'[Node_ID={self.node.node_id}] Packet hop count {packet.hops}')
+
+            if packet.hops > MAX_HOPS:
+                self.mark_episode_result(packet, success=False)
+                return
+
             # si no se puede empezar el episodio, se sigue intentando hasta que se pueda
-            self.start_episode(episode_number, max_hops, functions_sequence, penalty)
+            self.start_episode(episode_number, max_hops, functions_sequence, penalty, packet.hops)
         else:
             estimated_time_remaining = self.estimate_remaining_time(next_node)
 
-            callback_chain_step = CallbackChainStep(previous_hop_node=None,
-                                                    current_node=self.node.node_id,
-                                                    next_hop_node=next_node,
-                                                    send_timestamp=get_current_time(),
-                                                    estimated_time=estimated_time_remaining)
+            self.update_q_table_with_incomplete_info(
+                next_node=next_node,
+                estimated_time_remaining=estimated_time_remaining
+            )
 
-            self.callback_stack.append(callback_chain_step)
-
+            # movement: forward
             self.send_packet(next_node, packet)
 
     def handle_packet_hop(self, packet) -> None:
@@ -263,8 +276,13 @@ class SenderQRoutingApplication(QRoutingApplication):
         # Base case to stop recursion if no valid next node is found
         if next_node is None:
             print(f'[Node_ID={self.node.node_id}] No valid next node found. Stopping packet hop.')
-            self.send_packet(None, packet, True)
-            return
+            # movement: none
+            if not self.send_packet(None, packet, True):
+                # max hops reached
+                self.initiate_max_hops_callback(packet)
+            else:
+                # retry until there is a valid next node
+                handle_packet_hop(packet)
 
         estimated_time_remaining = self.estimate_remaining_time(next_node)
 
@@ -280,28 +298,34 @@ class SenderQRoutingApplication(QRoutingApplication):
                                                 estimated_time=estimated_time_remaining)
 
         self.callback_stack.append(callback_chain_step)
+        print(f"\033[92m[CALLBACK_STACK] Encolando {callback_chain_step}, callback_stack: {self.callback_stack}\033[0m")
 
         print(f'[Node_ID={self.node.node_id}] Adding step to callback chain stack: {callback_chain_step}')
 
-        self.send_packet(next_node, packet)
+        # movement: forward
+        if not self.send_packet(next_node, packet):
+            # max hops reached
+            self.initiate_max_hops_callback(packet)
 
     def handle_echo_callback(self, packet) -> None:
-        callback_data = self.callback_stack.pop()
+        if self.callback_stack:
+            callback_data = self.callback_stack.pop()
+            print(f"\033[91m[CALLBACK_STACK] Desencolando {callback_data}, callback_stack: {self.callback_stack}\033[0m")
 
-        self.update_q_value(
-            next_node=callback_data.next_hop_node,
-            s=get_current_time() - callback_data.send_timestamp,
-            t=callback_data.estimated_time,
-        )
+            self.update_q_value(
+                next_node=callback_data.next_hop_node,
+                s=get_current_time() - callback_data.send_timestamp,
+                t=callback_data.estimated_time,
+            )
 
-        if self.callback_stack and callback_data.previous_hop_node:
+            # movement: backward
             self.send_packet(callback_data.previous_hop_node, packet)
+        else:
+            print_q_table(self)
+            print(f'\n[Node_ID={self.node.node_id}] Episode {packet.episode_number} finished.')
+
+            self.mark_episode_result(packet, success=True)
             return
-
-        print_q_table(self)
-        print(f'\n[Node_ID={self.node.node_id}] Episode {packet.episode_number} finished.')
-
-        self.mark_episode_result(packet, success=True)
 
     def handle_lost_packet(self, packet) -> None:
         print(f"\n[Node_ID={self.node.node_id}] Episode {packet.episode_number} failed.")
@@ -327,6 +351,9 @@ class SenderQRoutingApplication(QRoutingApplication):
             packet=packet, 
             episode_success=success
         )
+
+        global CURRENT_HOP_COUNT
+        CURRENT_HOP_COUNT = 0
 
     def __str__(self) -> str:
         return f"SenderNode(id={self.node.node_id}, neighbors={self.node.network.get_neighbors(self.node.node_id)})"
@@ -378,18 +405,33 @@ class IntermediateQRoutingApplication(QRoutingApplication):
                                                     estimated_time=estimated_time_remaining)
 
             self.callback_stack.append(callback_chain_step)
+            print(f"\033[92m[CALLBACK_STACK] Encolando {callback_chain_step}, callback_stack: {self.callback_stack}\033[0m")
 
             print(f'[Node_ID={self.node.node_id}] Adding step to callback chain stack: {callback_chain_step}')
 
+            # movement: forward
             self.send_packet(next_node, packet)
+            return
         else:
-            self.send_packet(None, packet, lost_packet=True)
-            self.handle_packet_hop(packet)
-            # TODO: acá debería volver al sender y empezar de vuelta el episodio? o debería seguir probando con el mismo packet hop?
+            # movement: none
+            still_hops_remaining = self.send_packet(None, packet, lost_packet=True)
+            print(f'mf still_hops_remaining {still_hops_remaining}')
+
+            if not still_hops_remaining:
+                # max hops reached
+                print('mf initiate_max_hops_callback')
+                # initiate_max_hops_callback
+                self.initiate_max_hops_callback(packet)
+                return
+            else:
+                # retry until there is a valid next node
+                self.handle_packet_hop(packet)
+                return
 
     def handle_echo_callback(self, packet):
         """Maneja el callback cuando regresa el paquete."""
         callback_data = self.callback_stack.pop()
+        print(f"\033[91m[CALLBACK_STACK] Desencolando {callback_data}, callback_stack: {self.callback_stack}\033[0m")
 
         self.update_q_value(
             next_node=callback_data.next_hop_node,
@@ -397,16 +439,26 @@ class IntermediateQRoutingApplication(QRoutingApplication):
             t=callback_data.estimated_time,
         )
 
+        # movement: backward
         self.send_packet(callback_data.previous_hop_node, packet)
+        return
 
     def handle_lost_packet(self, packet) -> None:
-        callback_data = self.callback_stack.pop()
+        if self.callback_stack:
+            callback_data = self.callback_stack.pop()
+            print(f"\033[91m[CALLBACK_STACK] Desencolando {callback_data}, callback_stack: {self.callback_stack}\033[0m")
 
-        self.penalize_q_value(
-            next_node=callback_data.next_hop_node
-        )
+            self.penalize_q_value(
+                next_node=callback_data.next_hop_node
+            )
 
-        self.send_packet(callback_data.previous_hop_node, packet)
+            # movement: backward
+            self.send_packet(callback_data.previous_hop_node, packet)
+            return
+        else:
+            # movement: backward
+            self.send_packet(packet.from_node_id, packet)
+            return
 
     def penalize_q_value(self, next_node):
         """
@@ -433,7 +485,9 @@ class IntermediateQRoutingApplication(QRoutingApplication):
             max_hops=self.max_hops
         )
 
+        # movement: backward
         self.send_packet(packet.from_node_id, callback_packet)
+        return
 
     def initiate_max_hops_callback(self, packet):
 
@@ -444,9 +498,21 @@ class IntermediateQRoutingApplication(QRoutingApplication):
             max_hops=self.max_hops
         )
 
-        # TODO: penalizar
+        if self.callback_stack:
+            callback_data = self.callback_stack.pop()
+            print(f"\033[91m[CALLBACK_STACK] Desencolando {callback_data}, callback_stack: {self.callback_stack}\033[0m")
 
-        self.send_packet(packet.from_node_id, callback_packet)
+            self.penalize_q_value(
+                next_node=callback_data.next_hop_node
+            )
+
+            # movement: backward
+            self.send_packet(callback_data.previous_hop_node, callback_packet)
+            return
+        else:
+            # movement: backward
+            self.send_packet(packet.from_node_id, callback_packet)
+            return
 
     def assign_function(self, packet):
         """Asigna la función menos utilizada basada en los contadores del paquete."""
@@ -464,18 +530,19 @@ class IntermediateQRoutingApplication(QRoutingApplication):
         print(f'[Node_ID={self.node.node_id}] Node has no function, assigning function {function_to_assign}')
         self.assigned_function = function_to_assign
         packet.increment_function_counter(function_to_assign)
+        return
 
     def __str__(self):
         return f"IntermediateNode(id={self.node.node_id}, neighbors={self.node.network.get_neighbors(self.node.node_id)})"
 
 class Packet:
-    def __init__(self, episode_number, from_node_id, type, max_hops):
+    def __init__(self, episode_number, from_node_id, type, max_hops, hops=0):
         self.type = type
         self.episode_number = episode_number  # Número de episodio al que pertenece este paquete
         self.from_node_id = from_node_id  # Nodo anterior por el que pasó el paquete
         self.functions_sequence = FUNCTION_SEQ.copy()  # Secuencia de funciones a procesar
         self.function_counters = {func: 0 for func in FUNCTION_SEQ}  # Contadores de funciones asignadas
-        self.hops = 0  # Contador de saltos
+        self.hops = hops  # Contador de saltos
         self.time = 0  # Tiempo total acumulado del paquete
         self.max_hops = max_hops # Número máximo de saltos permitidos
         self.is_delivered = False
