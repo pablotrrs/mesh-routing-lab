@@ -591,7 +591,7 @@ class IntermediateBellmanFordApplication(BellmanFordApplication):
 
             case PacketType.ACK:
                 print(f"[Node_ID={self.node.node_id}] Received ACK for message ID {packet['message_id']}")
-                print("printing mf packet to see if has map of mf nodes and mf functions")
+                # print("printing mf packet to see if has map of mf nodes and mf functions")
                 print(packet)
 
                 if packet["from_node_id"] not in self.broadcast_state.received_acks:

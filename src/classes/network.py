@@ -82,10 +82,16 @@ class Network:
         Ejemplo: desconexión aleatoria de nodos.
         """
         for node_id in list(self.active_nodes):
-            if np.random.rand() < 0.3:  # 30% de probabilidad de desconexión
+            probability = np.random.rand()
+
+            if not self.nodes[node_id].status and probability < 0.3:  # 30% de probabilidad de desconexión
                 self.nodes[node_id].status = False
-                self.nodes[node_id].reconnect_time = np.random.exponential(scale=self.reconnect_interval_ms)
+                # self.nodes[node_id].reconnect_time = np.random.exponential(scale=self.reconnect_interval_ms)
                 print(f"[Network] Node {node_id} disconnected.")
+            elif self.nodes[node_id].status and probability >= 0.3:
+                self.nodes[node_id].status = True
+                self.nodes[node_id].reconnect_time = None
+                print(f"[Network] Node {node_id} reconnected.")
 
     def validate_connection(self, from_node_id, to_node_id):
         """
