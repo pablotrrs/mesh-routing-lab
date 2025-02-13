@@ -22,7 +22,7 @@ class Network:
         self.max_hops = max_hops
 
     def set_mean_interval_ms(self, mean_interval_ms):
-        self.mean_interval_ms = mean_interval_ms * 1000
+        self.mean_interval_ms = mean_interval_ms
 
     def set_reconnect_interval_ms(self, reconnect_interval_ms):
         self.reconnect_interval_ms = reconnect_interval_ms

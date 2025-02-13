@@ -47,7 +47,7 @@ class Application(ABC):
         self.node = node
 
     @abstractmethod
-    def start_episode(self, episode_number, max_hops, functions_sequence):
+    def start_episode(self, episode_number, max_hops, functions_sequence, penalty=0.0):
         pass
 
     @abstractmethod
@@ -80,9 +80,9 @@ class Node:
             self.reconnect_time = None
             self.status = None
 
-    def start_episode(self, episode_number, max_hops, functions_sequence):
+    def start_episode(self, episode_number, max_hops, functions_sequence, penalty=0.0):
         if self.application:
-            self.application.start_episode(episode_number, max_hops, functions_sequence)
+            self.application.start_episode(episode_number, max_hops, functions_sequence, penalty)
         else:
             raise RuntimeError(f"[Node_ID={self.node_id}] No application installed")
 

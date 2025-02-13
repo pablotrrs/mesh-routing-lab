@@ -41,7 +41,7 @@ from classes.base import Algorithm
 #     con respecto a los pasos tiempo)
 
 if __name__ == "__main__":
-    sys.setrecursionlimit(20000)
+    sys.setrecursionlimit(200000)
 
     parser = argparse.ArgumentParser(description='Run network simulation.')
 

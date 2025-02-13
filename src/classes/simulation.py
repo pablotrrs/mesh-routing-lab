@@ -57,11 +57,11 @@ class Simulation:
         self.running = False
 
     def _run_clock(self):
-        """Incrementa el reloj centralizado continuamente."""
+        """Incrementa el reloj centralizado continuamente en milisegundos."""
         while self.running:
-            # print(f"[Clock] Current time: {self.clock}")
             with self.lock:
-                self.clock += 10
+                self.clock += 1
+            time.sleep(0.001)  # 1 ms en tiempo real
 
     def get_current_time(self):
         """Obtiene el tiempo actual del reloj central."""
@@ -146,7 +146,10 @@ class Simulation:
             print(tabulate(node_info, headers=headers, tablefmt="grid"))
 
             # **Ejecutar episodio**
-            self.sender_node.start_episode(episode_number, self.max_hops, functions_sequence)
+            if algorithm == "Q_ROUTING":
+                self.sender_node.start_episode(episode_number, self.max_hops, functions_sequence, penalty)
+            else:
+                self.sender_node.start_episode(episode_number, self.max_hops, functions_sequence)
 
             end_time = self.get_current_time()
             episode_duration = end_time - start_time
@@ -196,7 +199,7 @@ class Simulation:
 
         print("\n[Simulation] Simulation finished and clock stopped.")
 
-        print(json.dumps(self.metrics, indent=4))
+        # print(json.dumps(self.metrics, indent=4))
 
         # self.save_metrics_to_file()
         # self.save_results_to_excel()

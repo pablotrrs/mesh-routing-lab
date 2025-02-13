@@ -200,6 +200,46 @@ class QRoutingApplication(Application):
         else:
             return True
 
+    def initiate_max_hops_callback(self, packet):
+
+        callback_packet = Packet(
+            episode_number=packet.episode_number,
+            from_node_id=self.node.node_id,
+            type=PacketType.MAX_HOPS_REACHED,
+            max_hops=self.max_hops
+        )
+
+        if self.callback_stack:
+            callback_data = self.callback_stack.pop()
+            print(f"\033[91m[CALLBACK_STACK] Desencolando {callback_data}, callback_stack: {self.callback_stack}\033[0m")
+
+            self.penalize_q_value(
+                next_node=callback_data.next_hop_node
+            )
+
+            # movement: backward
+            self.send_packet(callback_data.previous_hop_node, callback_packet)
+            return
+        else:
+            # movement: backward
+            self.send_packet(packet.from_node_id, callback_packet)
+            return
+
+    def penalize_q_value(self, next_node):
+        """
+        Penaliza el valor Q de la acción (ir al vecino `next_node`) con una reducción fuerte.
+        """
+        global PENALTY
+        old_q = self.q_table[self.node.node_id].get(next_node, 0.0)
+        new_q = old_q - PENALTY
+
+        self.q_table[self.node.node_id][next_node] = max(new_q, 0)  # Evita valores negativos extremos
+
+        print(
+            f"[Node_ID={self.node.node_id}] Penalized by {PENALTY} Q-Value for state {self.node.node_id} -> action {next_node} "
+            f"from {old_q:.4f} to {new_q:.4f} (hard penalty applied)"
+        )
+
     def get_assigned_function(self):
         """Returns the function assigned to this node."""
         return self.assigned_function
@@ -259,6 +299,7 @@ class SenderQRoutingApplication(QRoutingApplication):
 
             # si no se puede empezar el episodio, se sigue intentando hasta que se pueda
             self.start_episode(episode_number, max_hops, functions_sequence, penalty, packet.hops)
+            return
         else:
             estimated_time_remaining = self.estimate_remaining_time(next_node)
 
@@ -269,6 +310,7 @@ class SenderQRoutingApplication(QRoutingApplication):
 
             # movement: forward
             self.send_packet(next_node, packet)
+            return
 
     def handle_packet_hop(self, packet) -> None:
         next_node = self.select_next_node()
@@ -279,7 +321,7 @@ class SenderQRoutingApplication(QRoutingApplication):
             # movement: none
             if not self.send_packet(None, packet, True):
                 # max hops reached
-                self.initiate_max_hops_callback(packet)
+                self.mark_episode_result(packet, success=False)
             else:
                 # retry until there is a valid next node
                 handle_packet_hop(packet)
@@ -456,24 +498,10 @@ class IntermediateQRoutingApplication(QRoutingApplication):
             self.send_packet(callback_data.previous_hop_node, packet)
             return
         else:
+            raise Error
             # movement: backward
-            self.send_packet(packet.from_node_id, packet)
-            return
-
-    def penalize_q_value(self, next_node):
-        """
-        Penaliza el valor Q de la acción (ir al vecino `next_node`) con una reducción fuerte.
-        """
-        global PENALTY
-        old_q = self.q_table[self.node.node_id].get(next_node, 0.0)
-        new_q = old_q - PENALTY
-
-        self.q_table[self.node.node_id][next_node] = max(new_q, 0)  # Evita valores negativos extremos
-
-        print(
-            f"[Node_ID={self.node.node_id}] Penalized by {PENALTY} Q-Value for state {self.node.node_id} -> action {next_node} "
-            f"from {old_q:.4f} to {new_q:.4f} (hard penalty applied)"
-        )
+            # self.send_packet(packet.from_node_id, packet)
+            # return
 
     def initiate_full_echo_callback(self, packet):
         """Inicia el proceso de full echo callback hacia el nodo anterior."""
@@ -488,31 +516,6 @@ class IntermediateQRoutingApplication(QRoutingApplication):
         # movement: backward
         self.send_packet(packet.from_node_id, callback_packet)
         return
-
-    def initiate_max_hops_callback(self, packet):
-
-        callback_packet = Packet(
-            episode_number=packet.episode_number,
-            from_node_id=self.node.node_id,
-            type=PacketType.MAX_HOPS_REACHED,
-            max_hops=self.max_hops
-        )
-
-        if self.callback_stack:
-            callback_data = self.callback_stack.pop()
-            print(f"\033[91m[CALLBACK_STACK] Desencolando {callback_data}, callback_stack: {self.callback_stack}\033[0m")
-
-            self.penalize_q_value(
-                next_node=callback_data.next_hop_node
-            )
-
-            # movement: backward
-            self.send_packet(callback_data.previous_hop_node, callback_packet)
-            return
-        else:
-            # movement: backward
-            self.send_packet(packet.from_node_id, callback_packet)
-            return
 
     def assign_function(self, packet):
         """Asigna la función menos utilizada basada en los contadores del paquete."""
