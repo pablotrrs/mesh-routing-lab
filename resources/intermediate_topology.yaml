@@ -1,0 +1,57 @@
+#   (0)
+#   / | \
+# (1) | (2)
+#   \ | /
+#   (3)
+#  / | | \
+# (4)(5) (6)
+#  \ | | /
+#   (7)
+nodes:
+  0:
+    type: sender
+    neighbors:
+      - 1
+      - 2
+      - 3
+    position: [0.0, 0.0, 0.0]
+  1:
+    neighbors:
+      - 0
+      - 3
+    position: [100.0, 100.0, 0.0]
+  2:
+    neighbors:
+      - 0
+      - 3
+    position: [100.0, -100.0, 0.0]
+  3:
+    neighbors:
+      - 0
+      - 1
+      - 2
+      - 4
+      - 5
+      - 6
+    position: [200.0, 0.0, 0.0]
+  4:
+    neighbors:
+      - 3
+      - 7
+    position: [300.0, 100.0, 0.0]
+  5:
+    neighbors:
+      - 3
+      - 7
+    position: [300.0, 0.0, 0.0]
+  6:
+    neighbors:
+      - 3
+      - 7
+    position: [300.0, -100.0, 0.0]
+  7:
+    neighbors:
+      - 4
+      - 5
+      - 6
+    position: [400.0, 0.0, 0.0]
