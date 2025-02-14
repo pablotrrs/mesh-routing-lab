@@ -40,6 +40,7 @@ class CallbackChainStep:
     next_hop_node: int  # Node which we have to calculate the Q-Value for
     send_timestamp: float  # Timestamp del momento en que se realizó el salto to next hop
     estimated_time: float  # Tiempo estimado para completar la secuencia según la Q-table
+    episode_number: int  # Número de episodio asociadoMax hops reached. Initiating full echo callback
 
 class QRoutingApplication(Application):
     def __init__(self, node):
@@ -273,6 +274,9 @@ class SenderQRoutingApplication(QRoutingApplication):
         global FUNCTION_SEQ
         FUNCTION_SEQ=functions_sequence
 
+        # Clear the callback stack at the start of each episode
+        self.callback_stack.clear()
+
         packet = Packet(
             episode_number=episode_number,
             type=PacketType.PACKET_HOP,
@@ -337,7 +341,8 @@ class SenderQRoutingApplication(QRoutingApplication):
                                                 current_node=self.node.node_id,
                                                 next_hop_node=next_node,
                                                 send_timestamp=get_current_time(),
-                                                estimated_time=estimated_time_remaining)
+                                                estimated_time=estimated_time_remaining,
+                                                episode_number=packet.episode_number)
 
         self.callback_stack.append(callback_chain_step)
         print(f"\033[92m[CALLBACK_STACK] Encolando {callback_chain_step}, callback_stack: {self.callback_stack}\033[0m")
@@ -410,10 +415,34 @@ class IntermediateQRoutingApplication(QRoutingApplication):
     def handle_packet_hop(self, packet):
         self.initialize_or_update_q_table()
 
+        # remove all chain steps that are not from the current episode
+        for i in range(len(self.callback_stack)):
+            if i < len(self.callback_stack) and self.callback_stack[i].episode_number != packet.episode_number:
+                self.callback_stack.pop(i)
+                i -= 1         
+
+        next_node = self.select_next_node()
+
+        print(f'[Node_ID={self.node.node_id}] Next node is {next_node}')
+        if next_node is not None:
+            estimated_time_remaining = self.estimate_remaining_time(next_node)
+
+        callback_chain_step = CallbackChainStep(previous_hop_node=packet.from_node_id,
+                                                current_node=self.node.node_id,
+                                                next_hop_node=next_node,
+                                                send_timestamp=get_current_time(),
+                                                estimated_time=estimated_time_remaining,
+                                                episode_number=packet.episode_number)
+
+        self.callback_stack.append(callback_chain_step)
+        print(f"\033[92m[CALLBACK_STACK] Encolando {callback_chain_step}, callback_stack: {self.callback_stack}\033[0m")
+
+        print(f'[Node_ID={self.node.node_id}] Adding step to callback chain stack: {callback_chain_step}')
+
         if packet.hops > packet.max_hops:
             print(f'[Node_ID={self.node.node_id}] Max hops reached. Initiating full echo callback')
-            # print(f"*******callback_stack: {self.callback_stack}")
             self.initiate_max_hops_callback(packet)
+            
             return
 
         if self.assigned_function is None:
@@ -429,27 +458,11 @@ class IntermediateQRoutingApplication(QRoutingApplication):
             self.initiate_full_echo_callback(packet)
             return
 
-        next_node = self.select_next_node()
-
-        print(f'[Node_ID={self.node.node_id}] Next node is {next_node}')
         if next_node is not None:
-            estimated_time_remaining = self.estimate_remaining_time(next_node)
-
             self.update_q_table_with_incomplete_info(
                 next_node=next_node,
                 estimated_time_remaining=estimated_time_remaining
             )
-
-            callback_chain_step = CallbackChainStep(previous_hop_node=packet.from_node_id,
-                                                    current_node=self.node.node_id,
-                                                    next_hop_node=next_node,
-                                                    send_timestamp=get_current_time(),
-                                                    estimated_time=estimated_time_remaining)
-
-            self.callback_stack.append(callback_chain_step)
-            print(f"\033[92m[CALLBACK_STACK] Encolando {callback_chain_step}, callback_stack: {self.callback_stack}\033[0m")
-
-            print(f'[Node_ID={self.node.node_id}] Adding step to callback chain stack: {callback_chain_step}')
 
             # movement: forward
             self.send_packet(next_node, packet)
