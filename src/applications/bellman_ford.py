@@ -1,6 +1,7 @@
 from enum import Enum
 from classes.base import Application
 import random
+import threading
 
 class NodeFunction(Enum):
     A = "A"
@@ -11,8 +12,6 @@ FUNCTION_SEQ = None
 MAX_HOPS = 0
 
 global_function_counters = None
-
-broken_path = False
 
 class BroadcastState:
     def __init__(self):
@@ -189,8 +188,31 @@ class SenderBellmanFordApplication(BellmanFordApplication):
         self.previous_node_id = None
         self.max_hops = None
         self.functions_sequence = None
+        self.last_route_update = 0  # Última vez que se ejecutó el recalculo de rutas
+        self.running = True  # Control del hilo de monitoreo
 
-    def start_episode(self, episode_number, max_hops, functions_sequence):
+    def start_route_monitoring(self):
+        """Inicia un hilo que verifica periódicamente si se debe ejecutar Bellman-Ford."""
+        threading.Thread(target=self._monitor_route_updates, daemon=True).start()
+
+    def stop_route_monitoring(self):
+        """Detiene el monitoreo de actualización de rutas."""
+        self.running = False
+
+    def _monitor_route_updates(self):
+        """Monitorea el reloj central y ejecuta Bellman-Ford cada 30 segundos."""
+        while self.running:
+            current_time = self.node.network.simulation_clock.get_current_time()
+
+            if current_time - self.last_route_update >= 30000:  # 30 segundos en ms
+                print(f"[Node {self.node.node_id}] Recalculando rutas con Bellman-Ford en {current_time} ms")
+                self.compute_shortest_paths()
+                self.last_route_update = current_time
+
+            time.sleep(0.1)  # Evita sobrecarga de CPU
+
+    def start_episode(self, episode_number, max_hops, functions_sequence, penalty=0.0):
+        self.start_route_monitoring()
         # self.max_hops=max_hops
 
         global MAX_HOPS
@@ -202,9 +224,7 @@ class SenderBellmanFordApplication(BellmanFordApplication):
         global global_function_counters
         global_function_counters = {func: 0 for func in FUNCTION_SEQ}
 
-        global broken_path
-        if broken_path or episode_number == 1:
-            broken_path = False
+        if episode_number == 1:
             print(f"[Node_ID={self.node.node_id}] Starting broadcast for episode {episode_number}")
 
             # Iniciar el broadcast para recopilar latencias y asignar funciones
@@ -347,6 +367,7 @@ class SenderBellmanFordApplication(BellmanFordApplication):
                 print(f"\n[Node_ID={self.node.node_id}] Episode {episode_number} failed.")
 
                 self.mark_episode_result(packet, success=False)
+                self.stop_route_monitoring()
                 return
 
             case PacketType.PACKET_HOP:
@@ -380,6 +401,7 @@ class SenderBellmanFordApplication(BellmanFordApplication):
                 # print(f"[Node_ID={self.node.node_id}] Episode {packet.episode_number} completed with total time {packet.time}")
                 episode_number = packet["episode_number"]
                 self.mark_episode_result(packet, success=True)
+                self.stop_route_monitoring()
                 print(f"[Node_ID={self.node.node_id}] Episode {episode_number} completed")
 
             case PacketType.BROADCAST:
@@ -449,11 +471,7 @@ class SenderBellmanFordApplication(BellmanFordApplication):
             case PacketType.BROKEN_PATH:
                 episode_number = packet["episode_number"]
                 print(f"[Node_ID={self.node.node_id}] Episode {episode_number} detected a broken path. Packet={packet}")
-                global broken_path
-                broken_path = True
                 self.send_packet(None, packet, True)
-                # TODO: acá habría que revisar que el paquete quede como que no fue entregado
-                # self.start_episode(episode_number, True)
 
             case _:
                 packet_type = packet["type"]

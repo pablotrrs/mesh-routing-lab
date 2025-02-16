@@ -129,12 +129,12 @@ class Network:
         self.connections[node.node_id] = []
         self.active_nodes.add(node.node_id)
 
-    def connect_nodes(self, node_id1, node_id2):
-        if node_id1 in self.nodes and node_id2 in self.nodes:
-            self.connections[node_id1].append(node_id2)
-            self.connections[node_id2].append(node_id1)
-        else:
-            raise ValueError("One or both nodes don't exist in the network.")
+    def connect_nodes(self, node1_id, node2_id):
+        """Conecta dos nodos en la red sin duplicar conexiones."""
+        if node2_id not in self.connections.get(node1_id, []):
+            self.connections.setdefault(node1_id, []).append(node2_id)
+        if node1_id not in self.connections.get(node2_id, []):
+            self.connections.setdefault(node2_id, []).append(node1_id)
 
     def get_neighbors(self, node_id):
         """Returns a node's neighbors, excluding itself."""

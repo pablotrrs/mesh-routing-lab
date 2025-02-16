@@ -146,7 +146,7 @@ class SenderDijkstraApplication(DijkstraApplication):
         self.max_hops = None
         self.functions_sequence = None
 
-    def start_episode(self, episode_number, max_hops, functions_sequence):
+    def start_episode(self, episode_number, max_hops, functions_sequence, penalty=0.0):
         # self.max_hops=max_hops
 
         global MAX_HOPS
