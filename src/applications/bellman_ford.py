@@ -1,5 +1,5 @@
 from enum import Enum
-from classes.base import Application
+from classes.base import Application, EpisodeEnded
 import random
 import threading
 
@@ -367,8 +367,6 @@ class SenderBellmanFordApplication(BellmanFordApplication):
                 print(f"\n[Node_ID={self.node.node_id}] Episode {episode_number} failed.")
 
                 self.mark_episode_result(packet, success=False)
-                self.stop_route_monitoring()
-                return
 
             case PacketType.PACKET_HOP:
                 print(f"[Node_ID={self.node.node_id}] Processing packet at node {self.node}: {packet}")
@@ -401,7 +399,6 @@ class SenderBellmanFordApplication(BellmanFordApplication):
                 # print(f"[Node_ID={self.node.node_id}] Episode {packet.episode_number} completed with total time {packet.time}")
                 episode_number = packet["episode_number"]
                 self.mark_episode_result(packet, success=True)
-                self.stop_route_monitoring()
                 print(f"[Node_ID={self.node.node_id}] Episode {episode_number} completed")
 
             case PacketType.BROADCAST:
@@ -496,6 +493,9 @@ class SenderBellmanFordApplication(BellmanFordApplication):
             packet_dict=packet, 
             episode_success=success
         )
+
+        self.stop_route_monitoring()
+        raise EpisodeEnded()
 
     def _log_routes(self):
         """

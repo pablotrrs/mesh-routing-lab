@@ -1,5 +1,5 @@
 from enum import Enum
-from classes.base import Application
+from classes.base import Application, EpisodeEnded
 import random
 from queue import PriorityQueue
 
@@ -440,6 +440,8 @@ class SenderDijkstraApplication(DijkstraApplication):
             packet_dict=packet, 
             episode_success=success
         )
+
+        raise EpisodeEnded()
 
     def _log_routes(self):
         """
