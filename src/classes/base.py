@@ -2,6 +2,9 @@ import numpy as np
 from abc import ABC, abstractmethod
 from enum import Enum
 
+class EpisodeEnded(Exception):
+    pass
+
 class Algorithm(Enum):
     Q_ROUTING = "Q_ROUTING"
     DIJKSTRA = "DIJKSTRA"

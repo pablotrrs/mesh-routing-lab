@@ -9,6 +9,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import threading
 import datetime
+from classes.base import EpisodeEnded
 
 class Simulation:
     def __init__(self, network, sender_node):
@@ -147,9 +148,15 @@ class Simulation:
 
             # **Ejecutar episodio**
             if algorithm == "Q_ROUTING":
-                self.sender_node.start_episode(episode_number, self.max_hops, functions_sequence, penalty)
+                try:
+                    self.sender_node.start_episode(episode_number, self.max_hops, functions_sequence, penalty)
+                except EpisodeEnded:
+                    print(f'\n\n=== Episode #{episode_number} ended ===\n')
             else:
-                self.sender_node.start_episode(episode_number, self.max_hops, functions_sequence)
+                try:
+                    self.sender_node.start_episode(episode_number, self.max_hops, functions_sequence)
+                except EpisodeEnded:
+                    print(f'\n\n=== Episode #{episode_number} ended ===\n')
 
             end_time = self.get_current_time()
             episode_duration = end_time - start_time
