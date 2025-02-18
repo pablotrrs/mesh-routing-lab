@@ -208,11 +208,12 @@ class Simulation:
 
         # print(json.dumps(self.metrics, indent=4))
 
-        # self.save_metrics_to_file()
-        # self.save_results_to_excel()
+        self.save_metrics_to_file()
+        self.save_results_to_excel()
         # self.generar_individual_graphs_from_excel()
+        self.generar_comparative_graphs_from_excel()
 
-    def save_metrics_to_file(self, directory="../results/single-run"):
+    def save_metrics_to_file(self, directory="./results/single-run"):
         """
         Guarda las métricas de la simulación en un archivo JSON con el simulation_id en el nombre.
         Crea la carpeta `../results/simulations` si no existe.
@@ -228,7 +229,7 @@ class Simulation:
         except Exception as e:
             print(f"\nError al guardar las métricas: {e}")
 
-    def save_results_to_excel(self, filename="../results/resultados_simulacion.xlsx"):
+    def save_results_to_excel(self, filename="./results/resultados_simulacion.xlsx"):
         """
         Guarda los datos de la simulación en un archivo Excel, con una hoja por algoritmo.
         Incluye el `packet_log` completo para cada episodio para debug.
@@ -239,7 +240,7 @@ class Simulation:
         from openpyxl import load_workbook
         from openpyxl.utils import get_column_letter
 
-        os.makedirs("../results", exist_ok=True)
+        os.makedirs("./results", exist_ok=True)
 
         # Verificar si el archivo es corrupto antes de continuar
         if os.path.exists(filename):
@@ -266,12 +267,16 @@ class Simulation:
                 "dynamic_changes": [],
                 "packet_log_raw": [],  # Guardar packet log en JSON como string
             }
-            for algorithm in self.metrics.keys()
+            for algorithm in self.metrics.keys() if algorithm not in ["simulation_id", "parameters", "total_time", "runned_at"]
         }
-
+        print(f"\nℹ️ Algoritmos encontrados en las métricas: {list(metrics_data.keys())}")
         # Recorrer episodios y almacenar métricas
         for algorithm, episodes in self.metrics.items():
-            for episode_number, episode_data in episodes.items():
+            if algorithm in ["simulation_id", "parameters", "total_time", "runned_at"]:
+                continue
+            for episode_data in episodes["episodes"]:
+                print(f"ℹ️ Procesando episodio {episode_data['episode_number']} para {algorithm}...")
+                episode_number = episode_data["episode_number"]
                 # Obtener packet log del episodio
                 packet_log = self.network.packet_log.get(episode_number, {})
 
@@ -449,3 +454,124 @@ class Simulation:
         # plt.close()
         #
         # print("\nGráficos generados en '../results/'.")
+
+    def generar_comparative_graphs_from_excel(self, filename="./results/resultados_simulacion.xlsx"):
+        """
+        Genera gráficos comparativos basados en las métricas de la simulación, comparando todos los algoritmos en un solo gráfico por métrica.
+        """
+        import matplotlib.pyplot as plt
+        import pandas as pd
+        import os
+
+        os.makedirs("../results", exist_ok=True)
+        xls = pd.ExcelFile(filename)
+
+        # Diccionario para almacenar datos de todas las hojas
+        all_data = {
+            "episode_duration": {},
+            # "tasa_paquetes_por_segundo": {},
+            "hops_promedio": {},
+            # "delivered_packets": {},
+            # "total_packets": {}
+            "total_hops": {},
+            "average_delivery_time": {},
+            "success_rate": {}
+        }
+
+        for sheet_name in xls.sheet_names:
+            df = pd.read_excel(xls, sheet_name=sheet_name)
+            all_data["episode_duration"][sheet_name] = df["episode_duration"]
+            # all_data["tasa_paquetes_por_segundo"][sheet_name] = df["tasa_paquetes_por_segundo"]
+            all_data["hops_promedio"][sheet_name] = df["total_hops"] / df["episode"]
+            # all_data["delivered_packets"][sheet_name] = df["delivered_packets"]
+            # all_data["total_packets"][sheet_name] = df["total_packets"]
+            all_data["total_hops"][sheet_name] = df["total_hops"]
+            all_data["average_delivery_time"][sheet_name] = df["episode_duration"] / df["total_hops"]
+            all_data["success_rate"][sheet_name] = df["episode_success"].fillna(False).astype(int)
+            
+        # Gráfico comparativo de Duración del Episodio
+        plt.figure(figsize=(10, 6))
+        for algorithm, data in all_data["episode_duration"].items():
+            plt.plot(data, label=f"{algorithm}")
+        plt.title("Comparación de Duración del Episodio entre Algoritmos")
+        plt.xlabel("Episodio")
+        plt.ylabel("Duración (ms)")
+        plt.grid()
+        plt.legend()
+        plt.savefig("./results/Comparacion_Duracion_Episodio.png")
+        plt.close()
+
+        # Gráfico comparativo de Tasa de Paquetes Entregados por Segundo
+        # plt.figure(figsize=(10, 6))
+        # for algorithm, data in all_data["tasa_paquetes_por_segundo"].items():
+        #     plt.plot(data, label=f"{algorithm}")
+        # plt.title("Comparación de Tasa de Entrega entre Algoritmos")
+        # plt.xlabel("Episodio")
+        # plt.ylabel("Paquetes por segundo")
+        # plt.grid()
+        # plt.legend()
+        # plt.savefig("../results/Comparacion_Tasa_Entrega.png")
+        # plt.close()
+
+        # Gráfico comparativo de Hops Promedio
+        plt.figure(figsize=(10, 6))
+        for algorithm, data in all_data["hops_promedio"].items():
+            plt.plot(data, label=f"{algorithm}")
+        plt.title("Comparación de Hops Promedio entre Algoritmos")
+        plt.xlabel("Episodio")
+        plt.ylabel("Hops Promedio")
+        plt.grid()
+        plt.legend()
+        plt.savefig("./results/Comparacion_Hops_Promedio.png")
+        plt.close()
+
+        # Gráfico comparativo de Paquetes Entregados y Totales
+        # algorithms = list(all_data["delivered_packets"].keys())
+        # delivered_packets = [all_data["delivered_packets"][alg].sum() for alg in algorithms]
+        # total_packets = [all_data["total_packets"][alg].sum() for alg in algorithms]
+
+        # x = np.arange(len(algorithms))  # the label locations
+        # width = 0.35  # the width of the bars
+
+        # fig, ax = plt.subplots(figsize=(10, 6))
+        # rects1 = ax.bar(x - width/2, delivered_packets, width, label='Paquetes Entregados')
+        # rects2 = ax.bar(x + width/2, total_packets, width, label='Total de Paquetes')
+
+        # # Add some text for labels, title and custom x-axis tick labels, etc.
+        # ax.set_xlabel('Algoritmo')
+        # ax.set_ylabel('Número de Paquetes')
+        # ax.set_title('Comparación de Paquetes Entregados y Totales entre Algoritmos')
+        # ax.set_xticks(x)
+        # ax.set_xticklabels(algorithms)
+        # ax.legend()
+
+        # fig.tight_layout()
+        # plt.grid()
+        # plt.savefig("./results/Comparacion_Paquetes_Entregados_Totales.png")
+        # plt.close()
+
+        # Gráfico comparativo de Tiempo Promedio de Entrega
+        plt.figure(figsize=(10, 6))
+        for algorithm, data in all_data["average_delivery_time"].items():
+            plt.plot(data, label=f"{algorithm}")
+        plt.title("Comparación de Tiempo Promedio de Entrega entre Algoritmos")
+        plt.xlabel("Episodio")
+        plt.ylabel("Tiempo Promedio de Entrega (ms)")
+        plt.grid()
+        plt.legend()
+        plt.savefig("./results/Comparacion_Tiempo_Promedio_Entrega.png")
+        plt.close()
+
+        # Gráfico comparativo de Tasa de Éxito
+        plt.figure(figsize=(10, 6))
+        for algorithm, data in all_data["success_rate"].items():
+            plt.plot(data, label=f"{algorithm}")
+        plt.title("Comparación de Tasa de Éxito entre Algoritmos")
+        plt.xlabel("Episodio")
+        plt.ylabel("Tasa de Éxito")
+        plt.grid()
+        plt.legend()
+        plt.savefig("./results/Comparacion_Tasa_Exito.png")
+        plt.close()
+
+        print("\nGráficos comparativos generados en './results/'.")
