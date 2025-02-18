@@ -372,10 +372,9 @@ class SenderQRoutingApplication(QRoutingApplication):
             if not self.send_packet(None, packet, True):
                 # max hops reached
                 self.mark_episode_result(packet, success=False)
-                return
             else:
                 # retry until there is a valid next node
-                handle_packet_hop(packet)
+                self.handle_packet_hop(packet)
                 return
 
         estimated_time_remaining = self.estimate_remaining_time(next_node)

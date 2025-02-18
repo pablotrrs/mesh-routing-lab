@@ -684,7 +684,7 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                     print(next_node is None or not self.node.network.nodes[next_node].status)
 
                     # Verificar si el siguiente nodo es válido
-                    if next_node is None or not self.node.network.nodes[next_node].status:  # TODO: Crear un método auxiliar is_up o algo similar
+                    if next_node is None or not self.node.network.validate_connection(self.node.node_id, next_node):
                         print(f"[Node_ID={self.node.node_id}] Broken path at node {self.node.node_id}: {packet}")
 
                         # Crear un paquete BROKEN_PATH como dict
