@@ -213,7 +213,13 @@ class Simulation:
         # self.generar_individual_graphs_from_excel()
         self.generar_comparative_graphs_from_excel()
 
-    def save_metrics_to_file(self, directory="./results/single-run"):
+        q_tables = []
+        if algorithm == "Q_ROUTING":
+            for node in self.network.nodes.values():
+                q_tables.append(node.application.q_table)
+        self.generate_heat_map(q_tables)
+
+    def save_metrics_to_file(self, directory="../results/single-run"):
         """
         Guarda las métricas de la simulación en un archivo JSON con el simulation_id en el nombre.
         Crea la carpeta `../results/simulations` si no existe.
@@ -229,7 +235,7 @@ class Simulation:
         except Exception as e:
             print(f"\nError al guardar las métricas: {e}")
 
-    def save_results_to_excel(self, filename="./results/resultados_simulacion.xlsx"):
+    def save_results_to_excel(self, filename="../results/resultados_simulacion.xlsx"):
         """
         Guarda los datos de la simulación en un archivo Excel, con una hoja por algoritmo.
         Incluye el `packet_log` completo para cada episodio para debug.
@@ -240,7 +246,7 @@ class Simulation:
         from openpyxl import load_workbook
         from openpyxl.utils import get_column_letter
 
-        os.makedirs("./results", exist_ok=True)
+        os.makedirs("../results", exist_ok=True)
 
         # Verificar si el archivo es corrupto antes de continuar
         if os.path.exists(filename):
@@ -455,7 +461,7 @@ class Simulation:
         #
         # print("\nGráficos generados en '../results/'.")
 
-    def generar_comparative_graphs_from_excel(self, filename="./results/resultados_simulacion.xlsx"):
+    def generar_comparative_graphs_from_excel(self, filename="../results/resultados_simulacion.xlsx"):
         """
         Genera gráficos comparativos basados en las métricas de la simulación, comparando todos los algoritmos en un solo gráfico por métrica.
         """
@@ -498,7 +504,7 @@ class Simulation:
         plt.ylabel("Duración (ms)")
         plt.grid()
         plt.legend()
-        plt.savefig("./results/Comparacion_Duracion_Episodio.png")
+        plt.savefig("../results/Comparacion_Duracion_Episodio.png")
         plt.close()
 
         # Gráfico comparativo de Tasa de Paquetes Entregados por Segundo
@@ -522,7 +528,7 @@ class Simulation:
         plt.ylabel("Hops Promedio")
         plt.grid()
         plt.legend()
-        plt.savefig("./results/Comparacion_Hops_Promedio.png")
+        plt.savefig("../results/Comparacion_Hops_Promedio.png")
         plt.close()
 
         # Gráfico comparativo de Paquetes Entregados y Totales
@@ -559,7 +565,7 @@ class Simulation:
         plt.ylabel("Tiempo Promedio de Entrega (ms)")
         plt.grid()
         plt.legend()
-        plt.savefig("./results/Comparacion_Tiempo_Promedio_Entrega.png")
+        plt.savefig("../results/Comparacion_Tiempo_Promedio_Entrega.png")
         plt.close()
 
         # Gráfico comparativo de Tasa de Éxito
@@ -571,7 +577,59 @@ class Simulation:
         plt.ylabel("Tasa de Éxito")
         plt.grid()
         plt.legend()
-        plt.savefig("./results/Comparacion_Tasa_Exito.png")
+        plt.savefig("../results/Comparacion_Tasa_Exito.png")
         plt.close()
 
-        print("\nGráficos comparativos generados en './results/'.")
+        print("\nGráficos comparativos generados en '../results/'.")
+
+    def generate_heat_map(self, q_tables):
+        q_table_data = []
+        for q_table in q_tables:
+            for state, actions in q_table.items():
+                for action, q_value in actions.items():
+                    q_table_data.append((state, action, q_value))
+
+        if not q_table_data:
+            print(f"No Q-table data available.")
+            return
+
+        # Extract unique states and actions
+        states = sorted(set(state for state, _, _ in q_table_data))
+        actions = sorted(set(action for _, action, _ in q_table_data))
+
+        # Create a matrix to hold Q-values
+        q_matrix = np.zeros((len(states), len(actions)))
+
+        for state, action, q_value in q_table_data:
+            state_index = states.index(state)
+            action_index = actions.index(action)
+            q_matrix[state_index, action_index] = q_value
+
+        fig, ax = plt.subplots()
+        cax = ax.imshow(q_matrix, cmap='RdYlGn', aspect='auto', vmin=0, vmax=1)
+
+        # Add color bar
+        fig.colorbar(cax)
+
+        # Set axis labels
+        ax.set_xticks(np.arange(len(actions)))
+        ax.set_yticks(np.arange(len(states)))
+        ax.set_xticklabels(actions)
+        ax.set_yticklabels(states)
+
+        # Annotate each cell with its value
+        for i in range(len(states)):
+            for j in range(len(actions)):
+                ax.text(j, i, f'{q_matrix[i, j]:.2f}', ha='center', va='center', color='black')
+
+        plt.xlabel('Actions (Next Node ID)')
+        plt.ylabel('States (Node ID)')
+        plt.title(f'Q-Table Heat Map')
+
+        output_folder = '../results'
+        # Save the heat map as a .png file
+        filename = os.path.join(output_folder, f'q_table_heat_map.png')
+        plt.savefig(filename)
+        plt.close()
+
+        print(f'Heat map saved to {filename}')
