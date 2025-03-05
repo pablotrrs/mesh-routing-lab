@@ -481,7 +481,8 @@ class Simulation:
             # "total_packets": {}
             "total_hops": {},
             "average_delivery_time": {},
-            "success_rate": {}
+            "success_rate": {},
+            "episode_success": {}
         }
 
         for sheet_name in xls.sheet_names:
@@ -494,6 +495,7 @@ class Simulation:
             all_data["total_hops"][sheet_name] = df["total_hops"]
             all_data["average_delivery_time"][sheet_name] = df["episode_duration"] / df["total_hops"]
             all_data["success_rate"][sheet_name] = df["episode_success"].fillna(False).astype(int)
+            all_data["episode_success"][sheet_name] = df["episode_success"]
             
         # Gráfico comparativo de Duración del Episodio
         plt.figure(figsize=(10, 6))
@@ -580,7 +582,46 @@ class Simulation:
         plt.savefig("../results/Comparacion_Tasa_Exito.png")
         plt.close()
 
+        # Gráfico de columnas verticales de Tasa de Éxito por Episodio
+        plt.figure(figsize=(10, 6))
+
+        # Initialize dictionaries to count TRUE, FALSE, and blank values for each algorithm
+        success_counts = {algorithm: {"TRUE": 0, "FALSE": 0, "BLANK": 0} for algorithm in all_data["episode_success"].keys()}
+
+        # Count the occurrences of TRUE, FALSE, and blank values for each algorithm
+        for algorithm, data in all_data["episode_success"].items():
+            for value in data:
+                if pd.isna(value):
+                    success_counts[algorithm]["BLANK"] += 1
+                elif value:
+                    success_counts[algorithm]["TRUE"] += 1
+                else:
+                    success_counts[algorithm]["FALSE"] += 1
+
+        # Plot the counts for each algorithm
+        bar_width = 0.25
+        index = np.arange(len(success_counts))
+
+        # Plot TRUE values
+        plt.bar(index, [success_counts[alg]["TRUE"] for alg in success_counts], bar_width, label="TRUE")
+
+        # Plot FALSE values
+        plt.bar(index + bar_width, [success_counts[alg]["FALSE"] for alg in success_counts], bar_width, label="FALSE")
+
+        # Plot Blank values
+        plt.bar(index + 2 * bar_width, [success_counts[alg]["BLANK"] for alg in success_counts], bar_width, label="BLANK")
+
+        plt.title("Tasa de Éxito por Episodio entre Algoritmos")
+        plt.xlabel("Algoritmo")
+        plt.ylabel("Cantidad")
+        plt.xticks(index + bar_width, success_counts.keys())
+        plt.grid()
+        plt.legend()
+        plt.savefig("../results/Tasa_Exito_Columnas.png")
+        plt.close()
+
         print("\nGráficos comparativos generados en '../results/'.")
+
 
     def generate_heat_map(self, q_tables):
         q_table_data = []
