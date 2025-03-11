@@ -494,7 +494,7 @@ class Simulation:
             # all_data["total_packets"][sheet_name] = df["total_packets"]
             all_data["total_hops"][sheet_name] = df["total_hops"]
             all_data["average_delivery_time"][sheet_name] = df["episode_duration"] / df["total_hops"]
-            all_data["success_rate"][sheet_name] = df["episode_success"].fillna(False).astype(int)
+            all_data["success_rate"][sheet_name] = df["episode_success"].fillna(False).infer_objects(copy=False)
             all_data["episode_success"][sheet_name] = df["episode_success"]
             
         # Gráfico comparativo de Duración del Episodio
