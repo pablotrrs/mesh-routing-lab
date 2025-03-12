@@ -10,7 +10,7 @@ class MetricsManager:
     def __init__(self):
         self.metrics = {}
 
-    def initialize(self, max_hops, topology_file, functions_sequence, mean_interval_ms, reconnect_interval_ms, disconnect_probability, algorithms):
+    def initialize(self, max_hops, topology_file, functions_sequence, mean_interval_ms, reconnect_interval_ms, disconnect_probability, algorithms, penalty):
         """Inicializa las métricas para una nueva simulación con múltiples algoritmos."""
         self.metrics = {
             "simulation_id": 1,
@@ -27,13 +27,14 @@ class MetricsManager:
             "runned_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
 
-        # Inicializamos métricas para cada algoritmo seleccionado
         for algorithm in algorithms:
             self.metrics[algorithm] = {
                 "success_rate": 0.0,
-                "episodes": [],
-                "penalty": None if algorithm != "Q_ROUTING" else 0.0
+                "episodes": []
             }
+
+            if algorithm == "Q_ROUTING":
+                self.metrics[algorithm]["penalty"] = penalty
 
     def log_episode(self, algorithm, episode_number, start_time, end_time, episode_success, route, total_hops, dynamic_changes):
         """Registra las métricas de un episodio en ejecución para un algoritmo específico."""

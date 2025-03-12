@@ -56,6 +56,15 @@ class QRoutingApplication(Application):
         self.callback_stack = deque()
         self.max_hops = None
         self.functions_sequence = None
+        self.penalty = 0.0
+
+    def set_penalty(self, penalty):
+        print(f'setting penalty to {penalty}')
+        global PENALTY
+        PENALTY = penalty
+        self.penalty = penalty
+        print(f'penalty setted to {PENALTY}')
+
 
     def receive_packet(self, packet):
         print(f'[Node_ID={self.node.node_id}] Received packet {packet}')
@@ -295,12 +304,6 @@ class QRoutingApplication(Application):
 class SenderQRoutingApplication(QRoutingApplication):
     def __init__(self, node):
         super().__init__(node)
-
-    def set_penalty(self, penalty):
-        print(f'setting penalty to {penalty}')
-        global PENALTY
-        PENALTY = penalty
-        print(f'penalty setted to {PENALTY}')
 
     def start_episode(self, episode_number, max_hops=None, functions_sequence=None, penalty=0.0, current_hop_count=0) -> None:
         """Initiates an episode by creating a packet and sending it to chosen node."""

@@ -98,7 +98,8 @@ if __name__ == "__main__":
         mean_interval_ms=args.mean_interval_ms,
         reconnect_interval_ms=args.reconnect_interval_ms,
         disconnect_probability=args.disconnect_probability,
-        algorithms=[algo.name for algo in selected_algorithms]  # Pasamos la lista de nombres de los algoritmos
+        algorithms=[algo.name for algo in selected_algorithms],
+        penalty=args.penalty
     )
 
     simulation = Simulation(network, sender_node, metrics_manager)
@@ -114,16 +115,18 @@ if __name__ == "__main__":
 
         match algorithm:
             case Algorithm.Q_ROUTING:
-                from applications.q_routing import SenderQRoutingApplication, IntermediateQRoutingApplication
+                from applications.q_routing import QRoutingApplication, SenderQRoutingApplication, IntermediateQRoutingApplication
 
                 sender_node.install_application(SenderQRoutingApplication)
-                sender_node.application.set_penalty(args.penalty)
+
+                if isinstance(sender_node.application, QRoutingApplication):
+                    sender_node.application.set_penalty(args.penalty)
 
                 for node_id, node in network.nodes.items():
                     if node_id != sender_node.node_id:
                         node.install_application(IntermediateQRoutingApplication)
 
-                simulation.start(algorithm, args.episodes, args.penalty)
+                simulation.start(algorithm, args.episodes)
 
             case Algorithm.DIJKSTRA:
                 from applications.dijkstra import SenderDijkstraApplication, IntermediateDijkstraApplication

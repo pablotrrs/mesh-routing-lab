@@ -17,7 +17,7 @@ class Simulation:
     def set_functions_sequence(self, functions_sequence):
         self.functions_sequence = functions_sequence
 
-    def start(self, algorithm_enum, episodes, penalty=None):
+    def start(self, algorithm_enum, episodes):
         algorithm = algorithm_enum.name
         self.network.set_simulation_clock(self.clock)  # Pasamos Clock en vez de self
         self.clock.start()
@@ -32,7 +32,7 @@ class Simulation:
             registry.initialize_episode(episode_number)
 
             try:
-                self.sender_node.start_episode(episode_number, self.max_hops, self.functions_sequence, penalty if algorithm == "Q_ROUTING" else None)
+                self.sender_node.start_episode(episode_number, self.max_hops, self.functions_sequence)
             except EpisodeEnded:
                 print(f'\n\n=== Episode #{episode_number} ended ===\n')
 
