@@ -3,11 +3,6 @@ from classes.base import Application, EpisodeEnded
 import random
 from queue import PriorityQueue
 
-class NodeFunction(Enum):
-    A = "A"
-    B = "B"
-    C = "C"
-
 FUNCTION_SEQ = None
 MAX_HOPS = 0
 
@@ -136,7 +131,7 @@ class DijkstraApplication(Application):
             packet["from_node_id"] = self.node.node_id
 
         print(f'\n[Node_ID={self.node.node_id}] Sending packet to Node {to_node_id}\n')
-        self.node.network.send_dict(self.node.node_id, to_node_id, packet)
+        self.node.network.send(self.node.node_id, to_node_id, packet)
 
 class SenderDijkstraApplication(DijkstraApplication):
     def __init__(self, node):

@@ -59,13 +59,13 @@ class QRoutingApplication(Application):
     def receive_packet(self, packet):
         print(f'[Node_ID={self.node.node_id}] Received packet {packet}')
 
-        if packet.type == PacketType.PACKET_HOP:
+        if packet["type"] == PacketType.PACKET_HOP:
             self.handle_packet_hop(packet)
             return
-        elif packet.type == PacketType.CALLBACK:
+        elif packet["type"] == PacketType.CALLBACK:
             self.handle_echo_callback(packet)
             return
-        elif packet.type == PacketType.MAX_HOPS_REACHED:
+        elif packet["type"] == PacketType.MAX_HOPS_REACHED:
             self.handle_lost_packet(packet)
             return
 
@@ -202,18 +202,18 @@ class QRoutingApplication(Application):
         return
 
     def send_packet(self, to_node_id, packet, lost_packet=False) -> None:
-        packet.hops += 1
-        packet.time += 1
+        if packet.get("hops") is not None:
+            packet["hops"] += 1
 
         if lost_packet:
             self.node.network.send(self.node.node_id, None, packet, lost_packet=True)
         else:
-            packet.from_node_id = self.node.node_id
+            packet["from_node_id"] = self.node.node_id
 
             print(f'[Node_ID={self.node.node_id}] Sending packet to Node {to_node_id}\n')
             self.node.network.send(self.node.node_id, to_node_id, packet)
 
-        if packet.hops > MAX_HOPS:
+        if packet["hops"] > MAX_HOPS:
             print(f'[Node_ID={self.node.node_id}] Max hops reached. Initiating full echo callback')
             return False
         else:
@@ -225,19 +225,19 @@ class QRoutingApplication(Application):
         # si no tiene callback stack porque puede pasar
         # porque nunca salió del 0 -> n hop
 
-        episode_data = self.node.network.packet_log.get(packet.episode_number, {})
+        episode_data = self.node.network.packet_log.get(packet["episode_number"], {})
         route = episode_data.get("route", [])
 
         if not CALLBACK_STACK:
             if self.didnt_make_it_further_than_first_hop(route):
-                self.send_packet(packet.from_node_id, callback_packet)
+                self.send_packet(packet["from_node_id"], callback_packet)
 
-        callback_packet = Packet(
-            episode_number=packet.episode_number,
-            from_node_id=self.node.node_id,
-            type=PacketType.MAX_HOPS_REACHED,
-            max_hops=self.max_hops
-        )
+        callback_packet = {
+            "type": PacketType.MAX_HOPS_REACHED,
+            "episode_number": packet["episode_number"],
+            "from_node_id": self.node.node_id,
+            "max_hops": self.max_hops
+        }
 
         callback_data = CALLBACK_STACK.pop()
         print(f"\033[91m[CALLBACK_STACK] Desencolando {callback_data}, callback_stack: {CALLBACK_STACK}\033[0m")
@@ -323,13 +323,17 @@ class SenderQRoutingApplication(QRoutingApplication):
         global FUNCTION_SEQ
         FUNCTION_SEQ=functions_sequence
 
-        packet = Packet(
-            episode_number=episode_number,
-            type=PacketType.PACKET_HOP,
-            from_node_id=self.node.node_id,
-            max_hops=max_hops,
-            hops=current_hop_count
-        )
+        packet = {
+            "type": PacketType.PACKET_HOP,
+            "episode_number": episode_number,
+            "from_node_id": self.node.node_id,
+            "functions_sequence": FUNCTION_SEQ.copy(),
+            "function_counters": {func: 0 for func in FUNCTION_SEQ},
+            "hops": current_hop_count,
+            "time": 0,
+            "max_hops": max_hops,
+            "is_delivered": False
+        }
 
         self.initialize_or_update_q_table()
 
@@ -338,17 +342,15 @@ class SenderQRoutingApplication(QRoutingApplication):
         if next_node is None:
             print(f'[Node_ID={self.node.node_id}] No valid next node found. Can\'t initiate episode!.')
             # movement: none
-            print(f'mf current packet count hops : {packet.hops}')
             self.send_packet(None, packet, True)
-            packet.hops += 1
-            print(f'[Node_ID={self.node.node_id}] Packet hop count {packet.hops}')
+            packet["hops"] += 1
+            print(f'[Node_ID={self.node.node_id}] Packet hop count {packet["hops"]}')
 
-            if packet.hops > MAX_HOPS:
+            if packet["hops"] > MAX_HOPS:
                 self.mark_episode_result(packet, success=False)
-                return
 
             # si no se puede empezar el episodio, se sigue intentando hasta que se pueda
-            self.start_episode(episode_number, max_hops, functions_sequence, penalty, packet.hops)
+            self.start_episode(episode_number, max_hops, functions_sequence, penalty, packet["hops"])
             return
         else:
             estimated_time_remaining = self.estimate_remaining_time(next_node)
@@ -384,12 +386,12 @@ class SenderQRoutingApplication(QRoutingApplication):
             estimated_time_remaining=estimated_time_remaining
         )
 
-        callback_chain_step = CallbackChainStep(previous_hop_node=packet.from_node_id,
+        callback_chain_step = CallbackChainStep(previous_hop_node=packet["from_node_id"],
                                                 current_node=self.node.node_id,
                                                 next_hop_node=next_node,
                                                 send_timestamp=get_current_time(),
                                                 estimated_time=estimated_time_remaining,
-                                                episode_number=packet.episode_number)
+                                                episode_number=packet["episode_number"])
 
 
         global CALLBACK_STACK
@@ -422,16 +424,16 @@ class SenderQRoutingApplication(QRoutingApplication):
             return
         else:
             print_q_table(self)
-            print(f'\n[Node_ID={self.node.node_id}] Episode {packet.episode_number} finished.')
+            print(f'\n[Node_ID={self.node.node_id}] Episode {packet["episode_number"]} finished.')
 
             self.mark_episode_result(packet, success=True)
             return
 
     def handle_lost_packet(self, packet) -> None:
-        print(f"\n[Node_ID={self.node.node_id}] Episode {packet.episode_number} failed.")
+        episode_number = packet["episode_number"]
+        print(f"\n[Node_ID={self.node.node_id}] Episode {episode_number} failed.")
 
         self.mark_episode_result(packet, success=False)
-        return
 
     def mark_episode_result(self, packet, success=True):
         """
@@ -448,7 +450,8 @@ class SenderQRoutingApplication(QRoutingApplication):
         print(f'marking episode as mf completed {EPISODE_COMPLETED}')
 
         status_text = "SUCCESS" if success else "FAILURE"
-        print(f"\n[Node_ID={self.node.node_id}] Marking Episode {packet.episode_number} as {status_text}.")
+        episode_number = packet["episode_number"]
+        print(f"\n[Node_ID={self.node.node_id}] Marking Episode {episode_number} as {status_text}.")
 
         # Llamar a la red para registrar el estado del episodio
         self.node.network.send(
@@ -474,29 +477,15 @@ class IntermediateQRoutingApplication(QRoutingApplication):
 
     def handle_packet_hop(self, packet):
 
-        # global EPISODE_COMPLETED
-
-        # if EPISODE_COMPLETED:
-        #     print(f"\033[91m[Node_ID={self.node.node_id}] Episode {packet.episode_number} already ended or not found. Ignoring packet.\033[0m")
-        #     return
-
-        # manually ignore hop if episode has ended
-        # episode_data = self.node.network.packet_log.get(packet.episode_number)
-
-        # print(f'episode data {episode_data}')
-        #
-        # if episode_data is None or episode_data.get("episode_success", False) in [True, False]:
-        #     print(f"\033[91m[Node_ID={self.node.node_id}] Episode {packet.episode_number} already ended or not found. Ignoring packet.\033[0m")
-        #     return
-
         self.initialize_or_update_q_table()
 
-        if packet.hops > packet.max_hops:
+        if packet["hops"] > packet["max_hops"]:
             global EPISODE_COMPLETED
 
             print(f'episode completion {EPISODE_COMPLETED}')
             if EPISODE_COMPLETED:
-                print(f"\033[91m[Node_ID={self.node.node_id}] Episode {packet.episode_number} already ended or not found. Ignoring packet.\033[0m")
+                episode_number = packet["episode_number"]
+                print(f"\033[91m[Node_ID={self.node.node_id}] Episode {episode_number} already ended or not found. Ignoring packet.\033[0m")
                 return
             print(f'[Node_ID={self.node.node_id}] Max hops reached. Initiating full echo callback')
             self.initiate_max_hops_callback(packet)
@@ -505,11 +494,14 @@ class IntermediateQRoutingApplication(QRoutingApplication):
         if self.assigned_function is None:
             self.assign_function(packet)
 
-        if self.assigned_function == packet.next_function():
+        # if function to process is function assigned to this node
+        if self.assigned_function == packet["functions_sequence"][0] if packet["functions_sequence"] else None:
             print(f'[Node_ID={self.node.node_id}] Removing function {self.assigned_function} from functions to process')
-            packet.remove_next_function()
+            if packet["functions_sequence"]:
+                packet["functions_sequence"].pop(0)
 
-        if packet.is_sequence_completed():
+        # if all functions have been processed
+        if len(packet["functions_sequence"]) == 0:
             print(f'[Node_ID={self.node.node_id}] Function sequence is complete! Initiating full echo callback')
             self.initiate_full_echo_callback(packet)
             return
@@ -520,12 +512,12 @@ class IntermediateQRoutingApplication(QRoutingApplication):
         if next_node is not None:
             estimated_time_remaining = self.estimate_remaining_time(next_node)
 
-            callback_chain_step = CallbackChainStep(previous_hop_node=packet.from_node_id,
+            callback_chain_step = CallbackChainStep(previous_hop_node=packet["from_node_id"],
                                                     current_node=self.node.node_id,
                                                     next_hop_node=next_node,
                                                     send_timestamp=get_current_time(),
                                                     estimated_time=estimated_time_remaining,
-                                                    episode_number=packet.episode_number)
+                                                    episode_number=packet["episode_number"])
             global CALLBACK_STACK
             CALLBACK_STACK.append(callback_chain_step)
             print(f"\033[92m[CALLBACK_STACK] Encolando {callback_chain_step}, callback_stack: {CALLBACK_STACK}\033[0m")
@@ -588,23 +580,23 @@ class IntermediateQRoutingApplication(QRoutingApplication):
     def initiate_full_echo_callback(self, packet):
         """Inicia el proceso de full echo callback hacia el nodo anterior."""
 
-        callback_packet = Packet(
-            episode_number=packet.episode_number,
-            from_node_id=self.node.node_id,
-            type=PacketType.CALLBACK,
-            max_hops=self.max_hops
-        )
+        callback_packet = {
+            "type": PacketType.CALLBACK,
+            "episode_number": packet["episode_number"],
+            "from_node_id": self.node.node_id,
+            "max_hops": self.max_hops
+        }
 
         # movement: backward
-        self.send_packet(packet.from_node_id, callback_packet)
+        self.send_packet(packet["from_node_id"], callback_packet)
         return
 
     def assign_function(self, packet):
         """Asigna la función menos utilizada basada en los contadores del paquete."""
-        min_assignments = min(packet.function_counters.values())
+        min_assignments = min(packet["function_counters"].values())
 
         least_assigned_functions = [
-            func for func, count in packet.function_counters.items() if count == min_assignments
+            func for func, count in packet["function_counters"].items() if count == min_assignments
         ]
 
         if len(least_assigned_functions) == 1:
@@ -614,58 +606,11 @@ class IntermediateQRoutingApplication(QRoutingApplication):
 
         print(f'[Node_ID={self.node.node_id}] Node has no function, assigning function {function_to_assign}')
         self.assigned_function = function_to_assign
-        packet.increment_function_counter(function_to_assign)
+        packet["function_counters"][function_to_assign] += 1
         return
 
     def __str__(self):
         return f"IntermediateNode(id={self.node.node_id}, neighbors={self.node.network.get_neighbors(self.node.node_id)})"
-
-class Packet:
-    def __init__(self, episode_number, from_node_id, type, max_hops, hops=0):
-        self.type = type
-        self.episode_number = episode_number  # Número de episodio al que pertenece este paquete
-        self.from_node_id = from_node_id  # Nodo anterior por el que pasó el paquete
-        self.functions_sequence = FUNCTION_SEQ.copy()  # Secuencia de funciones a procesar
-        self.function_counters = {func: 0 for func in FUNCTION_SEQ}  # Contadores de funciones asignadas
-        self.hops = hops  # Contador de saltos
-        self.time = 0  # Tiempo total acumulado del paquete
-        self.max_hops = max_hops # Número máximo de saltos permitidos
-        self.is_delivered = False
-
-    def increment_function_counter(self, function):
-        """
-        Incrementa el contador de asignaciones para una función específica.
-        """
-        if function not in self.function_counters:
-            raise ValueError(f"La función {function} no es válida.")
-        self.function_counters[function] += 1
-
-    def is_sequence_completed(self):
-        """Revisa si la secuencia de funciones ha sido completamente procesada."""
-        return len(self.functions_sequence) == 0
-
-    def next_function(self):
-        """Obtiene la próxima función en la secuencia, si existe."""
-        return self.functions_sequence[0] if self.functions_sequence else None
-
-    def remove_next_function(self):
-        """Elimina la función actual de la secuencia, marcándola como procesada."""
-        if self.functions_sequence:
-            self.functions_sequence.pop(0)
-
-    def __str__(self):
-        functions_sequence_str = [func.value for func in self.functions_sequence]
-        function_counters_str = {func.value: count for func, count in self.function_counters.items()}
-        return (
-            f"Packet("
-            f"type={self.type.value}, "
-            f"episode_number={self.episode_number}, "
-            f"from_node_id={self.from_node_id}, "
-            f"functions_sequence={functions_sequence_str}, "
-            f"function_counters={function_counters_str}, "
-            f"hops={self.hops}, "
-            f"time={self.time})"
-        )
 
 def get_current_time():
     return time.time()

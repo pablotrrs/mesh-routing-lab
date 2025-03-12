@@ -3,9 +3,7 @@ import numpy as np
 import os
 import time
 import numpy as np
-from visualization import generate_heat_map, print_q_table
 from tabulate import tabulate
-import pandas as pd
 import matplotlib.pyplot as plt
 import threading
 import datetime
@@ -206,12 +204,9 @@ class Simulation:
 
         print("\n[Simulation] Simulation finished and clock stopped.")
 
-        # print(json.dumps(self.metrics, indent=4))
-
         self.save_metrics_to_file()
         self.save_results_to_excel()
-        # self.generar_individual_graphs_from_excel()
-        self.generar_comparative_graphs_from_excel()
+        # self.generar_comparative_graphs_from_excel()
 
         q_tables = []
         if algorithm == "Q_ROUTING":
@@ -224,7 +219,7 @@ class Simulation:
         Guarda las métricas de la simulación en un archivo JSON con el simulation_id en el nombre.
         Crea la carpeta `../results/simulations` si no existe.
         """
-        os.makedirs(directory, exist_ok=True)  # Crear directorio si no existe
+        os.makedirs(directory, exist_ok=True)
 
         filename = f"{directory}/simulation_{self.metrics['simulation_id']}.json"
 
@@ -253,7 +248,7 @@ class Simulation:
             try:
                 pd.ExcelFile(filename)
             except Exception:
-                print(f"⚠️ Archivo corrupto detectado: {filename}. Eliminando y regenerando...")
+                print(f"Archivo corrupto detectado: {filename}. Eliminando y regenerando...")
                 os.remove(filename)
 
         # Validar que self.metrics tiene datos
@@ -275,7 +270,7 @@ class Simulation:
             }
             for algorithm in self.metrics.keys() if algorithm not in ["simulation_id", "parameters", "total_time", "runned_at"]
         }
-        print(f"\nℹ️ Algoritmos encontrados en las métricas: {list(metrics_data.keys())}")
+        print(f"\nAlgoritmos encontrados en las métricas: {list(metrics_data.keys())}")
         # Recorrer episodios y almacenar métricas
         for algorithm, episodes in self.metrics.items():
             if algorithm in ["simulation_id", "parameters", "total_time", "runned_at"]:
@@ -325,142 +320,6 @@ class Simulation:
 
         print(f"\n✅ Resultados guardados en {filename}.")
 
-    def generar_individual_graphs_from_excel(self, filename="../results/resultados_simulacion.xlsx"):
-        # TODO: revisar los datos que estamos guardando en el excel y ver qué gráficos tiene sentido hacer para ayudarnos
-        #       en el análisis
-        return
-        # """
-        # Genera gráficos individuales basados en las métricas de la simulación, incluyendo gráficos adicionales para análisis más detallados.
-        # """
-        # import matplotlib.pyplot as plt
-        # import pandas as pd
-        # import os
-        #
-        # os.makedirs("../results", exist_ok=True)
-        # xls = pd.ExcelFile(filename)
-        #
-        # for sheet_name in xls.sheet_names:
-        #     df = pd.read_excel(xls, sheet_name=sheet_name)
-        #
-        #     # 📊 Gráfico 1: Duración del Episodio vs Episodio
-        #     plt.figure(figsize=(10, 6))
-        #     plt.plot(df["episode"], df["episode_duration"], label="Duración del episodio", marker="o", color="blue")
-        #     plt.title(f"Duración del Episodio vs Episodio\nAlgoritmo: {sheet_name}")
-        #     plt.xlabel("Episodio")
-        #     plt.ylabel("Duración (ms)")
-        #     plt.grid()
-        #     plt.legend()
-        #     plt.savefig(f"../results/Duracion_Episodio-{sheet_name}.png")
-        #     plt.close()
-        #
-        #     # Gráfico 2: Tasa de Paquetes Entregados por Segundo vs Episodio
-        #     plt.figure(figsize=(10, 6))
-        #     plt.plot(df["episode"], df["tasa_paquetes_por_segundo"], label="Tasa de entrega (pkt/s)", marker="s", color="green")
-        #     plt.title(f"Tasa de Entrega vs Episodio\nAlgoritmo: {sheet_name}")
-        #     plt.xlabel("Episodio")
-        #     plt.ylabel("Paquetes por segundo")
-        #     plt.grid()
-        #     plt.legend()
-        #     plt.savefig(f"../results/Tasa_Entrega-{sheet_name}.png")
-        #     plt.close()
-        #
-        #     # 📊 Gráfico 3: Hops Promedio por Episodio
-        #     plt.figure(figsize=(10, 6))
-        #     plt.plot(df["episode"], df["hops_promedio"], label="Hops Promedio", marker="^", color="purple")
-        #     plt.title(f"Hops Promedio vs Episodio\nAlgoritmo: {sheet_name}")
-        #     plt.xlabel("Episodio")
-        #     plt.ylabel("Hops Promedio")
-        #     plt.grid()
-        #     plt.legend()
-        #     plt.savefig(f"../results/Hops_Promedio-{sheet_name}.png")
-        #     plt.close()
-        #
-        #     # Gráfico 4: Distribución de Duración del Episodio
-        #     plt.figure(figsize=(10, 6))
-        #     plt.hist(df["episode_duration"], bins=20, color="orange", edgecolor="black")
-        #     plt.title(f"Distribución de la Duración del Episodio\nAlgoritmo: {sheet_name}")
-        #     plt.xlabel("Duración (ms)")
-        #     plt.ylabel("Frecuencia")
-        #     plt.grid()
-        #     plt.savefig(f"../results/Distribucion_Duracion-{sheet_name}.png")
-        #     plt.close()
-        #
-        #     # Gráfico 5: Relación Tasa de Entrega vs Hops Promedio
-        #     plt.figure(figsize=(10, 6))
-        #     plt.scatter(df["tasa_paquetes_por_segundo"], df["hops_promedio"], label="Relación Tasa vs Hops", color="red")
-        #     plt.title(f"Relación Tasa de Entrega vs Hops Promedio\nAlgoritmo: {sheet_name}")
-        #     plt.xlabel("Tasa de Entrega (pkt/s)")
-        #     plt.ylabel("Hops Promedio")
-        #     plt.grid()
-        #     plt.legend()
-        #     plt.savefig(f"../results/Relacion_Tasa_Hops-{sheet_name}.png")
-        #     plt.close()
-        #
-        #     # Gráfico 6: Actividad de Nodos (Proporción de Nodos Activos)
-        #     if "dynamic_changes" in df.columns:
-        #         active_nodes = [len(change) if isinstance(change, list) else 0 for change in df["dynamic_changes"]]
-        #         plt.figure(figsize=(10, 6))
-        #         plt.bar(df["episode"], active_nodes, color="cyan", label="Cambios Dinámicos")
-        #         plt.title(f"Actividad de Nodos vs Episodio\nAlgoritmo: {sheet_name}")
-        #         plt.xlabel("Episodio")
-        #         plt.ylabel("Número de Cambios")
-        #         plt.grid()
-        #         plt.legend()
-        #         plt.savefig(f"../results/Actividad_Nodos-{sheet_name}.png")
-        #         plt.close()
-        #
-        #     # Gráfico 7: Métricas vs Tiempo Real
-        #     if "start_time" in df.columns and "end_time" in df.columns:
-        #         tiempos_reales = df["end_time"] - df["start_time"]
-        #         plt.figure(figsize=(10, 6))
-        #         plt.plot(df["episode"], tiempos_reales, label="Duración Real del Episodio", marker="*", color="magenta")
-        #         plt.title(f"Duración Real del Episodio vs Episodio\nAlgoritmo: {sheet_name}")
-        #         plt.xlabel("Episodio")
-        #         plt.ylabel("Duración Real (ms)")
-        #         plt.grid()
-        #         plt.legend()
-        #         plt.savefig(f"../results/Duracion_Real_Episodio-{sheet_name}.png")
-        #         plt.close()
-        #
-        #     # Gráfico 8: Relación entre Episodio y Cambios Dinámicos
-        #     plt.figure(figsize=(10, 6))
-        #     num_changes = [len(eval(change)) for change in df["dynamic_changes"]]
-        #     plt.plot(df["episode"], num_changes, label="Cambios Dinámicos", marker="x", color="orange")
-        #     plt.title(f"Cambios Dinámicos vs Episodio\nAlgoritmo: {sheet_name}")
-        #     plt.xlabel("Episodio")
-        #     plt.ylabel("Número de Cambios")
-        #     plt.grid()
-        #     plt.legend()
-        #     plt.savefig(f"../results/Cambios_Dinamicos-{sheet_name}.png")
-        #     plt.close()
-        #
-        # # Gráfico 9: Comparación de Algoritmos (Promedios Globales)
-        # resumen_global = []
-        # for sheet_name in xls.sheet_names:
-        #     df = pd.read_excel(xls, sheet_name=sheet_name)
-        #     promedio_duracion = df["episode_duration"].mean()
-        #     promedio_tasa = df["tasa_paquetes_por_segundo"].mean()
-        #     promedio_hops = df["hops_promedio"].mean()
-        #     resumen_global.append([sheet_name, promedio_duracion, promedio_tasa, promedio_hops])
-        #
-        # resumen_df = pd.DataFrame(resumen_global, columns=["Algoritmo", "Duración Promedio (ms)", "Tasa Promedio (pkt/s)", "Hops Promedio"])
-        #
-        # plt.figure(figsize=(10, 6))
-        # x = range(len(resumen_df))
-        # plt.bar(x, resumen_df["Duración Promedio (ms)"], width=0.3, label="Duración Promedio", align="center")
-        # plt.bar(x, resumen_df["Tasa Promedio (pkt/s)"], width=0.3, label="Tasa Promedio", align="edge")
-        # plt.bar(x, resumen_df["Hops Promedio"], width=0.3, label="Hops Promedio", align="edge")
-        # plt.xticks(x, resumen_df["Algoritmo"], rotation=45)
-        # plt.title("Comparación de Métricas Promedio entre Algoritmos")
-        # plt.xlabel("Algoritmo")
-        # plt.ylabel("Métrica")
-        # plt.legend()
-        # plt.tight_layout()
-        # plt.savefig("../results/Comparacion_Algoritmos.png")
-        # plt.close()
-        #
-        # print("\nGráficos generados en '../results/'.")
-
     def generar_comparative_graphs_from_excel(self, filename="../results/resultados_simulacion.xlsx"):
         """
         Genera gráficos comparativos basados en las métricas de la simulación, comparando todos los algoritmos en un solo gráfico por métrica.
@@ -475,10 +334,7 @@ class Simulation:
         # Diccionario para almacenar datos de todas las hojas
         all_data = {
             "episode_duration": {},
-            # "tasa_paquetes_por_segundo": {},
             "hops_promedio": {},
-            # "delivered_packets": {},
-            # "total_packets": {}
             "total_hops": {},
             "average_delivery_time": {},
             "success_rate": {},
@@ -488,15 +344,12 @@ class Simulation:
         for sheet_name in xls.sheet_names:
             df = pd.read_excel(xls, sheet_name=sheet_name)
             all_data["episode_duration"][sheet_name] = df["episode_duration"]
-            # all_data["tasa_paquetes_por_segundo"][sheet_name] = df["tasa_paquetes_por_segundo"]
             all_data["hops_promedio"][sheet_name] = df["total_hops"] / df["episode"]
-            # all_data["delivered_packets"][sheet_name] = df["delivered_packets"]
-            # all_data["total_packets"][sheet_name] = df["total_packets"]
             all_data["total_hops"][sheet_name] = df["total_hops"]
             all_data["average_delivery_time"][sheet_name] = df["episode_duration"] / df["total_hops"]
             all_data["success_rate"][sheet_name] = df["episode_success"].fillna(False).infer_objects(copy=False)
             all_data["episode_success"][sheet_name] = df["episode_success"]
-            
+
         # Gráfico comparativo de Duración del Episodio
         plt.figure(figsize=(10, 6))
         for algorithm, data in all_data["episode_duration"].items():
@@ -509,18 +362,6 @@ class Simulation:
         plt.savefig("../results/Comparacion_Duracion_Episodio.png")
         plt.close()
 
-        # Gráfico comparativo de Tasa de Paquetes Entregados por Segundo
-        # plt.figure(figsize=(10, 6))
-        # for algorithm, data in all_data["tasa_paquetes_por_segundo"].items():
-        #     plt.plot(data, label=f"{algorithm}")
-        # plt.title("Comparación de Tasa de Entrega entre Algoritmos")
-        # plt.xlabel("Episodio")
-        # plt.ylabel("Paquetes por segundo")
-        # plt.grid()
-        # plt.legend()
-        # plt.savefig("../results/Comparacion_Tasa_Entrega.png")
-        # plt.close()
-
         # Gráfico comparativo de Hops Promedio
         plt.figure(figsize=(10, 6))
         for algorithm, data in all_data["hops_promedio"].items():
@@ -532,31 +373,6 @@ class Simulation:
         plt.legend()
         plt.savefig("../results/Comparacion_Hops_Promedio.png")
         plt.close()
-
-        # Gráfico comparativo de Paquetes Entregados y Totales
-        # algorithms = list(all_data["delivered_packets"].keys())
-        # delivered_packets = [all_data["delivered_packets"][alg].sum() for alg in algorithms]
-        # total_packets = [all_data["total_packets"][alg].sum() for alg in algorithms]
-
-        # x = np.arange(len(algorithms))  # the label locations
-        # width = 0.35  # the width of the bars
-
-        # fig, ax = plt.subplots(figsize=(10, 6))
-        # rects1 = ax.bar(x - width/2, delivered_packets, width, label='Paquetes Entregados')
-        # rects2 = ax.bar(x + width/2, total_packets, width, label='Total de Paquetes')
-
-        # # Add some text for labels, title and custom x-axis tick labels, etc.
-        # ax.set_xlabel('Algoritmo')
-        # ax.set_ylabel('Número de Paquetes')
-        # ax.set_title('Comparación de Paquetes Entregados y Totales entre Algoritmos')
-        # ax.set_xticks(x)
-        # ax.set_xticklabels(algorithms)
-        # ax.legend()
-
-        # fig.tight_layout()
-        # plt.grid()
-        # plt.savefig("./results/Comparacion_Paquetes_Entregados_Totales.png")
-        # plt.close()
 
         # Gráfico comparativo de Tiempo Promedio de Entrega
         plt.figure(figsize=(10, 6))

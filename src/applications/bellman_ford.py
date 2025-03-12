@@ -3,11 +3,6 @@ from classes.base import Application, EpisodeEnded
 import random
 import threading
 
-class NodeFunction(Enum):
-    A = "A"
-    B = "B"
-    C = "C"
-
 FUNCTION_SEQ = None
 MAX_HOPS = 0
 
@@ -159,7 +154,7 @@ class BellmanFordApplication(Application):
     def send_packet(self, to_node_id, packet, lost_packet=False):
 
         if lost_packet:
-            self.node.network.send_dict(self.node.node_id, None, packet, lost_packet=True)
+            self.node.network.send(self.node.node_id, None, packet, lost_packet=True)
             return
 
         if "hops" in packet:

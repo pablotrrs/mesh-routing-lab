@@ -27,18 +27,8 @@
 import argparse
 import os
 import sys
-from enum import Enum
 from classes.base import NodeFunction
 from classes.base import Algorithm
-
-# TODO:
-#  2. Obtener Q-table final y mostrarla (pasar a un .csv o .txt por episodio). Revisar que los resultados sean consistentes
-#     con los esperados.
-#  3. Revisar la animación para una red con más nodos (por ejemplo de 6x6).
-#  5. relevar resultados (integrar con lo que había antes para visualizar, y exportar a un csv como en modelado, 
-#     para comparar y hacer gráficos de cómo cambian los parámetros Latencia Promedio, Consistencia en la Latencia,
-#     Tasa de Éxito, Balanceo de Carga, Overhead de Comunicación, Tiempo de Cómputo, Adaptabilidad a Cambios en la Red
-#     con respecto a los pasos tiempo)
 
 if __name__ == "__main__":
     sys.setrecursionlimit(200000)
@@ -77,7 +67,7 @@ if __name__ == "__main__":
     try:
         functions_sequence = [NodeFunction.from_string(func) for func in args.functions_sequence]
     except ValueError as e:
-        print(f"Error: {e}")
+        print(f"Error parsing functions sequence from args: {e}")
         sys.exit(1)
 
     print(f"Using functions sequence: {[f.value for f in functions_sequence]}")
@@ -91,7 +81,6 @@ if __name__ == "__main__":
     from classes.simulation import Simulation
 
     topology_file_path = os.path.join(os.path.dirname(__file__), args.topology_file)
-    # topology_file_path = os.path.join(os.path.dirname(__file__), "../resources/6x6_grid_topology.yaml")
 
     network, sender_node = Network.from_yaml(topology_file_path)
     network.set_max_hops(args.max_hops)

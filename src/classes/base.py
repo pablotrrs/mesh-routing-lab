@@ -72,15 +72,9 @@ class Node:
         self.application = application_class(self)
         print(f"[Node_ID={self.node_id}] Installed {self.application.__class__.__name__}")
 
-        # Set attributes if the application is not SenderQRoutingApplication
-        # TODO: WTF y esto? hay que pasarle lo que nos pasaron de parámetro para el reconnect?
         if not self.is_sender:
-            self.lifetime = np.random.exponential(scale=2)
-            self.reconnect_time = np.random.exponential(scale=2)
             self.status = True
         else:
-            self.lifetime = None
-            self.reconnect_time = None
             self.status = None
 
     def start_episode(self, episode_number, max_hops, functions_sequence, penalty=0.0):
