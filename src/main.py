@@ -29,6 +29,7 @@ import os
 import sys
 from classes.base import NodeFunction
 from classes.base import Algorithm
+from classes.metrics_manager import MetricsManager
 
 if __name__ == "__main__":
     sys.setrecursionlimit(200000)
@@ -73,9 +74,9 @@ if __name__ == "__main__":
     print(f"Using functions sequence: {[f.value for f in functions_sequence]}")
 
     if args.algorithm:
-        selected_algorithm = Algorithm(args.algorithm)
+        selected_algorithms = [Algorithm(args.algorithm)]
     else:
-        selected_algorithm = None
+        selected_algorithms = [Algorithm.Q_ROUTING, Algorithm.DIJKSTRA, Algorithm.BELLMAN_FORD]
 
     from classes.network import Network
     from classes.simulation import Simulation
@@ -83,32 +84,36 @@ if __name__ == "__main__":
     topology_file_path = os.path.join(os.path.dirname(__file__), args.topology_file)
 
     network, sender_node = Network.from_yaml(topology_file_path)
-    network.set_max_hops(args.max_hops)
     network.set_mean_interval_ms(args.mean_interval_ms)
     network.set_reconnect_interval_ms(args.reconnect_interval_ms)
     network.set_disconnect_probability(args.disconnect_probability)
 
     print(network)
 
-    simulation = Simulation(network, sender_node)
+    metrics_manager = MetricsManager()
+    metrics_manager.initialize(
+        max_hops=args.max_hops,
+        topology_file=args.topology_file,
+        functions_sequence=functions_sequence,
+        mean_interval_ms=args.mean_interval_ms,
+        reconnect_interval_ms=args.reconnect_interval_ms,
+        disconnect_probability=args.disconnect_probability,
+        algorithms=[algo.name for algo in selected_algorithms]  # Pasamos la lista de nombres de los algoritmos
+    )
+
+    simulation = Simulation(network, sender_node, metrics_manager)
     simulation.set_max_hops(args.max_hops)
-    simulation.set_mean_interval_ms(args.mean_interval_ms)
-    simulation.set_topology_file(args.topology_file)
-    simulation.set_functions_sequence(functions_sequence)
+    simulation.set_functions_sequence(args.functions_sequence)
 
-    if selected_algorithm:
-
-        print(f"Running {args.episodes} episodes using the {selected_algorithm} algorithm.")
+    for algorithm in selected_algorithms:
+        print(f"Running {args.episodes} episodes using the {algorithm.name} algorithm.")
         print(f"Maximum hops: {args.max_hops}")
         print(f"Mean interval for dynamic changes: {args.mean_interval_ms} ms")
         print(f"Topology file: {args.topology_file}")
         print(f"Functions sequence: {functions_sequence}")
 
-        match selected_algorithm:
+        match algorithm:
             case Algorithm.Q_ROUTING:
-
-                print(f"Penalty: {args.penalty}")
-
                 from applications.q_routing import SenderQRoutingApplication, IntermediateQRoutingApplication
 
                 sender_node.install_application(SenderQRoutingApplication)
@@ -118,7 +123,7 @@ if __name__ == "__main__":
                     if node_id != sender_node.node_id:
                         node.install_application(IntermediateQRoutingApplication)
 
-                simulation.start(selected_algorithm, args.episodes, functions_sequence, args.mean_interval_ms, args.reconnect_interval_ms, args.topology_file, args.penalty, args.disconnect_probability)
+                simulation.start(algorithm, args.episodes, args.penalty)
 
             case Algorithm.DIJKSTRA:
                 from applications.dijkstra import SenderDijkstraApplication, IntermediateDijkstraApplication
@@ -129,7 +134,7 @@ if __name__ == "__main__":
                     if node_id != sender_node.node_id:
                         node.install_application(IntermediateDijkstraApplication)
 
-                simulation.start(selected_algorithm, args.episodes, functions_sequence, args.mean_interval_ms, args.reconnect_interval_ms, args.topology_file, args.penalty, args.disconnect_probability)
+                simulation.start(algorithm, args.episodes)
 
             case Algorithm.BELLMAN_FORD:
                 from applications.bellman_ford import SenderBellmanFordApplication, IntermediateBellmanFordApplication
@@ -140,49 +145,4 @@ if __name__ == "__main__":
                     if node_id != sender_node.node_id:
                         node.install_application(IntermediateBellmanFordApplication)
 
-                simulation.start(selected_algorithm, args.episodes, functions_sequence, args.mean_interval_ms, args.reconnect_interval_ms, args.topology_file, args.penalty, args.disconnect_probability)
-    else:
-        print(f"Running {args.episodes} episodes using all algorithms.")
-        print(f"Maximum hops: {args.max_hops}")
-        print(f"Mean interval for dynamic changes: {args.mean_interval_ms} ms")
-        print(f"Topology file: {args.topology_file}")
-        print(f"Functions sequence: {functions_sequence}")
-        print(f"Penalty: {args.penalty}")
-        print(f"Running simulation with Q_ROUTING")
-
-        from applications.q_routing import SenderQRoutingApplication, IntermediateQRoutingApplication
-
-        sender_node.install_application(SenderQRoutingApplication)
-        sender_node.application.set_penalty(args.penalty)
-
-        for node_id, node in network.nodes.items():
-            if node_id != sender_node.node_id:
-                node.install_application(IntermediateQRoutingApplication)
-
-        simulation.start(Algorithm.Q_ROUTING, args.episodes, functions_sequence, args.mean_interval_ms, args.reconnect_interval_ms, args.topology_file, args.penalty, args.disconnect_probability)
-
-        print(f"Running simulation with DIJKSTRA")
-
-        from applications.dijkstra import SenderDijkstraApplication, IntermediateDijkstraApplication
-
-        sender_node.install_application(SenderDijkstraApplication)
-
-        for node_id, node in network.nodes.items():
-            if node_id != sender_node.node_id:
-                node.install_application(IntermediateDijkstraApplication)
-
-        simulation.start(Algorithm.DIJKSTRA, args.episodes, functions_sequence, args.mean_interval_ms, args.reconnect_interval_ms, args.topology_file, args.penalty, args.disconnect_probability)
-
-        print(f"Running simulation with BELLMAN_FORD")
-
-        from applications.bellman_ford import SenderBellmanFordApplication, IntermediateBellmanFordApplication
-
-        sender_node.install_application(SenderBellmanFordApplication)
-
-        for node_id, node in network.nodes.items():
-            if node_id != sender_node.node_id:
-                node.install_application(IntermediateBellmanFordApplication)
-
-        simulation.start(Algorithm.BELLMAN_FORD, args.episodes, functions_sequence, args.mean_interval_ms, args.reconnect_interval_ms, args.topology_file, args.penalty, args.disconnect_probability)
-
-    simulation.save_metrics_to_file()
+                simulation.start(algorithm, args.episodes)

@@ -123,9 +123,11 @@ class DijkstraApplication(Application):
         print(f'\n[Node_ID={self.node.node_id}] Sending packet to Node {to_node_id}\n')
         self.node.network.send(self.node.node_id, to_node_id, packet)
 
-    def get_assigned_function(self):
-        """Returns the function assigned to this node."""
-        return self.broadcast_state.node_function_map.get(self.node.node_id, None)
+    def get_assigned_function(self) -> str:
+        """Returns the function assigned to this node or 'N/A' if None."""
+        func = self.broadcast_state.node_function_map.get(self.node.node_id)
+
+        return func if func is not None else "N/A"
 
 class SenderDijkstraApplication(DijkstraApplication):
     def __init__(self, node):

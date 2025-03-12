@@ -83,10 +83,10 @@ class Node:
         else:
             raise RuntimeError(f"[Node_ID={self.node_id}] No application installed")
 
-    def get_assigned_function(self):
+    def get_assigned_function(self) -> str:
         if self.application and hasattr(self.application, 'get_assigned_function'):
             return self.application.get_assigned_function()
-        return None
+        return "N/A"
 
     def update_status(self):
         if not self.is_sender:

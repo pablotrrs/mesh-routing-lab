@@ -16,10 +16,6 @@ class Network:
         self.lock = threading.Lock()  # Para acceso seguro al reloj y nodos
         self.mean_interval_ms = None
         self.reconnect_interval_ms = None
-        self.max_hops = None
-
-    def set_max_hops(self, max_hops):
-        self.max_hops = max_hops
 
     def set_mean_interval_ms(self, mean_interval_ms):
         self.mean_interval_ms = mean_interval_ms
@@ -173,16 +169,11 @@ class Network:
         latency = self.get_latency(from_node_id, to_node_id) if to_node_id != "N/A" else 0
 
         # **Registrar información del hop en packet_log**
-        print("mf assigned function")
-        print(
-        self.nodes[from_node_id].get_assigned_function().value if self.nodes[from_node_id].get_assigned_function() else "no hay"
-        )
-
         registry.log_packet_hop(
             episode_number,
             from_node_id,
             to_node_id,
-            self.nodes[from_node_id].get_assigned_function().value if self.nodes[from_node_id].get_assigned_function() else None,
+            self.nodes[from_node_id].get_assigned_function() if self.nodes[from_node_id].get_assigned_function() else "N/A",
             "active" if from_node_id in self.active_nodes else "inactive",
             latency,
             packet["type"].value
@@ -191,7 +182,6 @@ class Network:
         # **Validar si el nodo destino es alcanzable**
         if self.is_node_reachable(from_node_id, to_node_id):
             print(f"[Network] Sending packet from Node {from_node_id} to Node {to_node_id} with latency {latency:.6f} seconds")
-            print(f"[Network] Packet hops: {packet.get('hops', 0)} of {self.max_hops} max hops")
 
             time.sleep(latency)  # Simulación de la latencia
             self.nodes[to_node_id].application.receive_packet(packet)
