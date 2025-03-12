@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import threading
 import datetime
 from classes.base import EpisodeEnded
+from classes.packet_registry import packet_registry as registry
 
 class Simulation:
     def __init__(self, network, sender_node):
@@ -145,6 +146,7 @@ class Simulation:
             print(tabulate(node_info, headers=headers, tablefmt="grid"))
 
             # **Ejecutar episodio**
+            registry.initialize_episode(episode_number)
             if algorithm == "Q_ROUTING":
                 try:
                     self.sender_node.start_episode(episode_number, self.max_hops, functions_sequence, penalty)
@@ -160,10 +162,10 @@ class Simulation:
             episode_duration = end_time - start_time
 
             # **Recolección de datos**
-            if episode_number in self.network.packet_log:
-                self.network.packet_log[episode_number]["episode_duration"] = episode_duration
+            if episode_number in registry.packet_log:
+                registry.packet_log[episode_number]["episode_duration"] = episode_duration
 
-            episode_data = self.network.packet_log.get(episode_number, {})
+            episode_data = registry.packet_log.get(episode_number, {})
             episode_success = episode_data.get("episode_success", False)
             route = episode_data.get("route", [])
             total_hops = len(route)
@@ -199,7 +201,7 @@ class Simulation:
         # **Detener reloj al finalizar la simulación**
         self.stop_clock()
         self.network.stop_dynamic_changes()
-        self.network.packet_log = {}
+        registry.restart_packet_log()
         self.metrics["total_time"] = self.get_current_time()
 
         print("\n[Simulation] Simulation finished and clock stopped.")
@@ -279,7 +281,7 @@ class Simulation:
                 print(f"ℹ️ Procesando episodio {episode_data['episode_number']} para {algorithm}...")
                 episode_number = episode_data["episode_number"]
                 # Obtener packet log del episodio
-                packet_log = self.network.packet_log.get(episode_number, {})
+                packet_log = registry.packet_log.get(episode_number, {})
 
                 # Agregar datos a las listas de métricas
                 metrics_data[algorithm]["episode"].append(episode_number)

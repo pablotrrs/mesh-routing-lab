@@ -5,6 +5,7 @@ import random
 import time
 from classes.base import Application, EpisodeEnded
 from visualization import print_q_table
+from classes.packet_registry import packet_registry as registry
 
 ALPHA = 0.1
 GAMMA = 0.9
@@ -201,17 +202,14 @@ class QRoutingApplication(Application):
         self.q_table[self.node.node_id][next_node] = updated_q
         return
 
-    def send_packet(self, to_node_id, packet, lost_packet=False) -> None:
+    def send_packet(self, to_node_id, packet) -> None:
         if packet.get("hops") is not None:
             packet["hops"] += 1
 
-        if lost_packet:
-            self.node.network.send(self.node.node_id, None, packet, lost_packet=True)
-        else:
-            packet["from_node_id"] = self.node.node_id
+        packet["from_node_id"] = self.node.node_id
 
-            print(f'[Node_ID={self.node.node_id}] Sending packet to Node {to_node_id}\n')
-            self.node.network.send(self.node.node_id, to_node_id, packet)
+        print(f'[Node_ID={self.node.node_id}] Sending packet to Node {to_node_id}\n')
+        self.node.network.send(self.node.node_id, to_node_id, packet)
 
         if packet["hops"] > MAX_HOPS:
             print(f'[Node_ID={self.node.node_id}] Max hops reached. Initiating full echo callback')
@@ -225,7 +223,7 @@ class QRoutingApplication(Application):
         # si no tiene callback stack porque puede pasar
         # porque nunca salió del 0 -> n hop
 
-        episode_data = self.node.network.packet_log.get(packet["episode_number"], {})
+        episode_data = registry.packet_log.get(packet["episode_number"], {})
         route = episode_data.get("route", [])
 
         if not CALLBACK_STACK:
@@ -236,7 +234,8 @@ class QRoutingApplication(Application):
             "type": PacketType.MAX_HOPS_REACHED,
             "episode_number": packet["episode_number"],
             "from_node_id": self.node.node_id,
-            "max_hops": self.max_hops
+            "max_hops": self.max_hops,
+            "hops": packet["hops"]
         }
 
         callback_data = CALLBACK_STACK.pop()
@@ -342,8 +341,8 @@ class SenderQRoutingApplication(QRoutingApplication):
         if next_node is None:
             print(f'[Node_ID={self.node.node_id}] No valid next node found. Can\'t initiate episode!.')
             # movement: none
-            self.send_packet(None, packet, True)
             packet["hops"] += 1
+            registry.mark_packet_lost(packet["episode_number"], packet["from_node_id"], None, packet["type"])
             print(f'[Node_ID={self.node.node_id}] Packet hop count {packet["hops"]}')
 
             if packet["hops"] > MAX_HOPS:
@@ -371,7 +370,9 @@ class SenderQRoutingApplication(QRoutingApplication):
         if next_node is None:
             print(f'[Node_ID={self.node.node_id}] No valid next node found. Stopping packet hop.')
             # movement: none
-            if not self.send_packet(None, packet, True):
+            packet["hops"] += 1
+            registry.mark_packet_lost(packet["episode_number"], packet["from_node_id"], None, packet["type"])
+            if packet["hops"] > MAX_HOPS:
                 # max hops reached
                 self.mark_episode_result(packet, success=False)
             else:
@@ -427,7 +428,6 @@ class SenderQRoutingApplication(QRoutingApplication):
             print(f'\n[Node_ID={self.node.node_id}] Episode {packet["episode_number"]} finished.')
 
             self.mark_episode_result(packet, success=True)
-            return
 
     def handle_lost_packet(self, packet) -> None:
         episode_number = packet["episode_number"]
@@ -437,29 +437,20 @@ class SenderQRoutingApplication(QRoutingApplication):
 
     def mark_episode_result(self, packet, success=True):
         """
-        Marca un episodio como exitoso o fallido y lo notifica a la red.
+        Marca un episodio como exitoso o fallido y lo registra en el registry global.
 
         Args:
-            packet (Packet): El paquete asociado al episodio.
+            packet (dict): El paquete asociado al episodio.
             success (bool): `True` si el episodio fue exitoso, `False` si falló.
         """
-
         global EPISODE_COMPLETED
         EPISODE_COMPLETED = True
-
-        print(f'marking episode as mf completed {EPISODE_COMPLETED}')
 
         status_text = "SUCCESS" if success else "FAILURE"
         episode_number = packet["episode_number"]
         print(f"\n[Node_ID={self.node.node_id}] Marking Episode {episode_number} as {status_text}.")
 
-        # Llamar a la red para registrar el estado del episodio
-        self.node.network.send(
-            from_node_id=self.node.node_id, 
-            to_node_id=None,  # No es necesario enviar el paquete a otro nodo en este caso
-            packet=packet, 
-            episode_success=success
-        )
+        registry.mark_episode_complete(episode_number, success)
 
         global CURRENT_HOP_COUNT
         CURRENT_HOP_COUNT = 0
@@ -534,13 +525,12 @@ class IntermediateQRoutingApplication(QRoutingApplication):
             return
         else:
             # movement: none
-            still_hops_remaining = self.send_packet(None, packet, lost_packet=True)
-            print(f'mf still_hops_remaining {still_hops_remaining}')
+            packet["hops"] += 1
+            registry.mark_packet_lost(packet["episode_number"], packet["from_node_id"], None, packet["type"])
+            still_hops_remaining = packet["hops"] < MAX_HOPS
 
             if not still_hops_remaining:
                 # max hops reached
-                print('mf initiate_max_hops_callback')
-                # initiate_max_hops_callback
                 self.initiate_max_hops_callback(packet)
                 return
             else:

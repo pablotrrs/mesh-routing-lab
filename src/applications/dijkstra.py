@@ -2,6 +2,7 @@ from enum import Enum
 from classes.base import Application, EpisodeEnded
 import random
 from queue import PriorityQueue
+from classes.packet_registry import packet_registry as registry
 
 FUNCTION_SEQ = None
 MAX_HOPS = 0
@@ -55,6 +56,7 @@ class DijkstraApplication(Application):
         super().__init__(node)
         self.routes = {}  # Almacena las rutas más cortas calculadas
         self.callback_stack = []
+        self.assigned_function = None
 
     def select_next_function_node(self, packet):
         """
@@ -108,30 +110,22 @@ class DijkstraApplication(Application):
         print(f"[Node_ID={self.node.node_id}] No other nodes available. Defaulting to node 0.")
         return 0
 
-    def send_packet(self, to_node_id, packet, lost_packet=False):
-
-        if lost_packet:
-            self.node.network.send_dict(self.node.node_id, None, packet, lost_packet=True)
-            return
+    def send_packet(self, to_node_id, packet):
 
         if "hops" in packet:
             packet["hops"] += 1
         else:
             packet["hops"] = 0
 
-        if "max_hops" not in packet:
-            packet["max_hops"] = 500 # TODO: es una cagada hacer esto así,
-                                     # hacer que el método send tenga varias implementaciones,
-                                     # tomando un packet que sea un dict y el resto parámetros (max hops etc)
-
-        if "time" in packet:
-            packet["time"] += 1
-
         if "from_node_id" in packet:
             packet["from_node_id"] = self.node.node_id
 
         print(f'\n[Node_ID={self.node.node_id}] Sending packet to Node {to_node_id}\n')
         self.node.network.send(self.node.node_id, to_node_id, packet)
+
+    def get_assigned_function(self):
+        """Returns the function assigned to this node."""
+        return self.broadcast_state.node_function_map.get(self.node.node_id, None)
 
 class SenderDijkstraApplication(DijkstraApplication):
     def __init__(self, node):
@@ -408,9 +402,8 @@ class SenderDijkstraApplication(DijkstraApplication):
                 print(f"[Node_ID={self.node.node_id}] Episode {episode_number} detected a broken path. Packet={packet}")
                 global broken_path
                 broken_path = True
-                self.send_packet(None, packet, True)
-                # TODO: acá habría que revisar que el paquete quede como que no fue entregado
-                # self.start_episode(episode_number, True)
+                packet["hops"] += 1
+                registry.mark_packet_lost(packet["episode_number"], packet["from_node_id"], None, packet["type"].value)
 
             case _:
                 packet_type = packet["type"]
@@ -429,12 +422,7 @@ class SenderDijkstraApplication(DijkstraApplication):
         print(f"\n[Node_ID={self.node.node_id}] Marking Episode {episode_number} as {status_text}.")
 
         # Llamar a la red para registrar el estado del episodio
-        self.node.network.send_dict(
-            from_node_id=self.node.node_id, 
-            to_node_id=None,  # No es necesario enviar el paquete a otro nodo en este caso
-            packet_dict=packet, 
-            episode_success=success
-        )
+        registry.mark_episode_complete(episode_number, success)
 
         raise EpisodeEnded()
 

@@ -2,6 +2,7 @@ from enum import Enum
 from classes.base import Application, EpisodeEnded
 import random
 import threading
+from classes.packet_registry import packet_registry as registry
 
 FUNCTION_SEQ = None
 MAX_HOPS = 0
@@ -47,51 +48,6 @@ class PacketType(Enum):
     BROKEN_PATH = "BROKEN_PATH"
     SUCCESS = "SUCCESS"
     MAX_HOPS = "MAX_HOPS"
-
-class Packet:
-    def __init__(self, episode_number, from_node_id, type):
-        self.type = type
-        self.episode_number = episode_number  # Número de episodio al que pertenece este paquete
-        self.from_node_id = from_node_id  # Nodo anterior por el que pasó el paquete
-        self.functions_sequence = FUNCTION_SEQ.copy()  # Secuencia de funciones a procesar
-        self.function_counters = {func: 0 for func in FUNCTION_SEQ}  # Contadores de funciones asignadas
-        self.processed_functions = []  # Funciones ya procesadas
-        self.hops = 0  # Contador de saltos
-        self.time = 0  # Tiempo total acumulado del paquete
-        self.max_hops = 250  # Número máximo de saltos permitidos
-
-    def __init__(self, episode_number, from_node_id, type, message_id):
-        self.type = type
-        self.episode_number = episode_number  # Número de episodio al que pertenece este paquete
-        self.from_node_id = from_node_id  # Nodo anterior por el que pasó el paquete
-        self.functions_sequence = FUNCTION_SEQ.copy()  # Secuencia de funciones a procesar
-        self.function_counters = {func: 0 for func in FUNCTION_SEQ}  # Contadores de funciones asignadas
-        self.processed_functions = []  # Funciones ya procesadas
-        self.hops = 0  # Contador de saltos
-        self.time = 0  # Tiempo total acumulado del paquete
-        self.max_hops = 250  # Número máximo de saltos permitidos
-        self.message_id = message_id
-
-    def increment_function_counter(self, function):
-        """
-        Incrementa el contador de asignaciones para una función específica.
-        """
-        if function not in self.function_counters:
-            raise ValueError(f"La función {function} no es válida.")
-        self.function_counters[function] += 1
-
-    def is_sequence_completed(self):
-        """Revisa si la secuencia de funciones ha sido completamente procesada."""
-        return len(self.functions_sequence) == 0
-
-    def next_function(self):
-        """Obtiene la próxima función en la secuencia, si existe."""
-        return self.functions_sequence[0] if self.functions_sequence else None
-
-    def remove_next_function(self):
-        """Elimina la función actual de la secuencia, marcándola como procesada."""
-        if self.functions_sequence:
-            self.functions_sequence.pop(0)
 
 class BellmanFordApplication(Application):
     def __init__(self, node):
@@ -151,21 +107,12 @@ class BellmanFordApplication(Application):
         print(f"[Node_ID={self.node.node_id}] No other nodes available. Defaulting to node 0.")
         return 0
 
-    def send_packet(self, to_node_id, packet, lost_packet=False):
-
-        if lost_packet:
-            self.node.network.send(self.node.node_id, None, packet, lost_packet=True)
-            return
+    def send_packet(self, to_node_id, packet):
 
         if "hops" in packet:
             packet["hops"] += 1
         else:
             packet["hops"] = 0
-
-        if "max_hops" not in packet:
-            packet["max_hops"] = 500 # TODO: es una cagada hacer esto así,
-                                     # hacer que el método send tenga varias implementaciones,
-                                     # tomando un packet que sea un dict y el resto parámetros (max hops etc)
 
         if "time" in packet:
             packet["time"] += 1
@@ -174,7 +121,11 @@ class BellmanFordApplication(Application):
             packet["from_node_id"] = self.node.node_id
 
         print(f'\n[Node_ID={self.node.node_id}] Sending packet to Node {to_node_id}\n')
-        self.node.network.send_dict(self.node.node_id, to_node_id, packet)
+        self.node.network.send(self.node.node_id, to_node_id, packet)
+
+    def get_assigned_function(self):
+        """Returns the function assigned to this node."""
+        return self.broadcast_state.node_function_map.get(self.node.node_id, None)
 
 class SenderBellmanFordApplication(BellmanFordApplication):
     def __init__(self, node):
@@ -386,15 +337,13 @@ class SenderBellmanFordApplication(BellmanFordApplication):
                 else:
                     # Si la secuencia de funciones está completa
                     print(f"[Node_ID={self.node.node_id}] Function sequence completed.")
-                    # print(f"[Node_ID={self.node.node_id}] Episode {packet.episode_number} completed with total time {packet.time}")
                     episode_number = packet["episode_number"]
                     print(f"[Node_ID={self.node.node_id}] Episode {episode_number} completed")
 
             case PacketType.SUCCESS:
-                # print(f"[Node_ID={self.node.node_id}] Episode {packet.episode_number} completed with total time {packet.time}")
                 episode_number = packet["episode_number"]
-                self.mark_episode_result(packet, success=True)
                 print(f"[Node_ID={self.node.node_id}] Episode {episode_number} completed")
+                self.mark_episode_result(packet, success=True)
 
             case PacketType.BROADCAST:
                 print(f"[Node_ID={self.node.node_id}] Received BROADCAST packet with ID {packet.message_id}")
@@ -461,9 +410,11 @@ class SenderBellmanFordApplication(BellmanFordApplication):
                         self.send_packet(self.broadcast_state.parent_node, ack_packet)
 
             case PacketType.BROKEN_PATH:
+                packet["hops"] += 1
+                registry.mark_packet_lost(packet["episode_number"], packet["from_node_id"], None, packet["type"].value)
+
                 episode_number = packet["episode_number"]
                 print(f"[Node_ID={self.node.node_id}] Episode {episode_number} detected a broken path. Packet={packet}")
-                self.send_packet(None, packet, True)
 
             case _:
                 packet_type = packet["type"]
@@ -481,13 +432,7 @@ class SenderBellmanFordApplication(BellmanFordApplication):
         episode_number = packet["episode_number"]
         print(f"\n[Node_ID={self.node.node_id}] Marking Episode {episode_number} as {status_text}.")
 
-        # Llamar a la red para registrar el estado del episodio
-        self.node.network.send_dict(
-            from_node_id=self.node.node_id, 
-            to_node_id=None,  # No es necesario enviar el paquete a otro nodo en este caso
-            packet_dict=packet, 
-            episode_success=success
-        )
+        registry.mark_episode_complete(episode_number, success)
 
         self.stop_route_monitoring()
         raise EpisodeEnded()

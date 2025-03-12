@@ -3,13 +3,13 @@ import time
 import yaml
 import math
 import threading
+from classes.packet_registry import packet_registry as registry
 
 class Network:
     def __init__(self):
         self.nodes = {}  # {node_id: Node}
         self.connections = {}  # {node_id: [neighbors]}
         self.active_nodes = set()
-        self.packet_log = {}  # List to store packet logs
         self.dynamic_change_events = []  # Tiempos (ms) de cambios dinámicos
         self.simulation_clock = 0  # Reloj central en ms
         self.running = False  # Control del hilo
@@ -147,66 +147,49 @@ class Network:
         """
         return list(self.nodes.keys())
 
-    def send(self, from_node_id, to_node_id, packet, lost_packet=False, episode_success=False):
-        """
-        Registra el envío de un paquete en el packet_log y maneja la lógica de transmisión 
-        utilizando un diccionario en lugar de una instancia de la clase Packet.
+    def is_node_reachable(self, from_node_id, to_node_id):
+        return to_node_id in self.connections.get(from_node_id, []) and \
+                from_node_id in self.active_nodes and \
+                to_node_id in self.active_nodes
 
-        Args:
-            from_node_id (int): Nodo de origen.
-            to_node_id (int): Nodo de destino (puede ser None si el paquete ha llegado al nodo original).
-            packet (dict): Paquete representado como un diccionario.
-            lost_packet (bool): Indica si el paquete debe marcarse como perdido.
-            episode_success (bool): Indica si el episodio fue exitoso.
+    def send(self, from_node_id, to_node_id, packet):
+        """
+        Envía un paquete en la red sin necesidad de parámetros extra para marcar episodios o pérdidas.
         """
         episode_number = packet.get("episode_number")
-
-        # **Siempre inicializar packet_log**
-        if episode_number not in self.packet_log:
-            self.packet_log[episode_number] = {
-                "episode_success": None,  # Se actualizará al final del episodio
-                "episode_duration": None,
-                "route": []
-            }
+        registry.initialize_episode(episode_number)
 
         # **Caso: Paquete perdido**
-        if lost_packet:
-            print(f"[Network] Packet from {from_node_id} to {to_node_id} lost.")
-            self.packet_log[episode_number]["route"].append({
-                "from": from_node_id,
-                "to": to_node_id if to_node_id is not None else "N/A",
-                "function": "N/A",
-                "node_status": "inactive",
-                "latency": 0,
-                "packet_type": packet["type"].value
-            })
+        if not self.is_node_reachable(from_node_id, to_node_id):
+            registry.mark_packet_lost(episode_number, from_node_id, to_node_id, packet["type"].value)
             return  # No seguir procesando
 
         # **Caso: Fin del episodio (llegó al nodo original)**
         if to_node_id is None:
-            print(f"[Network] Packet reached final destination at Node {from_node_id}. Marking episode completion.")
-            to_node_id = "N/A"  # Marcar destino como N/A
-            self.packet_log[episode_number]["episode_success"] = episode_success
+            registry.mark_episode_complete(episode_number, True)
             return  # No seguir procesando
 
         # **Calcular latencia**
         latency = self.get_latency(from_node_id, to_node_id) if to_node_id != "N/A" else 0
 
         # **Registrar información del hop en packet_log**
-        self.packet_log[episode_number]["route"].append({
-            "from": from_node_id,
-            "to": to_node_id,
-            "function": self.nodes[from_node_id].get_assigned_function().value if self.nodes[from_node_id].get_assigned_function() else None,
-            "node_status": "active" if from_node_id in self.active_nodes else "inactive",
-            "latency": latency,
-            "packet_type": packet["type"].value
-        })
+        print("mf assigned function")
+        print(
+        self.nodes[from_node_id].get_assigned_function().value if self.nodes[from_node_id].get_assigned_function() else "no hay"
+        )
+
+        registry.log_packet_hop(
+            episode_number,
+            from_node_id,
+            to_node_id,
+            self.nodes[from_node_id].get_assigned_function().value if self.nodes[from_node_id].get_assigned_function() else None,
+            "active" if from_node_id in self.active_nodes else "inactive",
+            latency,
+            packet["type"].value
+        )
 
         # **Validar si el nodo destino es alcanzable**
-        if to_node_id in self.connections.get(from_node_id, []) and \
-                from_node_id in self.active_nodes and \
-                to_node_id in self.active_nodes:
-
+        if self.is_node_reachable(from_node_id, to_node_id):
             print(f"[Network] Sending packet from Node {from_node_id} to Node {to_node_id} with latency {latency:.6f} seconds")
             print(f"[Network] Packet hops: {packet.get('hops', 0)} of {self.max_hops} max hops")
 
