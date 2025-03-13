@@ -13,10 +13,6 @@ EPSILON = 1.0
 EPSILON_DECAY = 0.99
 EPSILON_MIN = 0.1
 
-PENALTY = 0.0
-
-MAX_HOPS = None
-
 CURRENT_HOP_COUNT = 0
 
 EPISODE_COMPLETED = False
@@ -37,8 +33,6 @@ class PacketType(Enum):
     CALLBACK = "CALLBACK"
     MAX_HOPS_REACHED = "MAX_HOPS_REACHED"
 
-FUNCTION_SEQ = None
-
 @dataclass
 class CallbackChainStep:
     previous_hop_node: int  # Next node in the callback chain
@@ -54,17 +48,6 @@ class QRoutingApplication(Application):
         self.q_table = {}
         self.assigned_function = None
         self.callback_stack = deque()
-        self.max_hops = None
-        self.functions_sequence = None
-        self.penalty = 0.0
-
-    def set_penalty(self, penalty):
-        print(f'setting penalty to {penalty}')
-        global PENALTY
-        PENALTY = penalty
-        self.penalty = penalty
-        print(f'penalty setted to {PENALTY}')
-
 
     def receive_packet(self, packet):
         print(f'[Node_ID={self.node.node_id}] Received packet {packet}')
@@ -220,7 +203,7 @@ class QRoutingApplication(Application):
         print(f'[Node_ID={self.node.node_id}] Sending packet to Node {to_node_id}\n')
         self.node.network.send(self.node.node_id, to_node_id, packet)
 
-        if packet["hops"] > MAX_HOPS:
+        if packet["hops"] > packet.get("max_hops", float("inf")):
             print(f'[Node_ID={self.node.node_id}] Max hops reached. Initiating full echo callback')
             return False
         else:
@@ -243,7 +226,6 @@ class QRoutingApplication(Application):
             "type": PacketType.MAX_HOPS_REACHED,
             "episode_number": packet["episode_number"],
             "from_node_id": self.node.node_id,
-            "max_hops": self.max_hops,
             "hops": packet["hops"]
         }
 
@@ -251,7 +233,8 @@ class QRoutingApplication(Application):
         print(f"\033[91m[CALLBACK_STACK] Desencolando {callback_data}, callback_stack: {CALLBACK_STACK}\033[0m")
 
         self.penalize_q_value(
-            next_node=callback_data.next_hop_node
+            next_node=callback_data.next_hop_node,
+            penalty=packet["penalty"]
         )
 
         # movement: backward
@@ -275,18 +258,17 @@ class QRoutingApplication(Application):
                     return True
         return False
 
-    def penalize_q_value(self, next_node):
+    def penalize_q_value(self, next_node, penalty):
         """
         Penaliza el valor Q de la acción (ir al vecino `next_node`) con una reducción fuerte.
         """
-        global PENALTY
         old_q = self.q_table[self.node.node_id].get(next_node, 0.0)
-        new_q = old_q - PENALTY
+        new_q = old_q - penalty
 
         self.q_table[self.node.node_id][next_node] = max(new_q, 0)  # Evita valores negativos extremos
 
         print(
-            f"[Node_ID={self.node.node_id}] Penalized by {PENALTY} Q-Value for state {self.node.node_id} -> action {next_node} "
+            f"[Node_ID={self.node.node_id}] Penalized by {penalty} Q-Value for state {self.node.node_id} -> action {next_node} "
             f"from {old_q:.4f} to {new_q:.4f} (hard penalty applied)"
         )
         return
@@ -304,10 +286,16 @@ class QRoutingApplication(Application):
 class SenderQRoutingApplication(QRoutingApplication):
     def __init__(self, node):
         super().__init__(node)
+        self.max_hops = None
+        self.functions_sequence = None
+        self.penalty = 0.0
 
-    def start_episode(self, episode_number, max_hops=None, functions_sequence=None, penalty=0.0, current_hop_count=0) -> None:
+    def set_penalty(self, penalty):
+        self.penalty = penalty
+
+    def start_episode(self, episode_number, max_hops=None, functions_sequence=None, current_hop_count=0) -> None:
         """Initiates an episode by creating a packet and sending it to chosen node."""
-        self.max_hops=max_hops
+        self.max_hops = max_hops
 
         global EPISODE_COMPLETED
         EPISODE_COMPLETED = False
@@ -316,25 +304,18 @@ class SenderQRoutingApplication(QRoutingApplication):
         global CALLBACK_STACK
         CALLBACK_STACK.clear()
 
-        global MAX_HOPS
-        MAX_HOPS=max_hops
-
-        global PENALTY
-        PENALTY = penalty
-
-        global FUNCTION_SEQ
-        FUNCTION_SEQ=functions_sequence
+        self.functions_sequence = functions_sequence
 
         packet = {
             "type": PacketType.PACKET_HOP,
             "episode_number": episode_number,
             "from_node_id": self.node.node_id,
-            "functions_sequence": FUNCTION_SEQ.copy(),
-            "function_counters": {func: 0 for func in FUNCTION_SEQ},
+            "functions_sequence": self.functions_sequence.copy(),
+            "function_counters": {func: 0 for func in self.functions_sequence},
             "hops": current_hop_count,
-            "time": 0,
-            "max_hops": max_hops,
-            "is_delivered": False
+            "max_hops": self.max_hops,
+            "is_delivered": False,
+            "penalty": self.penalty,
         }
 
         self.initialize_or_update_q_table()
@@ -348,11 +329,11 @@ class SenderQRoutingApplication(QRoutingApplication):
             registry.mark_packet_lost(packet["episode_number"], packet["from_node_id"], None, packet["type"])
             print(f'[Node_ID={self.node.node_id}] Packet hop count {packet["hops"]}')
 
-            if packet["hops"] > MAX_HOPS:
+            if packet["hops"] > self.max_hops:
                 self.mark_episode_result(packet, success=False)
 
             # si no se puede empezar el episodio, se sigue intentando hasta que se pueda
-            self.start_episode(episode_number, max_hops, functions_sequence, penalty, packet["hops"])
+            self.start_episode(episode_number, self.max_hops, functions_sequence, penalty, packet["hops"])
             return
         else:
             estimated_time_remaining = self.estimate_remaining_time(next_node)
@@ -375,7 +356,7 @@ class SenderQRoutingApplication(QRoutingApplication):
             # movement: none
             packet["hops"] += 1
             registry.mark_packet_lost(packet["episode_number"], packet["from_node_id"], None, packet["type"])
-            if packet["hops"] > MAX_HOPS:
+            if packet["hops"] > packet["max_hops"]:
                 # max hops reached
                 self.mark_episode_result(packet, success=False)
             else:
@@ -530,7 +511,7 @@ class IntermediateQRoutingApplication(QRoutingApplication):
             # movement: none
             packet["hops"] += 1
             registry.mark_packet_lost(packet["episode_number"], packet["from_node_id"], None, packet["type"])
-            still_hops_remaining = packet["hops"] < MAX_HOPS
+            still_hops_remaining = packet["hops"] < packet["max_hops"]
 
             if not still_hops_remaining:
                 # max hops reached
@@ -563,7 +544,8 @@ class IntermediateQRoutingApplication(QRoutingApplication):
         print(f"\033[91m[CALLBACK_STACK] Desencolando {callback_data}, callback_stack: {CALLBACK_STACK}\033[0m")
 
         self.penalize_q_value(
-            next_node=callback_data.next_hop_node
+            next_node=callback_data.next_hop_node,
+            penalty=packet["penalty"]
         )
 
         # movement: backward
@@ -577,7 +559,6 @@ class IntermediateQRoutingApplication(QRoutingApplication):
             "type": PacketType.CALLBACK,
             "episode_number": packet["episode_number"],
             "from_node_id": self.node.node_id,
-            "max_hops": self.max_hops
         }
 
         # movement: backward

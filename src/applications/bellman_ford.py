@@ -4,11 +4,6 @@ import random
 import threading
 from classes.packet_registry import packet_registry as registry
 
-FUNCTION_SEQ = None
-MAX_HOPS = 0
-
-global_function_counters = None
-
 class BroadcastState:
     def __init__(self):
         self.message_id = None            # Identificador único del mensaje de broadcast
@@ -134,10 +129,10 @@ class SenderBellmanFordApplication(BellmanFordApplication):
         super().__init__(node)
         self.routes = {}  # Almacena las rutas más cortas calculadas
         self.previous_node_id = None
-        self.max_hops = None
-        self.functions_sequence = None
         self.last_route_update = 0  # Última vez que se ejecutó el recalculo de rutas
         self.running = True  # Control del hilo de monitoreo
+        self.max_hops = None
+        self.functions_sequence = None
 
     def start_route_monitoring(self):
         """Inicia un hilo que verifica periódicamente si se debe ejecutar Bellman-Ford."""
@@ -159,18 +154,10 @@ class SenderBellmanFordApplication(BellmanFordApplication):
 
             time.sleep(0.1)  # Evita sobrecarga de CPU
 
-    def start_episode(self, episode_number, max_hops, functions_sequence, penalty=0.0):
+    def start_episode(self, episode_number, max_hops, functions_sequence):
         self.start_route_monitoring()
-        # self.max_hops=max_hops
-
-        global MAX_HOPS
-        MAX_HOPS=max_hops
-
-        global FUNCTION_SEQ
-        FUNCTION_SEQ=functions_sequence
-
-        global global_function_counters
-        global_function_counters = {func: 0 for func in FUNCTION_SEQ}
+        self.max_hops = max_hops
+        self.functions_sequence = functions_sequence
 
         if episode_number == 1:
             print(f"[Node_ID={self.node.node_id}] Starting broadcast for episode {episode_number}")
@@ -197,11 +184,10 @@ class SenderBellmanFordApplication(BellmanFordApplication):
             "type": PacketType.PACKET_HOP,
             "episode_number": episode_number,
             "from_node_id": self.node.node_id,
-            "functions_sequence": FUNCTION_SEQ.copy(),  # Copia de la secuencia de funciones a procesar
-            "function_counters": {func: 0 for func in FUNCTION_SEQ},  # Contadores de funciones asignadas
+            "functions_sequence": self.functions_sequence.copy(),  # Copia de la secuencia de funciones a procesar
+            "function_counters": {func: 0 for func in self.functions_sequence},  # Contadores de funciones asignadas
             "hops": 0,  # Contador de saltos
-            "time": 0,  # Tiempo total acumulado del paquete
-            "max_hops": MAX_HOPS,  # Número máximo de saltos permitidos
+            "max_hops": self.max_hops,  # Número máximo de saltos permitidos
             "node_function_map": self.broadcast_state.node_function_map
         }
         next_node = self.select_next_function_node(packet)
@@ -224,8 +210,8 @@ class SenderBellmanFordApplication(BellmanFordApplication):
             "from_node_id": self.node.node_id,
             "episode_number": episode_number,
             "visited_nodes": {self.node.node_id},
-            "functions_sequence": FUNCTION_SEQ.copy(),
-            "function_counters": {func: 0 for func in FUNCTION_SEQ},
+            "functions_sequence": self.functions_sequence.copy(),
+            "function_counters": {func: 0 for func in self.functions_sequence},
             "node_function_map": {},
         }
 
@@ -518,9 +504,9 @@ class IntermediateBellmanFordApplication(BellmanFordApplication):
                 #
                 if not self.assigned_function:
                     # Buscar la función menos asignada globalmente
-                    min_count = min(global_function_counters.values())
+                    min_count = min(packet["function_counters"].values())
                     least_assigned_functions = [
-                        func for func, count in global_function_counters.items() if count == min_count
+                        func for func, count in packet["function_counters"].items() if count == min_count
                     ]
 
                     # Seleccionar una función aleatoriamente de las menos asignadas
@@ -530,7 +516,7 @@ class IntermediateBellmanFordApplication(BellmanFordApplication):
                     self.assigned_function = function_to_assign
 
                     # Incrementar el contador global de asignaciones para la función
-                    global_function_counters[function_to_assign] += 1
+                    packet["function_counters"][function_to_assign] += 1
 
                     print(f"[Node_ID={self.node.node_id}] Assigned function: {self.assigned_function}")
 
@@ -557,8 +543,8 @@ class IntermediateBellmanFordApplication(BellmanFordApplication):
                         "from_node_id": self.node.node_id,
                         "episode_number": packet["episode_number"],
                         "visited_nodes": packet["visited_nodes"].copy(),
-                        "functions_sequence": FUNCTION_SEQ.copy(),
-                        "function_counters": {func: 0 for func in FUNCTION_SEQ},
+                        "functions_sequence": packet["functions_sequence"].copy(),
+                        "function_counters": {func: 0 for func in packet["functions_sequence"]},
                         "node_function_map": packet["node_function_map"]
                     }
                     broadcast_packet["visited_nodes"].add(self.node.node_id)
@@ -631,7 +617,7 @@ class IntermediateBellmanFordApplication(BellmanFordApplication):
             case PacketType.PACKET_HOP:
 
                 global MAX_HOPS
-                if packet["hops"] > MAX_HOPS:
+                if packet["hops"] > packet["max_hops"]:
                     print(f'[Node_ID={self.node.node_id}] Max hops reached. Initiating callback')
                     # print(f"*******callback_stack: {self.callback_stack}")
 
@@ -640,7 +626,6 @@ class IntermediateBellmanFordApplication(BellmanFordApplication):
                         "episode_number": packet["episode_number"],
                         "from_node_id": self.node.node_id,
                         "hops": packet["hops"] + 1,
-                        "max_hops": MAX_HOPS,
                     }
 
                     from_node_id = packet["from_node_id"]
