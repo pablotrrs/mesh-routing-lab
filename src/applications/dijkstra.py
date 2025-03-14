@@ -2,7 +2,9 @@ from enum import Enum
 from classes.base import Application, EpisodeEnded
 import random
 from queue import PriorityQueue
+from classes.clock import clock
 from classes.packet_registry import packet_registry as registry
+from tabulate import tabulate
 
 broken_path = False
 
@@ -16,6 +18,7 @@ class BroadcastState:
         self.completed = False                  # Indica si el broadcast se completó
         self.received_acks = set()              # Conjunto de nodos desde los que se recibieron ACKs
         self.node_function_map = {}
+        self.latency_map = {}
 
     def set_parent_node(self, parent_node: int):
         """Establece el nodo del que se recibió el BROADCAST."""
@@ -194,6 +197,7 @@ class SenderDijkstraApplication(DijkstraApplication):
             "functions_sequence": self.functions_sequence.copy(),
             "function_counters": {func: 0 for func in self.functions_sequence},
             "node_function_map": {},
+            "latency_map": {},
         }
 
         # Inicializar el estado de broadcast
@@ -202,7 +206,23 @@ class SenderDijkstraApplication(DijkstraApplication):
         print(f"[Node_ID={self.node.node_id}] Expected ACKs: {self.broadcast_state.expected_acks}")
 
         for neighbor in neighbors:
+            start_time = clock.get_current_time()
             self.send_packet(neighbor, broadcast_packet)
+            broadcast_packet["latency_map"][(self.node.node_id, neighbor)] = start_time  # 🔥 Guardamos la latencia
+
+
+        # dejar solo las latencias mínimas
+        self.broadcast_state.latency_map = {
+            (min(a, b), max(a, b)): min(latency for (x, y), latency in self.broadcast_state.latency_map.items() 
+                                    if {x, y} == {a, b})
+            for a, b in self.broadcast_state.latency_map
+        }
+
+        latency_table = [
+            [src, dst, latency] for (src, dst), latency in self.broadcast_state.latency_map.items()
+        ]
+        print(f"\n[Node_ID={self.node.node_id}] Latency Map After Broadcast:\n")
+        print(tabulate(latency_table, headers=["Source Node", "Destination Node", "Latency (ms)"], tablefmt="grid"))
 
     def compute_shortest_paths(self):
         """
@@ -343,6 +363,7 @@ class SenderDijkstraApplication(DijkstraApplication):
                             "from_node_id": self.node.node_id,
                             "episode_number": packet.episode_number,
                             "visited_nodes": {self.node.node_id},
+                            "latency_map": packet["latency_map"],
                         }
                         self.send_packet(neighbor, broadcast_packet)
 
@@ -353,36 +374,55 @@ class SenderDijkstraApplication(DijkstraApplication):
             case PacketType.ACK:
                 print(f"[Node_ID={self.node.node_id}] Received ACK for message ID {packet['message_id']}")
 
-                if "node_function_map" in packet:
-                    combined_node_function_map = {**self.broadcast_state.node_function_map, **packet["node_function_map"]}
-                    self.broadcast_state.node_function_map = combined_node_function_map
-                    print(self.broadcast_state.node_function_map)
+                # 📌 Guardamos el tiempo actual al recibir el ACK
+                end_time = clock.get_current_time()
 
+                # 📌 Fusionar `node_function_map`
+                if "node_function_map" in packet:
+                    self.broadcast_state.node_function_map.update(packet["node_function_map"])
+                    print(f"[Node_ID={self.node.node_id}] Updated node-function map: {self.broadcast_state.node_function_map}")
+
+                # 📌 Fusionar `latency_map` (si existe en el paquete)
+                if "latency_map" in packet:
+                    for (src, dst), latency in packet["latency_map"].items():
+                        # 🔥 Solo agregamos si no está o si encontramos una latencia menor (mejor ruta)
+                        if (src, dst) not in self.broadcast_state.latency_map or latency < self.broadcast_state.latency_map[(src, dst)]:
+                            self.broadcast_state.latency_map[(src, dst)] = latency
+                            print(f"[Node_ID={self.node.node_id}] Added latency {latency} ms for route {src} -> {dst}")
+
+                # 📌 Verificar si es un nuevo ACK (evitar duplicados)
                 if packet["from_node_id"] not in self.broadcast_state.received_acks:
                     self.broadcast_state.increment_acks_received(packet["from_node_id"])
                     acks_left = self.broadcast_state.expected_acks - self.broadcast_state.acks_received
                     print(f"[Node_ID={self.node.node_id}] {acks_left} ACKs left")
+
+                    # 📌 Calcular latencia solo si tenemos el tiempo de envío guardado
+                    if (packet["from_node_id"], self.node.node_id) in self.broadcast_state.latency_map:
+                        start_time = self.broadcast_state.latency_map[(packet["from_node_id"], self.node.node_id)]
+                        latency = end_time - start_time
+                        self.broadcast_state.latency_map[(packet["from_node_id"], self.node.node_id)] = latency
+                        print(f"[Node_ID={self.node.node_id}] Measured latency from {packet['from_node_id']}: {latency} ms")
+
                 else:
                     print(f"[Node_ID={self.node.node_id}] Duplicate ACK received from Node {packet['from_node_id']}. Ignoring.")
 
-                # Verificar si se recibieron todos los ACKs esperados
+                # 📌 Verificar si se recibieron todos los ACKs esperados
                 if self.broadcast_state.acks_received == self.broadcast_state.expected_acks:
                     print(f"[Node_ID={self.node.node_id}] Broadcast completed successfully.")
                     print(f"[Node_ID={self.node.node_id}] Final node-function map: {self.broadcast_state.node_function_map}")
+                    print(f"[Node_ID={self.node.node_id}] Final latency map: {self.broadcast_state.latency_map}")
                     self.broadcast_state.mark_completed()
+
                     if self.broadcast_state.parent_node is not None:
                         ack_packet = {
                             "type": PacketType.ACK,
-                            "message_id": message_id,
+                            "message_id": packet["message_id"],
                             "from_node_id": self.node.node_id,
-                            "node_function_map": {},
-                            "episode_number": packet.episode_number
+                            "node_function_map": self.broadcast_state.node_function_map,
+                            # "latency_map": self.broadcast_state.latency_map,  # 🔥 Enviar el latency_map completo
+                            "latency_map": self.broadcast_state.latency_map,  # 🔥 Enviar el latency_map completo
+                            "episode_number": packet["episode_number"]
                         }
-                        # Solo agregar al mapa si el nodo tiene una función asignada
-                        if self.assigned_function is not None:
-                            ack_packet["node_function_map"][self.node.node_id] = self.assigned_function
-                            self.broadcast_state.node_function_map[self.node.node_id] = self.assigned_function
-
                         self.send_packet(self.broadcast_state.parent_node, ack_packet)
 
             case PacketType.BROKEN_PATH:
@@ -465,20 +505,24 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                 print(packet)
                 message_id = packet["message_id"]
 
-                # Verificar si el mensaje ya fue recibido
+                # 📌 Verificar si el mensaje ya fue recibido (para evitar loops)
                 if self.broadcast_state and message_id in self.broadcast_state.received_messages:
                     print(f"[Node_ID={self.node.node_id}] Received duplicate BROADCAST packet. Sending ACK back.")
+
+                    # 📌 Enviar ACK de vuelta con `latency_map` fusionado
                     ack_packet = {
                         "type": PacketType.ACK,
                         "message_id": message_id,
                         "from_node_id": self.node.node_id,
                         "node_function_map": {},
-                        "episode_number": packet["episode_number"]
+                        "episode_number": packet["episode_number"],
+                        "latency_map": packet["latency_map"],  # 🔥 Asegurar que el mapa se propague correctamente
                     }
-                    # Solo agregar al mapa si el nodo tiene una función asignada
+
                     if self.assigned_function is not None:
                         ack_packet["node_function_map"][self.node.node_id] = self.assigned_function
                         self.broadcast_state.node_function_map[self.node.node_id] = self.assigned_function
+
                     self.send_packet(packet["from_node_id"], ack_packet)
                     return
 
@@ -521,6 +565,11 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                     n for n in neighbors if n not in packet["visited_nodes"]
                 ]
 
+                # 📌 Guardamos el `start_time` en el `latency_map` dentro del paquete
+                updated_latency_map = packet["latency_map"].copy()
+                for neighbor in neighbors_to_broadcast:
+                    updated_latency_map[(self.node.node_id, neighbor)] = clock.get_current_time()
+
                 # Inicializar contador de ACKs esperados
                 self.broadcast_state.expected_acks = len(neighbors_to_broadcast)
                 print(f"[Node_ID={self.node.node_id}] {self.broadcast_state.expected_acks} expected ACKs from nodes {neighbors_to_broadcast}")
@@ -534,7 +583,8 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                         "visited_nodes": packet["visited_nodes"].copy(),
                         "functions_sequence": packet["functions_sequence"].copy(),
                         "function_counters": {func: 0 for func in packet["functions_sequence"]},
-                        "node_function_map": packet["node_function_map"]
+                        "node_function_map": packet["node_function_map"],
+                        "latency_map": updated_latency_map  # 🔥 Ahora el `latency_map` viaja en el paquete
                     }
                     broadcast_packet["visited_nodes"].add(self.node.node_id)
                     self.send_packet(neighbor, broadcast_packet)
@@ -546,7 +596,8 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                         "message_id": message_id,
                         "from_node_id": self.node.node_id,
                         "node_function_map": {},
-                        "episode_number": packet["episode_number"]
+                        "episode_number": packet["episode_number"],
+                        "latency_map": packet["latency_map"],
                     }
                     # Solo agregar al mapa si el nodo tiene una función asignada
                     if self.assigned_function is not None:
@@ -559,6 +610,20 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                 print(f"[Node_ID={self.node.node_id}] Received ACK for message ID {packet['message_id']}")
                 print("printing mf packet to see if has map of mf nodes and mf functions")
                 print(packet)
+
+                ack_from = packet["from_node_id"]
+                end_time = clock.get_current_time()
+
+                # 📌 Calcular la latencia real en el `latency_map` del paquete
+                if (self.node.node_id, ack_from) in packet["latency_map"]:
+                    start_time = packet["latency_map"][(self.node.node_id, ack_from)]
+                    latency = end_time - start_time
+                    packet["latency_map"][(self.node.node_id, ack_from)] = latency
+                    print(f"[Node_ID={self.node.node_id}] Measured latency from {ack_from}: {latency} ms")
+
+                # 📌 Fusionamos `latency_map` del paquete con los datos recibidos
+                combined_latency_map = {**self.broadcast_state.latency_map, **packet["latency_map"]}
+                self.broadcast_state.latency_map = combined_latency_map
 
                 if packet["from_node_id"] not in self.broadcast_state.received_acks:
                     self.broadcast_state.increment_acks_received(packet["from_node_id"])
@@ -586,12 +651,16 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                         combined_node_function_map = {**self.broadcast_state.node_function_map, **packet["node_function_map"]}
                         self.broadcast_state.node_function_map = combined_node_function_map
 
+                        combined_latency_map = {**self.broadcast_state.latency_map, **packet["latency_map"]}
+                        self.broadcast_state.latency_map = combined_latency_map
+
                         ack_packet = {
                             "type": PacketType.ACK,
                             "message_id": message_id,
                             "from_node_id": self.node.node_id,
                             "node_function_map": self.broadcast_state.node_function_map,
-                            "episode_number": packet["episode_number"]
+                            "episode_number": packet["episode_number"],
+                            "latency_map": combined_latency_map,
                         }
 
                         self.send_packet(self.broadcast_state.parent_node, ack_packet)
