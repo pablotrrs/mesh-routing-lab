@@ -3,6 +3,7 @@ import time
 import yaml
 import math
 import threading
+from classes.clock import clock
 from classes.packet_registry import packet_registry as registry
 
 class Network:
@@ -11,7 +12,6 @@ class Network:
         self.connections = {}  # {node_id: [neighbors]}
         self.active_nodes = set()
         self.dynamic_change_events = []  # Tiempos (ms) de cambios dinámicos
-        self.simulation_clock = 0  # Reloj central en ms
         self.running = False  # Control del hilo
         self.lock = threading.Lock()  # Para acceso seguro al reloj y nodos
         self.mean_interval_ms = None
@@ -25,10 +25,6 @@ class Network:
 
     def set_disconnect_probability(self, disconnect_probability):
         self.disconnect_probability = disconnect_probability
-
-    def set_simulation_clock(self, clock_reference):
-        """Sincroniza el reloj central con el de la simulación."""
-        self.simulation_clock = clock_reference
 
     def generate_next_dynamic_change(self):
         """
@@ -50,7 +46,7 @@ class Network:
     def start_dynamic_changes(self):
         """Inicia un hilo que aplica los cambios dinámicos en función del reloj central."""
         self.running = True
-        current_time = self.simulation_clock.get_current_time()
+        current_time = clock.get_current_time()
         print(f"[Network] clock starts: {current_time}")
         threading.Thread(target=self._monitor_dynamic_changes, daemon=True).start()
 
@@ -60,9 +56,9 @@ class Network:
 
     def _monitor_dynamic_changes(self):
         """Monitorea el reloj central y aplica cambios dinámicos automáticamente."""
-        next_event_time = self.simulation_clock.get_current_time() + self.generate_next_dynamic_change()
+        next_event_time = clock.get_current_time() + self.generate_next_dynamic_change()
         while self.running:
-            current_time = self.simulation_clock.get_current_time()
+            current_time = clock.get_current_time()
             # print(f"[Network] clock tics: {current_time}")
             with self.lock:
                 if current_time >= next_event_time:
@@ -84,7 +80,7 @@ class Network:
                 self.nodes[node_id].status = False
                 self.nodes[node_id].reconnect_time = np.random.exponential(scale=self.reconnect_interval_ms)
 
-                current_time = self.simulation_clock.get_current_time()
+                current_time = clock.get_current_time()
                 print(f"\033[91m\n⚡[Network] Node {node_id} disconnected at {current_time:.2f}. ⚡\n\033[0m")
 
         return
@@ -98,7 +94,7 @@ class Network:
                 node.status = True
                 node.reconnect_time = None
 
-                current_time = self.simulation_clock.get_current_time()
+                current_time = clock.get_current_time()
                 print(f"\033[92m\n⚡ [Network] Node {node_id} reconnected at {current_time:.2f}. ⚡\n\033[0m")
                 return
 
