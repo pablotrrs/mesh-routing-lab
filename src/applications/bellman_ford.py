@@ -126,7 +126,7 @@ class BellmanFordApplication(Application):
         """Returns the function assigned to this node or 'N/A' if None."""
         func = self.broadcast_state.node_function_map.get(self.node.node_id)
 
-        return func if func is not None else "N/A"
+        return func.value if func is not None else "N/A"
 
 class SenderBellmanFordApplication(BellmanFordApplication):
     def __init__(self, node):
@@ -158,10 +158,8 @@ class SenderBellmanFordApplication(BellmanFordApplication):
 
             time.sleep(0.1)  # Evita sobrecarga de CPU
 
-    def start_episode(self, episode_number, max_hops, functions_sequence):
+    def start_episode(self, episode_number):
         self.start_route_monitoring()
-        self.max_hops = max_hops
-        self.functions_sequence = functions_sequence
 
         if episode_number == 1:
             print(f"[Node_ID={self.node.node_id}] Starting broadcast for episode {episode_number}")

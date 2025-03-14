@@ -103,8 +103,6 @@ if __name__ == "__main__":
     )
 
     simulation = Simulation(network, sender_node, metrics_manager)
-    simulation.set_max_hops(args.max_hops)
-    simulation.set_functions_sequence(args.functions_sequence)
 
     for algorithm in selected_algorithms:
         print(f"Running {args.episodes} episodes using the {algorithm.name} algorithm.")
@@ -118,6 +116,7 @@ if __name__ == "__main__":
                 from applications.q_routing import QRoutingApplication, SenderQRoutingApplication, IntermediateQRoutingApplication
 
                 sender_node.install_application(SenderQRoutingApplication)
+                sender_node.application.set_params(args.max_hops, functions_sequence)
 
                 if isinstance(sender_node.application, QRoutingApplication):
                     sender_node.application.set_penalty(args.penalty)
@@ -125,6 +124,7 @@ if __name__ == "__main__":
                 for node_id, node in network.nodes.items():
                     if node_id != sender_node.node_id:
                         node.install_application(IntermediateQRoutingApplication)
+                        node.application.set_params(args.max_hops, functions_sequence)
 
                 simulation.start(algorithm, args.episodes)
 
@@ -132,10 +132,12 @@ if __name__ == "__main__":
                 from applications.dijkstra import SenderDijkstraApplication, IntermediateDijkstraApplication
 
                 sender_node.install_application(SenderDijkstraApplication)
+                sender_node.application.set_params(args.max_hops, functions_sequence)
 
                 for node_id, node in network.nodes.items():
                     if node_id != sender_node.node_id:
                         node.install_application(IntermediateDijkstraApplication)
+                        node.application.set_params(args.max_hops, functions_sequence)
 
                 simulation.start(algorithm, args.episodes)
 
@@ -143,9 +145,11 @@ if __name__ == "__main__":
                 from applications.bellman_ford import SenderBellmanFordApplication, IntermediateBellmanFordApplication
 
                 sender_node.install_application(SenderBellmanFordApplication)
+                sender_node.application.set_params(args.max_hops, functions_sequence)
 
                 for node_id, node in network.nodes.items():
                     if node_id != sender_node.node_id:
                         node.install_application(IntermediateBellmanFordApplication)
+                        node.application.set_params(args.max_hops, functions_sequence)
 
                 simulation.start(algorithm, args.episodes)

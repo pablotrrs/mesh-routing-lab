@@ -74,12 +74,9 @@ class MetricsManager:
 
         filename = f"{directory}/simulation_{self.metrics['simulation_id']}.json"
 
-        try:
-            with open(filename, "w", encoding="utf-8") as file:
-                json.dump(self.metrics, file, indent=4)
-            print(f"\nMétricas de la simulación guardadas en {filename}")
-        except Exception as e:
-            print(f"\nError al guardar las métricas: {e}")
+        with open(filename, "w", encoding="utf-8") as file:
+            json.dump(self.metrics, file, indent=4)
+        print(f"\nMétricas de la simulación guardadas en {filename}")
 
     def save_results_to_excel(self, filename="../results/resultados_simulacion.xlsx"):
         """

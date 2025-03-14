@@ -125,19 +125,15 @@ class DijkstraApplication(Application):
         """Returns the function assigned to this node or 'N/A' if None."""
         func = self.broadcast_state.node_function_map.get(self.node.node_id)
 
-        return func if func is not None else "N/A"
+        return func.value if func is not None else "N/A"
 
 class SenderDijkstraApplication(DijkstraApplication):
     def __init__(self, node):
         super().__init__(node)
         self.routes = {}  # Almacena las rutas más cortas calculadas
         self.previous_node_id = None
-        self.max_hops = None
-        self.functions_sequence = None
 
-    def start_episode(self, episode_number, max_hops, functions_sequence):
-        self.max_hops = max_hops
-        self.functions_sequence = functions_sequence
+    def start_episode(self, episode_number):
 
         global broken_path
         if broken_path or episode_number == 1:

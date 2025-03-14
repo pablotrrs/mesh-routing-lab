@@ -6,14 +6,7 @@ class Simulation:
     def __init__(self, network, sender_node, metrics_manager):
         self.network = network
         self.sender_node = sender_node
-        self.max_hops = None
         self.metrics_manager = metrics_manager
-
-    def set_max_hops(self, max_hops):
-        self.max_hops = max_hops
-
-    def set_functions_sequence(self, functions_sequence):
-        self.functions_sequence = functions_sequence
 
     def start(self, algorithm_enum, episodes):
         clock.start()  # Iniciamos el reloj global al principio de la simulación
@@ -28,7 +21,7 @@ class Simulation:
             registry.initialize_episode(episode_number)
 
             try:
-                self.sender_node.start_episode(episode_number, self.max_hops, self.functions_sequence)
+                self.sender_node.start_episode(episode_number)
             except EpisodeEnded:
                 print(f'\n\n=== Episode #{episode_number} ended ===\n')
 

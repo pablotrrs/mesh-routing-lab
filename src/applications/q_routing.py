@@ -275,7 +275,9 @@ class QRoutingApplication(Application):
 
     def get_assigned_function(self):
         """Returns the function assigned to this node."""
-        return self.assigned_function
+        assigned_function = self.assigned_function
+
+        return assigned_function.value if assigned_function is not None else "N/A"
 
     def __str__(self) -> str:
         return f"Node(id={self.node.node_id}, neighbors={self.node.network.get_neighbors(self.node.node_id)})"
@@ -293,9 +295,8 @@ class SenderQRoutingApplication(QRoutingApplication):
     def set_penalty(self, penalty):
         self.penalty = penalty
 
-    def start_episode(self, episode_number, max_hops=None, functions_sequence=None, current_hop_count=0) -> None:
+    def start_episode(self, episode_number, current_hop_count=0) -> None:
         """Initiates an episode by creating a packet and sending it to chosen node."""
-        self.max_hops = max_hops
 
         global EPISODE_COMPLETED
         EPISODE_COMPLETED = False
@@ -303,8 +304,6 @@ class SenderQRoutingApplication(QRoutingApplication):
         print(f"\n\033[93mClearing callback stacks for Episode {episode_number}\033[0m")
         global CALLBACK_STACK
         CALLBACK_STACK.clear()
-
-        self.functions_sequence = functions_sequence
 
         packet = {
             "type": PacketType.PACKET_HOP,
@@ -333,7 +332,7 @@ class SenderQRoutingApplication(QRoutingApplication):
                 self.mark_episode_result(packet, success=False)
 
             # si no se puede empezar el episodio, se sigue intentando hasta que se pueda
-            self.start_episode(episode_number, self.max_hops, functions_sequence, penalty, packet["hops"])
+            self.start_episode(episode_number, packet["hops"])
             return
         else:
             estimated_time_remaining = self.estimate_remaining_time(next_node)
