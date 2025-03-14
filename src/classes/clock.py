@@ -1,13 +1,14 @@
 import threading
 import time
 
+
 class Clock:
     """Centralized simulation clock."""
 
     def __init__(self):
-        self.time = 0  # Tiempo en milisegundos
-        self.running = False  # Control del reloj
-        self.lock = threading.Lock()  # Sincronización
+        self.time = 0
+        self.running = False
+        self.lock = threading.Lock()
 
     def start(self):
         """Inicia un hilo dedicado al reloj central."""
@@ -35,5 +36,6 @@ class Clock:
         with self.lock:
             self.time += increment
             return self.time
+
 
 clock = Clock()

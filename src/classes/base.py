@@ -1,14 +1,18 @@
-import numpy as np
 from abc import ABC, abstractmethod
 from enum import Enum
 
+import numpy as np
+
+
 class EpisodeEnded(Exception):
     pass
+
 
 class Algorithm(Enum):
     Q_ROUTING = "Q_ROUTING"
     DIJKSTRA = "DIJKSTRA"
     BELLMAN_FORD = "BELLMAN_FORD"
+
 
 class NodeFunction(Enum):
     A = "A"
@@ -43,7 +47,10 @@ class NodeFunction(Enum):
         try:
             return NodeFunction(value)
         except ValueError:
-            raise ValueError(f"'{value}' is not a valid NodeFunction. Valid values: {[f.value for f in NodeFunction]}")
+            raise ValueError(
+                f"'{value}' is not a valid NodeFunction. Valid values: {[f.value for f in NodeFunction]}"
+            )
+
 
 class Application(ABC):
     def __init__(self, node):
@@ -68,6 +75,7 @@ class Application(ABC):
     def get_assigned_function(self):
         pass
 
+
 class Node:
     def __init__(self, node_id, network, position):
         self.node_id = node_id
@@ -81,7 +89,9 @@ class Node:
 
     def install_application(self, application_class):
         self.application = application_class(self)
-        print(f"[Node_ID={self.node_id}] Installed {self.application.__class__.__name__}")
+        print(
+            f"[Node_ID={self.node_id}] Installed {self.application.__class__.__name__}"
+        )
 
         if not self.is_sender:
             self.status = True
@@ -95,7 +105,7 @@ class Node:
             raise RuntimeError(f"[Node_ID={self.node_id}] No application installed")
 
     def get_assigned_function(self) -> str:
-        if self.application and hasattr(self.application, 'get_assigned_function'):
+        if self.application and hasattr(self.application, "get_assigned_function"):
             return self.application.get_assigned_function()
         return "N/A"
 

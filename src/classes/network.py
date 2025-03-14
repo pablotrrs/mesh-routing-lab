@@ -1,19 +1,21 @@
-import numpy as np
-import time
-import yaml
 import math
 import threading
+import time
+
+import numpy as np
+import yaml
 from classes.clock import clock
 from classes.packet_registry import packet_registry as registry
+
 
 class Network:
     def __init__(self):
         self.nodes = {}  # {node_id: Node}
         self.connections = {}  # {node_id: [neighbors]}
         self.active_nodes = set()
-        self.dynamic_change_events = []  # Tiempos (ms) de cambios dinámicos
-        self.running = False  # Control del hilo
-        self.lock = threading.Lock()  # Para acceso seguro al reloj y nodos
+        self.dynamic_change_events = []
+        self.running = False
+        self.lock = threading.Lock()
         self.mean_interval_ms = None
         self.reconnect_interval_ms = None
 
@@ -36,11 +38,11 @@ class Network:
         Returns:
             int: Tiempo (ms) para el próximo cambio dinámico.
         """
-        if self.mean_interval_ms == float('inf'):
-            # No generar cambios dinámicos; retorna un tiempo muy alto
-            return int(1e12)  # Un valor grande que nunca será alcanzado en la simulación
+        if self.mean_interval_ms == float("inf"):
+            return int(
+                1e12
+            )
         else:
-            # Generar el próximo cambio dinámico normalmente
             return int(np.random.exponential(self.mean_interval_ms))
 
     def start_dynamic_changes(self):
@@ -59,11 +61,9 @@ class Network:
         next_event_time = clock.get_current_time() + self.generate_next_dynamic_change()
         while self.running:
             current_time = clock.get_current_time()
-            # print(f"[Network] clock tics: {current_time}")
             with self.lock:
                 if current_time >= next_event_time:
                     print("\033[93m\n⚡ZZZAP⚡\n\033[0m")
-                    # print(f"[Network] Dynamic Change triggered at {current_time} ms")
                     self.trigger_dynamic_change()
                     self.dynamic_change_events.append(current_time)
                     next_event_time = current_time + self.generate_next_dynamic_change()
@@ -78,10 +78,14 @@ class Network:
         for node_id in list(self.active_nodes):
             if np.random.rand() < self.disconnect_probability:
                 self.nodes[node_id].status = False
-                self.nodes[node_id].reconnect_time = np.random.exponential(scale=self.reconnect_interval_ms)
+                self.nodes[node_id].reconnect_time = np.random.exponential(
+                    scale=self.reconnect_interval_ms
+                )
 
                 current_time = clock.get_current_time()
-                print(f"\033[91m\n⚡[Network] Node {node_id} disconnected at {current_time:.2f}. ⚡\n\033[0m")
+                print(
+                    f"\033[91m\n⚡[Network] Node {node_id} disconnected at {current_time:.2f}. ⚡\n\033[0m"
+                )
 
         return
 
@@ -90,12 +94,18 @@ class Network:
         Verifica qué nodos desconectados pueden reconectarse y los reactiva.
         """
         for node_id, node in self.nodes.items():
-            if not node.status and node.reconnect_time is not None and current_time >= node.reconnect_time:
+            if (
+                not node.status
+                and node.reconnect_time is not None
+                and current_time >= node.reconnect_time
+            ):
                 node.status = True
                 node.reconnect_time = None
 
                 current_time = clock.get_current_time()
-                print(f"\033[92m\n⚡ [Network] Node {node_id} reconnected at {current_time:.2f}. ⚡\n\033[0m")
+                print(
+                    f"\033[92m\n⚡ [Network] Node {node_id} reconnected at {current_time:.2f}. ⚡\n\033[0m"
+                )
                 return
 
     def validate_connection(self, from_node_id, to_node_id):
@@ -111,9 +121,9 @@ class Network:
         """
         with self.lock:
             return (
-                to_node_id in self.connections.get(from_node_id, []) and
-                from_node_id in self.active_nodes and
-                to_node_id in self.active_nodes
+                to_node_id in self.connections.get(from_node_id, [])
+                and from_node_id in self.active_nodes
+                and to_node_id in self.active_nodes
             )
 
     def add_node(self, node):
@@ -140,9 +150,11 @@ class Network:
         return list(self.nodes.keys())
 
     def is_node_reachable(self, from_node_id, to_node_id):
-        return to_node_id in self.connections.get(from_node_id, []) and \
-                from_node_id in self.active_nodes and \
-                to_node_id in self.active_nodes
+        return (
+            to_node_id in self.connections.get(from_node_id, [])
+            and from_node_id in self.active_nodes
+            and to_node_id in self.active_nodes
+        )
 
     def send(self, from_node_id, to_node_id, packet):
         """
@@ -151,74 +163,76 @@ class Network:
         episode_number = packet.get("episode_number")
         registry.initialize_episode(episode_number)
 
-        # **Caso: Paquete perdido**
         if not self.is_node_reachable(from_node_id, to_node_id):
-            registry.mark_packet_lost(episode_number, from_node_id, to_node_id, packet["type"].value)
-            return  # No seguir procesando
+            registry.mark_packet_lost(
+                episode_number, from_node_id, to_node_id, packet["type"].value
+            )
+            return
 
-        # **Caso: Fin del episodio (llegó al nodo original)**
         if to_node_id is None:
             registry.mark_episode_complete(episode_number, True)
-            return  # No seguir procesando
+            return
 
-        # **Calcular latencia**
-        latency = self.get_latency(from_node_id, to_node_id) if to_node_id != "N/A" else 0
+        latency = (
+            self.get_latency(from_node_id, to_node_id) if to_node_id != "N/A" else 0
+        )
 
-        # **Registrar información del hop en packet_log**
         registry.log_packet_hop(
             episode_number,
             from_node_id,
             to_node_id,
-            self.nodes[from_node_id].get_assigned_function() if self.nodes[from_node_id].get_assigned_function() else "N/A",
+            self.nodes[from_node_id].get_assigned_function()
+            if self.nodes[from_node_id].get_assigned_function()
+            else "N/A",
             "active" if from_node_id in self.active_nodes else "inactive",
             latency,
-            packet["type"].value
+            packet["type"].value,
         )
 
-        # **Validar si el nodo destino es alcanzable**
         if self.is_node_reachable(from_node_id, to_node_id):
-            print(f"[Network] Sending packet from Node {from_node_id} to Node {to_node_id} with latency {latency:.6f} seconds")
+            print(
+                f"[Network] Sending packet from Node {from_node_id} to Node {to_node_id} with latency {latency:.6f} seconds"
+            )
 
-            time.sleep(latency)  # Simulación de la latencia
+            time.sleep(latency)
             self.nodes[to_node_id].application.receive_packet(packet)
         else:
-            print(f"[Network] Failed to send packet: Node {to_node_id} is not reachable from Node {from_node_id}")
+            print(
+                f"[Network] Failed to send packet: Node {to_node_id} is not reachable from Node {from_node_id}"
+            )
 
     @classmethod
     def from_yaml(cls, file_path):
         """
         Crea una instancia de Network a partir de un archivo YAML y devuelve la red y el nodo emisor.
         """
-        with open(file_path, 'r') as file:
+        with open(file_path, "r") as file:
             data = yaml.safe_load(file)
 
-        # Crear la red
         network = cls()
         sender_node = None
 
         from classes.base import Node
 
-        # Crear y añadir nodos
-        for node_id, node_info in data['nodes'].items():
+        for node_id, node_info in data["nodes"].items():
             node_id = int(node_id)
-            position = tuple(node_info['position']) if 'position' in node_info else None
+            position = tuple(node_info["position"]) if "position" in node_info else None
 
-            # Crear instancia de Node con posición
             node = Node(node_id, network, position=position)
             network.add_node(node)
 
-            # Identificar el nodo sender para devolverlo después
-            if 'type' in node_info and node_info['type'] == 'sender':
+            if "type" in node_info and node_info["type"] == "sender":
                 node.is_sender = True
                 sender_node = node
 
         if sender_node is None:
-            raise ValueError("No se encontró un nodo de tipo 'sender' en el archivo YAML.")
+            raise ValueError(
+                "No se encontró un nodo de tipo 'sender' en el archivo YAML."
+            )
 
-        # Conectar los nodos
-        for node_id, node_info in data['nodes'].items():
+        for node_id, node_info in data["nodes"].items():
             node_id = int(node_id)
-            neighbors = node_info['neighbors']
+            neighbors = node_info["neighbors"]
             for neighbor_id in neighbors:
                 network.connect_nodes(node_id, neighbor_id)
 
@@ -229,12 +243,16 @@ class Network:
         """Calcula la distancia euclidiana entre dos nodos."""
         pos1 = self.nodes[node_id1].position
         pos2 = self.nodes[node_id2].position
-        return math.sqrt((pos1[0] - pos2[0])**2 + (pos1[1] - pos2[1])**2 + (pos1[2] - pos2[2])**2)
+        return math.sqrt(
+            (pos1[0] - pos2[0]) ** 2
+            + (pos1[1] - pos2[1]) ** 2
+            + (pos1[2] - pos2[2]) ** 2
+        )
 
     def get_latency(self, node_id1, node_id2, propagation_speed=3e8):
         """Calcula la latencia de propagación entre dos nodos."""
         distance = self.get_distance(node_id1, node_id2)
-        return distance / propagation_speed  # Latencia en segundos
+        return distance / propagation_speed
 
     def __str__(self) -> str:
         result = ["\nNetwork Topology:"]
@@ -253,4 +271,8 @@ class Network:
         Returns:
             list: Lista de tiempos en los que ocurrieron cambios dinámicos dentro del intervalo dado.
         """
-        return [cambio for cambio in self.dynamic_change_events if start_time <= cambio <= end_time]
+        return [
+            cambio
+            for cambio in self.dynamic_change_events
+            if start_time <= cambio <= end_time
+        ]
