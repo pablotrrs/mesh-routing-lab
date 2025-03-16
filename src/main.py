@@ -25,7 +25,7 @@
 # https://github.com/pablotrrs/py-q-mesh-routing
 
 import argparse
-import logging
+import logging as log
 import os
 import sys
 
@@ -34,10 +34,13 @@ from core.simulation import Simulation
 from core.enums import Algorithm, NodeFunction
 from core.metrics_manager import MetricsManager
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
-
+def setup_logging():
+    log.root.handlers = []
+    log.basicConfig(
+        level=log.DEBUG,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[log.StreamHandler()],
+    )
 
 def setup_arguments():
     parser = argparse.ArgumentParser(description="Run network simulation.")
@@ -110,6 +113,7 @@ def initialize_network(args):
 
 
 def main():
+    setup_logging()
     args = setup_arguments()
     sys.setrecursionlimit(200000)
 
@@ -118,10 +122,10 @@ def main():
             NodeFunction.from_string(func) for func in args.functions_sequence
         ]
     except ValueError as e:
-        logging.error(f"Error parsing functions sequence from args: {e}")
+        log.error(f"Error parsing functions sequence from args: {e}")
         sys.exit(1)
 
-    logging.info(f"Using functions sequence: {[f.value for f in functions_sequence]}")
+    log.info(f"Using functions sequence: {[f.value for f in functions_sequence]}")
 
     selected_algorithms = (
         [Algorithm(args.algorithm)]
@@ -130,7 +134,7 @@ def main():
     )
 
     network, sender_node = initialize_network(args)
-    logging.info(network)
+    log.info(network)
 
     metrics_manager = MetricsManager()
     metrics_manager.initialize(
@@ -147,13 +151,13 @@ def main():
     simulation = Simulation(network, sender_node, metrics_manager)
 
     for algorithm in selected_algorithms:
-        logging.info(
+        log.info(
             f"Running {args.episodes} episodes using the {algorithm.name} algorithm."
         )
-        logging.info(f"Maximum hops: {args.max_hops}")
-        logging.info(f"Mean interval for dynamic changes: {args.mean_interval_ms} ms")
-        logging.info(f"Topology file: {args.topology_file}")
-        logging.info(f"Functions sequence: {functions_sequence}")
+        log.info(f"Maximum hops: {args.max_hops}")
+        log.info(f"Mean interval for dynamic changes: {args.mean_interval_ms} ms")
+        log.info(f"Topology file: {args.topology_file}")
+        log.info(f"Functions sequence: {functions_sequence}")
 
         match algorithm:
             case Algorithm.Q_ROUTING:

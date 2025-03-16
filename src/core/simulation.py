@@ -1,4 +1,4 @@
-import logging
+import logging as log
 
 from core.base import EpisodeEnded
 from core.clock import clock
@@ -27,7 +27,7 @@ class Simulation:
         self.network = network
         self.sender_node = sender_node
         self.metrics_manager = metrics_manager
-        logging.info("Simulation initialized.")
+        log.info("Simulation initialized.")
 
     def start(self, algorithm_enum: "Algorithm", episodes: int) -> None:
         """Starts the simulation for a specified number of episodes.
@@ -41,10 +41,10 @@ class Simulation:
         successful_episodes = 0
 
         algorithm = algorithm_enum.name
-        logging.info(f"Starting simulation with {episodes} episodes using {algorithm}.")
+        log.info(f"Starting simulation with {episodes} episodes using {algorithm}.")
 
         for episode_number in range(1, episodes + 1):
-            logging.info(f"=== Starting Episode #{episode_number} ({algorithm}) ===")
+            log.info(f"=== Starting Episode #{episode_number} ({algorithm}) ===")
 
             start_time = clock.get_current_time()
             registry.initialize_episode(episode_number)
@@ -52,7 +52,7 @@ class Simulation:
             try:
                 self.sender_node.start_episode(episode_number)
             except EpisodeEnded:
-                logging.info(f"=== Episode #{episode_number} ended ===")
+                log.info(f"=== Episode #{episode_number} ended ===")
 
             end_time = clock.get_current_time()
 
@@ -86,4 +86,4 @@ class Simulation:
             clock.get_current_time(), successful_episodes, episodes
         )
 
-        logging.info("Simulation finished and clock stopped.")
+        log.info("Simulation finished and clock stopped.")

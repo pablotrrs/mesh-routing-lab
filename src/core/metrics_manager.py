@@ -1,6 +1,6 @@
 import datetime
 import json
-import logging
+import logging as log
 import os
 from typing import Dict, List, Optional, Union
 
@@ -19,7 +19,7 @@ class MetricsManager:
     def __init__(self) -> None:
         """Initializes the MetricsManager with an empty metrics dictionary."""
         self.metrics: Dict[str, Union[int, float, str, List, Dict]] = {}
-        logging.info("MetricsManager initialized.")
+        log.info("MetricsManager initialized.")
 
     def initialize(
         self,
@@ -65,7 +65,7 @@ class MetricsManager:
             if algorithm == "Q_ROUTING":
                 self.metrics[algorithm]["penalty"] = penalty
 
-        logging.info("Metrics initialized for simulation.")
+        log.info("Metrics initialized for simulation.")
 
     def log_episode(
         self,
@@ -107,7 +107,7 @@ class MetricsManager:
             }
         )
 
-        logging.debug(f"Logged episode {episode_number} for algorithm {algorithm}.")
+        log.debug(f"Logged episode {episode_number} for algorithm {algorithm}.")
 
     def finalize_simulation(
         self, total_time: float, successful_episodes: int, episodes: int
@@ -127,7 +127,7 @@ class MetricsManager:
 
         self.save_metrics_to_file()
         self.save_results_to_excel()
-        logging.info("Simulation finalized and results saved.")
+        log.info("Simulation finalized and results saved.")
 
     def save_metrics_to_file(self, directory: str = "../resources/results/single-run") -> None:
         """Saves the simulation metrics to a JSON file.
@@ -142,7 +142,7 @@ class MetricsManager:
         with open(filename, "w", encoding="utf-8") as file:
             json.dump(self.metrics, file, indent=4)
 
-        logging.info(f"Simulation metrics saved to {filename}.")
+        log.info(f"Simulation metrics saved to {filename}.")
 
     def save_results_to_excel(
         self, filename: str = "../resources/results/resultados_simulacion.xlsx"
@@ -165,13 +165,13 @@ class MetricsManager:
             try:
                 pd.ExcelFile(filename)
             except Exception:
-                logging.error(
+                log.error(
                     f"Corrupted file detected: {filename}. Deleting and regenerating..."
                 )
                 os.remove(filename)
 
         if not self.metrics:
-            logging.error("self.metrics is empty")
+            log.error("self.metrics is empty")
             return
 
         metrics_data = {
@@ -189,7 +189,7 @@ class MetricsManager:
             if algorithm
             not in ["simulation_id", "parameters", "total_time", "runned_at"]
         }
-        logging.info(
+        log.info(
             f"Algorithms found in metrics: {list(metrics_data.keys())}"
         )
 
@@ -197,7 +197,7 @@ class MetricsManager:
             if algorithm in ["simulation_id", "parameters", "total_time", "runned_at"]:
                 continue
             for episode_data in episodes["episodes"]:
-                logging.debug(
+                log.debug(
                     f"Processing episode no {episode_data['episode_number']} for algorithm {algorithm}..."
                 )
                 episode_number = episode_data["episode_number"]
@@ -227,7 +227,7 @@ class MetricsManager:
                 try:
                     packet_log_json = json.dumps(packet_log, indent=2)
                 except Exception as e:
-                    logging.error(e)
+                    log.error(e)
                     packet_log_json = "{}"
 
                 metrics_data[algorithm]["packet_log_raw"].append(packet_log_json)
@@ -235,7 +235,7 @@ class MetricsManager:
         with pd.ExcelWriter(filename, engine="openpyxl", mode="w") as writer:
             for algorithm, data in metrics_data.items():
                 if not data["episode"]:
-                    logging.error(f"no episodes for algorithm {algorithm}.")
+                    log.error(f"no episodes for algorithm {algorithm}.")
                     continue
 
                 df = pd.DataFrame(data)
@@ -253,7 +253,7 @@ class MetricsManager:
                 )
         wb.save(filename)
 
-        logging.info(f"\nresults saved in {filename}.")
+        log.info(f"\nresults saved in {filename}.")
 
     def generar_comparative_graphs_from_excel(
         self, filename: str = "../resources/results/resultados_simulacion.xlsx"
@@ -386,7 +386,7 @@ class MetricsManager:
         plt.savefig("../resources/results/Tasa_Exito_Columnas.png")
         plt.close()
 
-        logging.info("Comparative graphs generated in: '../resources/results/'.")
+        log.info("Comparative graphs generated in: '../resources/results/'.")
 
     def generate_heat_map(self, q_tables):
         q_table_data = []
@@ -396,7 +396,7 @@ class MetricsManager:
                     q_table_data.append((state, action, q_value))
 
         if not q_table_data:
-            logging.error(f"No Q-table data available.")
+            log.error(f"No Q-table data available.")
             return
 
         states = sorted(set(state for state, _, _ in q_table_data))
@@ -439,4 +439,4 @@ class MetricsManager:
         plt.savefig(filename)
         plt.close()
 
-        logging.info(f"Heat map saved to {filename}")
+        log.info(f"Heat map saved to {filename}")

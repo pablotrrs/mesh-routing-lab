@@ -1,4 +1,4 @@
-import logging
+import logging as log
 from typing import Optional, Tuple, Type
 
 import numpy as np
@@ -39,7 +39,7 @@ class Node:
         self.reconnect_time: Optional[float] = None
         self.status: Optional[bool] = None
         self.position: Optional[Tuple[float, float, float]] = position
-        logging.info(f"Node {node_id} initialized.")
+        log.info(f"Node {node_id} initialized.")
 
     def install_application(self, application_class: Type["Application"]) -> None:
         """Installs an application on the node.
@@ -48,7 +48,7 @@ class Node:
             application_class (Type[Application]): The application class to install.
         """
         self.application = application_class(self)
-        logging.info(
+        log.info(
             f"Node {self.node_id} installed {self.application.__class__.__name__}."
         )
 
@@ -94,14 +94,14 @@ class Node:
                 if self.lifetime <= 0:
                     self.status = False
                     self.reconnect_time = np.random.exponential(scale=2)
-                    logging.warning(f"Node {self.node_id} disconnected.")
+                    log.warning(f"Node {self.node_id} disconnected.")
             else:
                 self.reconnect_time -= 1
 
                 if self.reconnect_time <= 0:
                     self.status = True
                     self.lifetime = np.random.exponential(scale=2)
-                    logging.info(f"Node {self.node_id} reconnected.")
+                    log.info(f"Node {self.node_id} reconnected.")
 
         return self.status
 

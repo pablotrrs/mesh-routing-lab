@@ -1,5 +1,5 @@
-import logging
-from typing import Dict, List, Optional
+import logging as log
+from typing import Dict, Optional
 
 
 class PacketRegistry:
@@ -12,7 +12,7 @@ class PacketRegistry:
     def __init__(self) -> None:
         """Initializes the PacketRegistry with an empty packet log."""
         self.packet_log: Dict[int, Dict] = {}
-        logging.info("PacketRegistry initialized.")
+        log.info("PacketRegistry initialized.")
 
     def initialize_episode(self, episode_number: int) -> None:
         """Initializes the packet log for a new episode.
@@ -26,12 +26,12 @@ class PacketRegistry:
                 "episode_duration": None,
                 "route": [],
             }
-            logging.debug(f"Initialized packet log for episode {episode_number}.")
+            log.debug(f"Initialized packet log for episode {episode_number}.")
 
     def restart_packet_log(self) -> None:
         """Clears the packet log."""
         self.packet_log = {}
-        logging.info("Packet log restarted.")
+        log.info("Packet log restarted.")
 
     def mark_packet_lost(
         self,
@@ -48,7 +48,7 @@ class PacketRegistry:
             to_node_id (Optional[int]): ID of the destination node (or None if not applicable).
             packet_type (str): Type of the packet.
         """
-        logging.warning(f"Packet from {from_node_id} to {to_node_id} lost.")
+        log.warning(f"Packet from {from_node_id} to {to_node_id} lost.")
         self.packet_log[episode_number]["route"].append(
             {
                 "from": from_node_id,
@@ -67,7 +67,7 @@ class PacketRegistry:
             episode_number (int): The number of the episode.
             episode_success (bool): Whether the episode was successful.
         """
-        logging.info(
+        log.info(
             f"Marking episode {episode_number} as {'successful' if episode_success else 'failed'}."
         )
         self.packet_log[episode_number]["episode_success"] = episode_success
@@ -103,7 +103,7 @@ class PacketRegistry:
                 "packet_type": packet_type,
             }
         )
-        logging.debug(
+        log.debug(
             f"Logged packet hop from {from_node_id} to {to_node_id} in episode {episode_number}."
         )
 

@@ -1,6 +1,6 @@
 import math
 import threading
-import logging
+import logging as log
 import time
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -37,7 +37,7 @@ class Network:
         self.mean_interval_ms: Optional[float] = None
         self.reconnect_interval_ms: Optional[float] = None
         self.disconnect_probability: Optional[float] = None
-        logging.info("Network initialized.")
+        log.info("Network initialized.")
 
     def set_mean_interval_ms(self, mean_interval_ms: float) -> None:
         """Sets the mean interval between dynamic changes.
@@ -77,13 +77,13 @@ class Network:
         """Starts a thread to apply dynamic changes based on the central clock."""
         self.running = True
         current_time = clock.get_current_time()
-        logging.info(f"Network clock starts: {current_time}")
+        log.info(f"Network clock starts: {current_time}")
         threading.Thread(target=self._monitor_dynamic_changes, daemon=True).start()
 
     def stop_dynamic_changes(self) -> None:
         """Stops the dynamic changes thread."""
         self.running = False
-        logging.info("Dynamic changes stopped.")
+        log.info("Dynamic changes stopped.")
 
     def _monitor_dynamic_changes(self) -> None:
         """Monitors the central clock and applies dynamic changes automatically."""
@@ -92,7 +92,7 @@ class Network:
             current_time = clock.get_current_time()
             with self.lock:
                 if current_time >= next_event_time:
-                    logging.warning("⚡ZZZAP⚡")  # Dynamic change event
+                    log.debug("⚡ZZZAP⚡")  # Dynamic change event
                     self.trigger_dynamic_change()
                     self.dynamic_change_events.append(current_time)
                     next_event_time = current_time + self.generate_next_dynamic_change()
@@ -109,7 +109,7 @@ class Network:
                 )
 
                 current_time = clock.get_current_time()
-                logging.warning(f"Node {node_id} disconnected at {current_time:.2f}.")
+                log.warning(f"Node {node_id} disconnected at {current_time:.2f}.")
 
     def _handle_reconnections(self, current_time: int) -> None:
         """Handles reconnections of previously disconnected nodes.
@@ -127,7 +127,7 @@ class Network:
                 node.reconnect_time = None
 
                 current_time = clock.get_current_time()
-                logging.info(f"Node {node_id} reconnected at {current_time:.2f}.")
+                log.info(f"Node {node_id} reconnected at {current_time:.2f}.")
 
     def validate_connection(self, from_node_id: int, to_node_id: int) -> bool:
         """Validates if a connection between two nodes is valid.
@@ -155,7 +155,7 @@ class Network:
         self.nodes[node.node_id] = node
         self.connections[node.node_id] = []
         self.active_nodes.add(node.node_id)
-        logging.debug(f"Node {node.node_id} added to the network.")
+        log.debug(f"Node {node.node_id} added to the network.")
 
     def connect_nodes(self, node1_id: int, node2_id: int) -> None:
         """Connects two nodes in the network without duplicating connections.
@@ -168,7 +168,7 @@ class Network:
             self.connections.setdefault(node1_id, []).append(node2_id)
         if node1_id not in self.connections.get(node2_id, []):
             self.connections.setdefault(node2_id, []).append(node1_id)
-        logging.debug(f"Nodes {node1_id} and {node2_id} connected.")
+        log.debug(f"Nodes {node1_id} and {node2_id} connected.")
 
     def get_neighbors(self, node_id: int) -> List[int]:
         """Returns a node's neighbors, excluding itself.
@@ -244,13 +244,13 @@ class Network:
         )
 
         if self.is_node_reachable(from_node_id, to_node_id):
-            logging.info(
+            log.info(
                 f"Sending packet from Node {from_node_id} to Node {to_node_id} with latency {latency:.6f} seconds"
             )
             time.sleep(latency)
             self.nodes[to_node_id].application.receive_packet(packet)
         else:
-            logging.warning(
+            log.warning(
                 f"Failed to send packet: Node {to_node_id} is not reachable from Node {from_node_id}"
             )
 
@@ -293,7 +293,7 @@ class Network:
             for neighbor_id in neighbors:
                 network.connect_nodes(node_id, neighbor_id)
 
-        logging.info(f"Network loaded from {file_path}.")
+        log.info(f"Network loaded from {file_path}.")
         return network, sender_node
 
     def get_distance(self, node_id1: int, node_id2: int) -> float:
