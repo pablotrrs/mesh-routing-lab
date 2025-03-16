@@ -4,8 +4,8 @@ import time
 
 import numpy as np
 import yaml
-from classes.clock import clock
-from classes.packet_registry import packet_registry as registry
+from core.clock import clock
+from core.packet_registry import registry
 
 
 class Network:
@@ -212,7 +212,7 @@ class Network:
         network = cls()
         sender_node = None
 
-        from classes.base import Node
+        from core.node import Node
 
         for node_id, node_info in data["nodes"].items():
             node_id = int(node_id)

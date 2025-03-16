@@ -3,9 +3,9 @@ import threading
 import time
 from enum import Enum
 
-from classes.base import Application, EpisodeEnded
-from classes.clock import clock
-from classes.packet_registry import packet_registry as registry
+from core.base import Application, EpisodeEnded
+from core.clock import clock
+from core.packet_registry import registry
 from tabulate import tabulate
 
 

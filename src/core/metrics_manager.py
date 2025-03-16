@@ -4,7 +4,7 @@ import os
 
 import matplotlib.pyplot as plt
 import numpy as np
-from classes.packet_registry import packet_registry as registry
+from core.packet_registry import registry
 
 
 class MetricsManager:
@@ -84,7 +84,7 @@ class MetricsManager:
         self.save_results_to_excel()
         # self.generar_comparative_graphs_from_excel()
 
-    def save_metrics_to_file(self, directory="../results/single-run"):
+    def save_metrics_to_file(self, directory="../../results/single-run"):
         """
         Guarda las métricas de la simulación en un archivo JSON con el simulation_id en el nombre.
         Crea la carpeta `../results/simulations` si no existe.
@@ -97,7 +97,7 @@ class MetricsManager:
             json.dump(self.metrics, file, indent=4)
         print(f"\nMétricas de la simulación guardadas en {filename}")
 
-    def save_results_to_excel(self, filename="../results/resultados_simulacion.xlsx"):
+    def save_results_to_excel(self, filename="../../resources/results/resultados_simulacion.xlsx"):
         """
         Guarda los datos de la simulación en un archivo Excel, con una hoja por algoritmo.
         Incluye el `packet_log` completo para cada episodio para debug.
@@ -109,7 +109,7 @@ class MetricsManager:
         from openpyxl import load_workbook
         from openpyxl.utils import get_column_letter
 
-        os.makedirs("../results", exist_ok=True)
+        os.makedirs("../../resources/results", exist_ok=True)
 
         if os.path.exists(filename):
             try:

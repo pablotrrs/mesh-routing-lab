@@ -4,7 +4,7 @@ from tabulate import tabulate
 import networkx as nx
 import os
 
-output_folder = 'simulation_images'
+output_folder = '../../resources/simulation_images'
 os.makedirs(output_folder, exist_ok=True)
 
 # Define positions for the nodes in the network
@@ -87,7 +87,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-output_folder = 'simulation_images'
+output_folder = '../../resources/simulation_images'
 os.makedirs(output_folder, exist_ok=True)
 
 def generate_heat_map(q_tables, episode_number):

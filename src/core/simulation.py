@@ -1,6 +1,6 @@
-from classes.base import EpisodeEnded
-from classes.clock import clock
-from classes.packet_registry import packet_registry as registry
+from core.base import EpisodeEnded
+from core.clock import clock
+from core.packet_registry import registry
 
 
 class Simulation:

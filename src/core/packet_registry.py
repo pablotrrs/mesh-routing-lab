@@ -58,4 +58,4 @@ class PacketRegistry:
         )
 
 
-packet_registry = PacketRegistry()
+registry = PacketRegistry()

@@ -3,9 +3,9 @@ from dataclasses import dataclass
 from collections import deque
 from enum import Enum
 
-from classes.clock import clock
-from classes.base import Application, EpisodeEnded
-from classes.packet_registry import packet_registry as registry
+from core.clock import clock
+from core.base import Application, EpisodeEnded
+from core.packet_registry import registry
 from utils.visualization import print_q_table
 
 ALPHA = 0.1

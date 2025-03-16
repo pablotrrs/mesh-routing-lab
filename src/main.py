@@ -29,10 +29,10 @@ import logging
 import os
 import sys
 
-from classes.network import Network
-from classes.simulation import Simulation
-from classes.base import Algorithm, NodeFunction
-from classes.metrics_manager import MetricsManager
+from core.network import Network
+from core.simulation import Simulation
+from core.enums import Algorithm, NodeFunction
+from core.metrics_manager import MetricsManager
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -157,7 +157,7 @@ def main():
 
         match algorithm:
             case Algorithm.Q_ROUTING:
-                from applications.q_routing import (
+                from algorithms.q_routing import (
                     IntermediateQRoutingApplication,
                     QRoutingApplication,
                     SenderQRoutingApplication,
@@ -175,7 +175,7 @@ def main():
                         node.application.set_params(args.max_hops, functions_sequence)
 
             case Algorithm.DIJKSTRA:
-                from applications.dijkstra import (
+                from algorithms.dijkstra import (
                     IntermediateDijkstraApplication,
                     SenderDijkstraApplication,
                 )
@@ -189,7 +189,7 @@ def main():
                         node.application.set_params(args.max_hops, functions_sequence)
 
             case Algorithm.BELLMAN_FORD:
-                from applications.bellman_ford import (
+                from algorithms.bellman_ford import (
                     IntermediateBellmanFordApplication,
                     SenderBellmanFordApplication,
                 )
