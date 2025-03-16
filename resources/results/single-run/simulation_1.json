@@ -1,2516 +1,32 @@
 {
     "simulation_id": 1,
     "parameters": {
-        "max_hops": 100,
+        "max_hops": 10,
         "algorithms": [
-            "Q_ROUTING",
-            "DIJKSTRA",
             "BELLMAN_FORD"
         ],
         "mean_interval_ms": Infinity,
         "reconnect_interval_ms": 50,
-        "topology_file": "../resources/6x6_grid_topology.yaml",
+        "topology_file": "../resources/topologies/6x6_grid_topology.yaml",
         "functions_sequence": [
             "A",
             "B",
             "C",
-            "D"
+            "D",
+            "E"
         ],
         "disconnect_probability": 0.1
     },
-    "total_time": 2734,
-    "runned_at": "2025-03-16 14:21:51",
-    "Q_ROUTING": {
-        "success_rate": 0.0,
-        "episodes": [
-            {
-                "episode_number": 1,
-                "start_time": 4,
-                "end_time": 26,
-                "episode_duration": 22,
-                "episode_success": true,
-                "route": [
-                    {
-                        "from": 0,
-                        "to": 1,
-                        "function": "N/A",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "A",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 7,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 7,
-                        "to": 6,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 6,
-                        "to": 7,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "CALLBACK"
-                    },
-                    {
-                        "from": 7,
-                        "to": 1,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "CALLBACK"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "CALLBACK"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "A",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "CALLBACK"
-                    },
-                    {
-                        "from": 1,
-                        "to": 0,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "CALLBACK"
-                    }
-                ],
-                "total_hops": 10,
-                "dynamic_changes": [],
-                "dynamic_changes_count": 0
-            }
-        ],
-        "penalty": 0.0
-    },
-    "DIJKSTRA": {
-        "success_rate": 0.0,
-        "episodes": [
-            {
-                "episode_number": 1,
-                "start_time": 29,
-                "end_time": 1510,
-                "episode_duration": 1481,
-                "episode_success": false,
-                "route": [
-                    {
-                        "from": 0,
-                        "to": 1,
-                        "function": "N/A",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 2,
-                        "to": 3,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 3,
-                        "to": 9,
-                        "function": "A",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 9,
-                        "to": 10,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 10,
-                        "to": 16,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 16,
-                        "to": 17,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 17,
-                        "to": 11,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 11,
-                        "to": 5,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 5,
-                        "to": 4,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 4,
-                        "to": 5,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 5,
-                        "to": 11,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 11,
-                        "to": 17,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 17,
-                        "to": 22,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 22,
-                        "to": 28,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 28,
-                        "to": 34,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 34,
-                        "to": 33,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 33,
-                        "to": 32,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 32,
-                        "to": 26,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 26,
-                        "to": 27,
-                        "function": "A",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 27,
-                        "to": 21,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 21,
-                        "to": 20,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 20,
-                        "to": 15,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 15,
-                        "to": 20,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 20,
-                        "to": 21,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 21,
-                        "to": 27,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 27,
-                        "to": 26,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 26,
-                        "to": 20,
-                        "function": "A",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 20,
-                        "to": 26,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 26,
-                        "to": 32,
-                        "function": "A",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 32,
-                        "to": 33,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 33,
-                        "to": 27,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 27,
-                        "to": 33,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 33,
-                        "to": 34,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 34,
-                        "to": 28,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 28,
-                        "to": 27,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 27,
-                        "to": 28,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 28,
-                        "to": 22,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 22,
-                        "to": 21,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 21,
-                        "to": 22,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 22,
-                        "to": 17,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 17,
-                        "to": 16,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 16,
-                        "to": 21,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 21,
-                        "to": 16,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 16,
-                        "to": 15,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 15,
-                        "to": 16,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 16,
-                        "to": 10,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 10,
-                        "to": 11,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 11,
-                        "to": 10,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 10,
-                        "to": 4,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 4,
-                        "to": 10,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 10,
-                        "to": 9,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 9,
-                        "to": 15,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 15,
-                        "to": 9,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 9,
-                        "to": 3,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 3,
-                        "to": 4,
-                        "function": "A",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 4,
-                        "to": 3,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 3,
-                        "to": 2,
-                        "function": "A",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 1,
-                        "to": 7,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 7,
-                        "to": 8,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 8,
-                        "to": 14,
-                        "function": "A",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 14,
-                        "to": 13,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 13,
-                        "to": 19,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 19,
-                        "to": 25,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 25,
-                        "to": 24,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 24,
-                        "to": 18,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 18,
-                        "to": 12,
-                        "function": "A",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 12,
-                        "to": 6,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 6,
-                        "to": 12,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 12,
-                        "to": 18,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 18,
-                        "to": 24,
-                        "function": "A",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 24,
-                        "to": 30,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 30,
-                        "to": 31,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 31,
-                        "to": 30,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 30,
-                        "to": 24,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 24,
-                        "to": 25,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 25,
-                        "to": 19,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 19,
-                        "to": 18,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 18,
-                        "to": 19,
-                        "function": "A",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 19,
-                        "to": 13,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 13,
-                        "to": 12,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 12,
-                        "to": 13,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 13,
-                        "to": 14,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 14,
-                        "to": 8,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 8,
-                        "to": 7,
-                        "function": "A",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 7,
-                        "to": 13,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 13,
-                        "to": 7,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 7,
-                        "to": 6,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 6,
-                        "to": 7,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 7,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 1,
-                        "to": 0,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 0,
-                        "to": 6,
-                        "function": "N/A",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "BROADCAST"
-                    },
-                    {
-                        "from": 6,
-                        "to": 0,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "ACK"
-                    },
-                    {
-                        "from": 0,
-                        "to": 1,
-                        "function": "N/A",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 3,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 3,
-                        "to": 2,
-                        "function": "A",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 3,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 3,
-                        "to": 2,
-                        "function": "A",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 0,
-                        "function": "B",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    }
-                ],
-                "total_hops": 296,
-                "dynamic_changes": [],
-                "dynamic_changes_count": 0
-            }
-        ]
-    },
+    "total_time": 18,
+    "runned_at": "2025-03-16 16:08:06",
     "BELLMAN_FORD": {
         "success_rate": 0.0,
         "episodes": [
             {
                 "episode_number": 1,
-                "start_time": 1514,
-                "end_time": 2734,
-                "episode_duration": 1220,
+                "start_time": 1,
+                "end_time": 18,
+                "episode_duration": 17,
                 "episode_success": false,
                 "route": [
                     {
@@ -2524,7 +40,7 @@
                     {
                         "from": 1,
                         "to": 2,
-                        "function": "C",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -2532,7 +48,7 @@
                     {
                         "from": 2,
                         "to": 3,
-                        "function": "D",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -2548,7 +64,7 @@
                     {
                         "from": 9,
                         "to": 10,
-                        "function": "A",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -2564,7 +80,7 @@
                     {
                         "from": 16,
                         "to": 17,
-                        "function": "D",
+                        "function": "B",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -2572,7 +88,7 @@
                     {
                         "from": 17,
                         "to": 11,
-                        "function": "A",
+                        "function": "D",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -2580,7 +96,7 @@
                     {
                         "from": 11,
                         "to": 5,
-                        "function": "C",
+                        "function": "B",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -2588,7 +104,7 @@
                     {
                         "from": 5,
                         "to": 4,
-                        "function": "A",
+                        "function": "D",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -2596,7 +112,7 @@
                     {
                         "from": 4,
                         "to": 5,
-                        "function": "B",
+                        "function": "A",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -2604,7 +120,7 @@
                     {
                         "from": 5,
                         "to": 11,
-                        "function": "A",
+                        "function": "D",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -2612,7 +128,7 @@
                     {
                         "from": 11,
                         "to": 17,
-                        "function": "C",
+                        "function": "B",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -2620,7 +136,7 @@
                     {
                         "from": 17,
                         "to": 22,
-                        "function": "A",
+                        "function": "D",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -2628,7 +144,7 @@
                     {
                         "from": 22,
                         "to": 28,
-                        "function": "C",
+                        "function": "D",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -2644,7 +160,7 @@
                     {
                         "from": 34,
                         "to": 33,
-                        "function": "D",
+                        "function": "A",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -2652,7 +168,7 @@
                     {
                         "from": 33,
                         "to": 32,
-                        "function": "D",
+                        "function": "C",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -2660,7 +176,7 @@
                     {
                         "from": 32,
                         "to": 26,
-                        "function": "D",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -2668,7 +184,7 @@
                     {
                         "from": 26,
                         "to": 27,
-                        "function": "C",
+                        "function": "A",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -2676,7 +192,7 @@
                     {
                         "from": 27,
                         "to": 21,
-                        "function": "D",
+                        "function": "C",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -2684,7 +200,7 @@
                     {
                         "from": 21,
                         "to": 20,
-                        "function": "B",
+                        "function": "C",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -2692,7 +208,7 @@
                     {
                         "from": 20,
                         "to": 15,
-                        "function": "B",
+                        "function": "A",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -2708,7 +224,7 @@
                     {
                         "from": 20,
                         "to": 21,
-                        "function": "B",
+                        "function": "A",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -2716,7 +232,7 @@
                     {
                         "from": 21,
                         "to": 27,
-                        "function": "B",
+                        "function": "C",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -2724,7 +240,7 @@
                     {
                         "from": 27,
                         "to": 26,
-                        "function": "D",
+                        "function": "C",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -2732,7 +248,7 @@
                     {
                         "from": 26,
                         "to": 20,
-                        "function": "C",
+                        "function": "A",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -2740,7 +256,7 @@
                     {
                         "from": 20,
                         "to": 26,
-                        "function": "B",
+                        "function": "A",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -2748,7 +264,7 @@
                     {
                         "from": 26,
                         "to": 32,
-                        "function": "C",
+                        "function": "A",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -2756,7 +272,7 @@
                     {
                         "from": 32,
                         "to": 33,
-                        "function": "D",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -2764,7 +280,7 @@
                     {
                         "from": 33,
                         "to": 27,
-                        "function": "D",
+                        "function": "C",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -2772,7 +288,7 @@
                     {
                         "from": 27,
                         "to": 33,
-                        "function": "D",
+                        "function": "C",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -2780,7 +296,7 @@
                     {
                         "from": 33,
                         "to": 34,
-                        "function": "D",
+                        "function": "C",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -2788,7 +304,7 @@
                     {
                         "from": 34,
                         "to": 28,
-                        "function": "D",
+                        "function": "A",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -2804,7 +320,7 @@
                     {
                         "from": 27,
                         "to": 28,
-                        "function": "D",
+                        "function": "C",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -2820,7 +336,7 @@
                     {
                         "from": 22,
                         "to": 21,
-                        "function": "C",
+                        "function": "D",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -2828,7 +344,7 @@
                     {
                         "from": 21,
                         "to": 22,
-                        "function": "B",
+                        "function": "C",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -2836,7 +352,7 @@
                     {
                         "from": 22,
                         "to": 17,
-                        "function": "C",
+                        "function": "D",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -2844,7 +360,7 @@
                     {
                         "from": 17,
                         "to": 16,
-                        "function": "A",
+                        "function": "D",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -2852,7 +368,7 @@
                     {
                         "from": 16,
                         "to": 21,
-                        "function": "D",
+                        "function": "B",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -2860,7 +376,7 @@
                     {
                         "from": 21,
                         "to": 16,
-                        "function": "B",
+                        "function": "C",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -2868,7 +384,7 @@
                     {
                         "from": 16,
                         "to": 15,
-                        "function": "D",
+                        "function": "B",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -2884,7 +400,7 @@
                     {
                         "from": 16,
                         "to": 10,
-                        "function": "D",
+                        "function": "B",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -2900,7 +416,7 @@
                     {
                         "from": 11,
                         "to": 10,
-                        "function": "C",
+                        "function": "B",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -2916,7 +432,7 @@
                     {
                         "from": 4,
                         "to": 10,
-                        "function": "B",
+                        "function": "A",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -2932,7 +448,7 @@
                     {
                         "from": 9,
                         "to": 15,
-                        "function": "A",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -2948,7 +464,7 @@
                     {
                         "from": 9,
                         "to": 3,
-                        "function": "A",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -2964,7 +480,7 @@
                     {
                         "from": 4,
                         "to": 3,
-                        "function": "B",
+                        "function": "A",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -2980,7 +496,7 @@
                     {
                         "from": 2,
                         "to": 1,
-                        "function": "D",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -2988,7 +504,7 @@
                     {
                         "from": 1,
                         "to": 7,
-                        "function": "C",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -3004,7 +520,7 @@
                     {
                         "from": 8,
                         "to": 14,
-                        "function": "B",
+                        "function": "D",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -3012,7 +528,7 @@
                     {
                         "from": 14,
                         "to": 13,
-                        "function": "D",
+                        "function": "C",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -3020,7 +536,7 @@
                     {
                         "from": 13,
                         "to": 19,
-                        "function": "D",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -3028,7 +544,7 @@
                     {
                         "from": 19,
                         "to": 25,
-                        "function": "B",
+                        "function": "A",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -3036,7 +552,7 @@
                     {
                         "from": 25,
                         "to": 24,
-                        "function": "D",
+                        "function": "B",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -3044,7 +560,7 @@
                     {
                         "from": 24,
                         "to": 18,
-                        "function": "A",
+                        "function": "C",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -3052,7 +568,7 @@
                     {
                         "from": 18,
                         "to": 12,
-                        "function": "D",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -3060,7 +576,7 @@
                     {
                         "from": 12,
                         "to": 6,
-                        "function": "B",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -3068,7 +584,7 @@
                     {
                         "from": 6,
                         "to": 12,
-                        "function": "B",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -3076,7 +592,7 @@
                     {
                         "from": 12,
                         "to": 18,
-                        "function": "B",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -3084,7 +600,7 @@
                     {
                         "from": 18,
                         "to": 24,
-                        "function": "D",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -3092,7 +608,7 @@
                     {
                         "from": 24,
                         "to": 30,
-                        "function": "A",
+                        "function": "C",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -3100,7 +616,7 @@
                     {
                         "from": 30,
                         "to": 31,
-                        "function": "A",
+                        "function": "B",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -3108,7 +624,7 @@
                     {
                         "from": 31,
                         "to": 30,
-                        "function": "D",
+                        "function": "B",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -3116,7 +632,7 @@
                     {
                         "from": 30,
                         "to": 24,
-                        "function": "A",
+                        "function": "B",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -3124,7 +640,7 @@
                     {
                         "from": 24,
                         "to": 25,
-                        "function": "A",
+                        "function": "C",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -3132,7 +648,7 @@
                     {
                         "from": 25,
                         "to": 19,
-                        "function": "D",
+                        "function": "B",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -3140,7 +656,7 @@
                     {
                         "from": 19,
                         "to": 18,
-                        "function": "B",
+                        "function": "A",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -3148,7 +664,7 @@
                     {
                         "from": 18,
                         "to": 19,
-                        "function": "D",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -3156,7 +672,7 @@
                     {
                         "from": 19,
                         "to": 13,
-                        "function": "B",
+                        "function": "A",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -3164,7 +680,7 @@
                     {
                         "from": 13,
                         "to": 12,
-                        "function": "D",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "BROADCAST"
@@ -3172,7 +688,7 @@
                     {
                         "from": 12,
                         "to": 13,
-                        "function": "B",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -3180,7 +696,7 @@
                     {
                         "from": 13,
                         "to": 14,
-                        "function": "D",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -3188,7 +704,7 @@
                     {
                         "from": 14,
                         "to": 8,
-                        "function": "D",
+                        "function": "C",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -3196,7 +712,7 @@
                     {
                         "from": 8,
                         "to": 7,
-                        "function": "B",
+                        "function": "D",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -3212,7 +728,7 @@
                     {
                         "from": 13,
                         "to": 7,
-                        "function": "D",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -3228,7 +744,7 @@
                     {
                         "from": 6,
                         "to": 7,
-                        "function": "B",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -3244,7 +760,7 @@
                     {
                         "from": 1,
                         "to": 0,
-                        "function": "C",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -3260,7 +776,7 @@
                     {
                         "from": 6,
                         "to": 0,
-                        "function": "B",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "ACK"
@@ -3276,7 +792,7 @@
                     {
                         "from": 1,
                         "to": 2,
-                        "function": "C",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "PACKET_HOP"
@@ -3284,7 +800,7 @@
                     {
                         "from": 2,
                         "to": 1,
-                        "function": "D",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "PACKET_HOP"
@@ -3292,7 +808,7 @@
                     {
                         "from": 1,
                         "to": 2,
-                        "function": "C",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "PACKET_HOP"
@@ -3300,7 +816,7 @@
                     {
                         "from": 2,
                         "to": 1,
-                        "function": "D",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "PACKET_HOP"
@@ -3308,7 +824,7 @@
                     {
                         "from": 1,
                         "to": 2,
-                        "function": "C",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "PACKET_HOP"
@@ -3316,7 +832,7 @@
                     {
                         "from": 2,
                         "to": 1,
-                        "function": "D",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "PACKET_HOP"
@@ -3324,7 +840,7 @@
                     {
                         "from": 1,
                         "to": 2,
-                        "function": "C",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "PACKET_HOP"
@@ -3332,7 +848,7 @@
                     {
                         "from": 2,
                         "to": 1,
-                        "function": "D",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "PACKET_HOP"
@@ -3340,7 +856,7 @@
                     {
                         "from": 1,
                         "to": 2,
-                        "function": "C",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "PACKET_HOP"
@@ -3348,7 +864,7 @@
                     {
                         "from": 2,
                         "to": 1,
-                        "function": "D",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "PACKET_HOP"
@@ -3356,1455 +872,15 @@
                     {
                         "from": 1,
                         "to": 2,
-                        "function": "C",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "PACKET_HOP"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 2,
-                        "to": 1,
-                        "function": "D",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
-                        "packet_type": "MAX_HOPS"
-                    },
-                    {
-                        "from": 1,
-                        "to": 2,
-                        "function": "C",
-                        "node_status": "active",
-                        "latency": 3.3333333333333335e-07,
                         "packet_type": "MAX_HOPS"
                     },
                     {
                         "from": 2,
                         "to": 1,
-                        "function": "D",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "MAX_HOPS"
@@ -4812,7 +888,7 @@
                     {
                         "from": 1,
                         "to": 2,
-                        "function": "C",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "MAX_HOPS"
@@ -4820,7 +896,7 @@
                     {
                         "from": 2,
                         "to": 1,
-                        "function": "D",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "MAX_HOPS"
@@ -4828,7 +904,7 @@
                     {
                         "from": 1,
                         "to": 2,
-                        "function": "C",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "MAX_HOPS"
@@ -4836,7 +912,7 @@
                     {
                         "from": 2,
                         "to": 1,
-                        "function": "D",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "MAX_HOPS"
@@ -4844,7 +920,7 @@
                     {
                         "from": 1,
                         "to": 2,
-                        "function": "C",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "MAX_HOPS"
@@ -4852,7 +928,7 @@
                     {
                         "from": 2,
                         "to": 1,
-                        "function": "D",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "MAX_HOPS"
@@ -4860,7 +936,7 @@
                     {
                         "from": 1,
                         "to": 2,
-                        "function": "C",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "MAX_HOPS"
@@ -4868,7 +944,7 @@
                     {
                         "from": 2,
                         "to": 1,
-                        "function": "D",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "MAX_HOPS"
@@ -4876,13 +952,13 @@
                     {
                         "from": 1,
                         "to": 0,
-                        "function": "C",
+                        "function": "E",
                         "node_status": "active",
                         "latency": 3.3333333333333335e-07,
                         "packet_type": "MAX_HOPS"
                     }
                 ],
-                "total_hops": 296,
+                "total_hops": 116,
                 "dynamic_changes": [],
                 "dynamic_changes_count": 0
             }

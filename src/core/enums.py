@@ -1,13 +1,31 @@
 from enum import Enum
 
 
-class Algorithm(Enum):
+class Algorithm(str, Enum):
+    """Enum representing the available routing algorithms.
+
+    Attributes:
+        Q_ROUTING (str): Q-Routing algorithm.
+        DIJKSTRA (str): Dijkstra's algorithm.
+        BELLMAN_FORD (str): Bellman-Ford algorithm.
+    """
+
     Q_ROUTING = "Q_ROUTING"
     DIJKSTRA = "DIJKSTRA"
     BELLMAN_FORD = "BELLMAN_FORD"
 
 
-class NodeFunction(Enum):
+class NodeFunction(str, Enum):
+    """Enum representing the available node functions.
+
+    Attributes:
+        A (str): Function A.
+        B (str): Function B.
+        C (str): Function C.
+        ...
+        Z (str): Function Z.
+    """
+
     A = "A"
     B = "B"
     C = "C"
@@ -36,10 +54,22 @@ class NodeFunction(Enum):
     Z = "Z"
 
     @staticmethod
-    def from_string(value: str):
+    def from_string(value: str) -> "NodeFunction":
+        """Converts a string to a NodeFunction enum value.
+
+        Args:
+            value (str): The string to convert.
+
+        Returns:
+            NodeFunction: The corresponding NodeFunction enum value.
+
+        Raises:
+            ValueError: If the string is not a valid NodeFunction.
+        """
         try:
             return NodeFunction(value)
-        except ValueError:
+        except ValueError as e:
+            valid_values = [f.value for f in NodeFunction]
             raise ValueError(
-                f"'{value}' is not a valid NodeFunction. Valid values: {[f.value for f in NodeFunction]}"
-            )
+                f"'{value}' is not a valid NodeFunction. Valid values: {valid_values}"
+            ) from e

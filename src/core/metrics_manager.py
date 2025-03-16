@@ -1,6 +1,8 @@
 import datetime
 import json
+import logging
 import os
+from typing import Dict, List, Optional, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,21 +10,40 @@ from core.packet_registry import registry
 
 
 class MetricsManager:
-    def __init__(self):
-        self.metrics = {}
+    """Manages and stores metrics for the simulation.
+
+    Attributes:
+        metrics (Dict[str, Union[int, float, str, List, Dict]]): Dictionary to store simulation metrics.
+    """
+
+    def __init__(self) -> None:
+        """Initializes the MetricsManager with an empty metrics dictionary."""
+        self.metrics: Dict[str, Union[int, float, str, List, Dict]] = {}
+        logging.info("MetricsManager initialized.")
 
     def initialize(
         self,
-        max_hops,
-        topology_file,
-        functions_sequence,
-        mean_interval_ms,
-        reconnect_interval_ms,
-        disconnect_probability,
-        algorithms,
-        penalty,
-    ):
-        """Inicializa las métricas para una nueva simulación con múltiples algoritmos."""
+        max_hops: int,
+        topology_file: str,
+        functions_sequence: List[str],
+        mean_interval_ms: float,
+        reconnect_interval_ms: float,
+        disconnect_probability: float,
+        algorithms: List[str],
+        penalty: float,
+    ) -> None:
+        """Initializes the metrics for a new simulation with multiple algorithms.
+
+        Args:
+            max_hops (int): Maximum number of hops allowed.
+            topology_file (str): Path to the topology file.
+            functions_sequence (List[str]): Sequence of node functions.
+            mean_interval_ms (float): Mean interval for dynamic changes.
+            reconnect_interval_ms (float): Interval for node reconnection.
+            disconnect_probability (float): Probability of node disconnection.
+            algorithms (List[str]): List of algorithms used in the simulation.
+            penalty (float): Penalty for Q-Routing.
+        """
         self.metrics = {
             "simulation_id": 1,
             "parameters": {
@@ -44,18 +65,31 @@ class MetricsManager:
             if algorithm == "Q_ROUTING":
                 self.metrics[algorithm]["penalty"] = penalty
 
+        logging.info("Metrics initialized for simulation.")
+
     def log_episode(
         self,
-        algorithm,
-        episode_number,
-        start_time,
-        end_time,
-        episode_success,
-        route,
-        total_hops,
-        dynamic_changes,
-    ):
-        """Registra las métricas de un episodio en ejecución para un algoritmo específico."""
+        algorithm: str,
+        episode_number: int,
+        start_time: float,
+        end_time: float,
+        episode_success: bool,
+        route: List[str],
+        total_hops: int,
+        dynamic_changes: List[Dict],
+    ) -> None:
+        """Logs the metrics of an episode for a specific algorithm.
+
+        Args:
+            algorithm (str): The algorithm used in the episode.
+            episode_number (int): The number of the episode.
+            start_time (float): Start time of the episode.
+            end_time (float): End time of the episode.
+            episode_success (bool): Whether the episode was successful.
+            route (List[str]): The route taken in the episode.
+            total_hops (int): Total number of hops in the episode.
+            dynamic_changes (List[Dict]): List of dynamic changes during the episode.
+        """
         if algorithm not in self.metrics:
             self.metrics[algorithm] = {"success_rate": 0.0, "episodes": []}
 
@@ -73,21 +107,33 @@ class MetricsManager:
             }
         )
 
-    def finalize_simulation(self, total_time, successful_episodes, episodes):
-        """Finaliza la simulación y guarda los resultados."""
+        logging.debug(f"Logged episode {episode_number} for algorithm {algorithm}.")
+
+    def finalize_simulation(
+        self, total_time: float, successful_episodes: int, episodes: int
+    ) -> None:
+        """Finalizes the simulation and saves the results.
+
+        Args:
+            total_time (float): Total time taken for the simulation.
+            successful_episodes (int): Number of successful episodes.
+            episodes (int): Total number of episodes.
+        """
         algorithm = self.metrics["parameters"]["algorithms"][-1]
         self.metrics[algorithm]["success_rate"] = (
             successful_episodes / episodes if episodes > 0 else 0.0
         )
         self.metrics["total_time"] = total_time
+
         self.save_metrics_to_file()
         self.save_results_to_excel()
-        # self.generar_comparative_graphs_from_excel()
+        logging.info("Simulation finalized and results saved.")
 
-    def save_metrics_to_file(self, directory="../../results/single-run"):
-        """
-        Guarda las métricas de la simulación en un archivo JSON con el simulation_id en el nombre.
-        Crea la carpeta `../results/simulations` si no existe.
+    def save_metrics_to_file(self, directory: str = "../resources/results/single-run") -> None:
+        """Saves the simulation metrics to a JSON file.
+
+        Args:
+            directory (str): Directory to save the file. Defaults to "../resources/results/single-run".
         """
         os.makedirs(directory, exist_ok=True)
 
@@ -95,12 +141,16 @@ class MetricsManager:
 
         with open(filename, "w", encoding="utf-8") as file:
             json.dump(self.metrics, file, indent=4)
-        print(f"\nMétricas de la simulación guardadas en {filename}")
 
-    def save_results_to_excel(self, filename="../../resources/results/resultados_simulacion.xlsx"):
-        """
-        Guarda los datos de la simulación en un archivo Excel, con una hoja por algoritmo.
-        Incluye el `packet_log` completo para cada episodio para debug.
+        logging.info(f"Simulation metrics saved to {filename}.")
+
+    def save_results_to_excel(
+        self, filename: str = "../resources/results/resultados_simulacion.xlsx"
+    ) -> None:
+        """Saves the simulation results to an Excel file.
+
+        Args:
+            filename (str): Path to the Excel file. Defaults to "../../resources/results/resultados_simulacion.xlsx".
         """
         import json
         import os
@@ -115,13 +165,13 @@ class MetricsManager:
             try:
                 pd.ExcelFile(filename)
             except Exception:
-                print(
-                    f"Archivo corrupto detectado: {filename}. Eliminando y regenerando..."
+                logging.error(
+                    f"Corrupted file detected: {filename}. Deleting and regenerating..."
                 )
                 os.remove(filename)
 
         if not self.metrics:
-            print("self.metrics is empty")
+            logging.error("self.metrics is empty")
             return
 
         metrics_data = {
@@ -139,14 +189,16 @@ class MetricsManager:
             if algorithm
             not in ["simulation_id", "parameters", "total_time", "runned_at"]
         }
-        print(f"\nAlgoritmos encontrados en las métricas: {list(metrics_data.keys())}")
+        logging.info(
+            f"Algorithms found in metrics: {list(metrics_data.keys())}"
+        )
 
         for algorithm, episodes in self.metrics.items():
             if algorithm in ["simulation_id", "parameters", "total_time", "runned_at"]:
                 continue
             for episode_data in episodes["episodes"]:
-                print(
-                    f"ℹ️ Procesando episodio {episode_data['episode_number']} para {algorithm}..."
+                logging.debug(
+                    f"Processing episode no {episode_data['episode_number']} for algorithm {algorithm}..."
                 )
                 episode_number = episode_data["episode_number"]
 
@@ -175,7 +227,7 @@ class MetricsManager:
                 try:
                     packet_log_json = json.dumps(packet_log, indent=2)
                 except Exception as e:
-                    print(e)
+                    logging.error(e)
                     packet_log_json = "{}"
 
                 metrics_data[algorithm]["packet_log_raw"].append(packet_log_json)
@@ -183,9 +235,7 @@ class MetricsManager:
         with pd.ExcelWriter(filename, engine="openpyxl", mode="w") as writer:
             for algorithm, data in metrics_data.items():
                 if not data["episode"]:
-                    print(
-                        f"no episodes for algorithm {algorithm}."
-                    )
+                    logging.error(f"no episodes for algorithm {algorithm}.")
                     continue
 
                 df = pd.DataFrame(data)
@@ -203,20 +253,22 @@ class MetricsManager:
                 )
         wb.save(filename)
 
-        print(f"\nresults saved in {filename}.")
+        logging.info(f"\nresults saved in {filename}.")
 
     def generar_comparative_graphs_from_excel(
-        self, filename="../results/resultados_simulacion.xlsx"
-    ):
-        """
-        Genera gráficos comparativos basados en las métricas de la simulación, comparando todos los algoritmos en un solo gráfico por métrica.
+        self, filename: str = "../resources/results/resultados_simulacion.xlsx"
+    ) -> None:
+        """Generates comparative graphs based on simulation metrics.
+
+        Args:
+            filename (str): Path to the Excel file. Defaults to "../resources/results/resultados_simulacion.xlsx".
         """
         import os
 
         import matplotlib.pyplot as plt
         import pandas as pd
 
-        os.makedirs("../results", exist_ok=True)
+        os.makedirs("../resources/results", exist_ok=True)
         xls = pd.ExcelFile(filename)
 
         all_data = {
@@ -249,7 +301,7 @@ class MetricsManager:
         plt.ylabel("Duración (ms)")
         plt.grid()
         plt.legend()
-        plt.savefig("../results/Comparacion_Duracion_Episodio.png")
+        plt.savefig("../resources/results/Comparacion_Duracion_Episodio.png")
         plt.close()
 
         plt.figure(figsize=(10, 6))
@@ -260,7 +312,7 @@ class MetricsManager:
         plt.ylabel("Hops Promedio")
         plt.grid()
         plt.legend()
-        plt.savefig("../results/Comparacion_Hops_Promedio.png")
+        plt.savefig("../resources/results/Comparacion_Hops_Promedio.png")
         plt.close()
 
         plt.figure(figsize=(10, 6))
@@ -271,7 +323,7 @@ class MetricsManager:
         plt.ylabel("Tiempo Promedio de Entrega (ms)")
         plt.grid()
         plt.legend()
-        plt.savefig("../results/Comparacion_Tiempo_Promedio_Entrega.png")
+        plt.savefig("../resources/results/Comparacion_Tiempo_Promedio_Entrega.png")
         plt.close()
 
         plt.figure(figsize=(10, 6))
@@ -282,7 +334,7 @@ class MetricsManager:
         plt.ylabel("Tasa de Éxito")
         plt.grid()
         plt.legend()
-        plt.savefig("../results/Comparacion_Tasa_Exito.png")
+        plt.savefig("../resources/results/Comparacion_Tasa_Exito.png")
         plt.close()
 
         plt.figure(figsize=(10, 6))
@@ -331,10 +383,10 @@ class MetricsManager:
         plt.xticks(index + bar_width, success_counts.keys())
         plt.grid()
         plt.legend()
-        plt.savefig("../results/Tasa_Exito_Columnas.png")
+        plt.savefig("../resources/results/Tasa_Exito_Columnas.png")
         plt.close()
 
-        print("\nGráficos comparativos generados en '../results/'.")
+        logging.info("Comparative graphs generated in: '../resources/results/'.")
 
     def generate_heat_map(self, q_tables):
         q_table_data = []
@@ -344,7 +396,7 @@ class MetricsManager:
                     q_table_data.append((state, action, q_value))
 
         if not q_table_data:
-            print(f"No Q-table data available.")
+            logging.error(f"No Q-table data available.")
             return
 
         states = sorted(set(state for state, _, _ in q_table_data))
@@ -382,9 +434,9 @@ class MetricsManager:
         plt.ylabel("States (Node ID)")
         plt.title(f"Q-Table Heat Map")
 
-        output_folder = "../results"
+        output_folder = "../resources/results"
         filename = os.path.join(output_folder, f"q_table_heat_map.png")
         plt.savefig(filename)
         plt.close()
 
-        print(f"Heat map saved to {filename}")
+        logging.info(f"Heat map saved to {filename}")

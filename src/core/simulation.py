@@ -1,22 +1,50 @@
+import logging
+
 from core.base import EpisodeEnded
 from core.clock import clock
 from core.packet_registry import registry
 
 
 class Simulation:
-    def __init__(self, network, sender_node, metrics_manager):
+    """Manages the execution of the simulation.
+
+    Attributes:
+        network (Network): The network to simulate.
+        sender_node (Node): The sender node in the network.
+        metrics_manager (MetricsManager): The metrics manager to log simulation results.
+    """
+
+    def __init__(
+        self, network: "Network", sender_node: "Node", metrics_manager: "MetricsManager"
+    ) -> None:
+        """Initializes the Simulation with the network, sender node, and metrics manager.
+
+        Args:
+            network (Network): The network to simulate.
+            sender_node (Node): The sender node in the network.
+            metrics_manager (MetricsManager): The metrics manager to log simulation results.
+        """
         self.network = network
         self.sender_node = sender_node
         self.metrics_manager = metrics_manager
+        logging.info("Simulation initialized.")
 
-    def start(self, algorithm_enum, episodes):
+    def start(self, algorithm_enum: "Algorithm", episodes: int) -> None:
+        """Starts the simulation for a specified number of episodes.
+
+        Args:
+            algorithm_enum (Algorithm): The algorithm to use for routing.
+            episodes (int): The number of episodes to run.
+        """
         clock.start()
         self.network.start_dynamic_changes()
         successful_episodes = 0
 
         algorithm = algorithm_enum.name
+        logging.info(f"Starting simulation with {episodes} episodes using {algorithm}.")
+
         for episode_number in range(1, episodes + 1):
-            print(f"\n\n=== Starting Episode #{episode_number} ({algorithm}) ===\n")
+            logging.info(f"=== Starting Episode #{episode_number} ({algorithm}) ===")
 
             start_time = clock.get_current_time()
             registry.initialize_episode(episode_number)
@@ -24,7 +52,7 @@ class Simulation:
             try:
                 self.sender_node.start_episode(episode_number)
             except EpisodeEnded:
-                print(f"\n\n=== Episode #{episode_number} ended ===\n")
+                logging.info(f"=== Episode #{episode_number} ended ===")
 
             end_time = clock.get_current_time()
 
@@ -58,4 +86,4 @@ class Simulation:
             clock.get_current_time(), successful_episodes, episodes
         )
 
-        print("\n[Simulation] Simulation finished and clock stopped.")
+        logging.info("Simulation finished and clock stopped.")
