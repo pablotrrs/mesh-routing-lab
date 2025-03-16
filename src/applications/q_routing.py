@@ -1,9 +1,9 @@
 import random
-import time
-from collections import deque
 from dataclasses import dataclass
+from collections import deque
 from enum import Enum
 
+from classes.clock import clock
 from classes.base import Application, EpisodeEnded
 from classes.packet_registry import packet_registry as registry
 from utils.visualization import print_q_table
@@ -419,7 +419,7 @@ class SenderQRoutingApplication(QRoutingApplication):
             previous_hop_node=packet["from_node_id"],
             current_node=self.node.node_id,
             next_hop_node=next_node,
-            send_timestamp=get_current_time(),
+            send_timestamp=clock.get_current_time(),
             estimated_time=estimated_time_remaining,
             episode_number=packet["episode_number"],
         )
@@ -451,7 +451,7 @@ class SenderQRoutingApplication(QRoutingApplication):
 
             self.update_q_value(
                 next_node=callback_data.next_hop_node,
-                s=get_current_time() - callback_data.send_timestamp,
+                s=clock.get_current_time() - callback_data.send_timestamp,
                 t=callback_data.estimated_time,
             )
 
@@ -561,7 +561,7 @@ class IntermediateQRoutingApplication(QRoutingApplication):
                 previous_hop_node=packet["from_node_id"],
                 current_node=self.node.node_id,
                 next_hop_node=next_node,
-                send_timestamp=get_current_time(),
+                send_timestamp=clock.get_current_time(),
                 estimated_time=estimated_time_remaining,
                 episode_number=packet["episode_number"],
             )
@@ -609,7 +609,7 @@ class IntermediateQRoutingApplication(QRoutingApplication):
 
         self.update_q_value(
             next_node=callback_data.next_hop_node,
-            s=get_current_time() - callback_data.send_timestamp,
+            s=clock.get_current_time() - callback_data.send_timestamp,
             t=callback_data.estimated_time,
         )
 
@@ -669,7 +669,3 @@ class IntermediateQRoutingApplication(QRoutingApplication):
 
     def __str__(self):
         return f"IntermediateNode(id={self.node.node_id}, neighbors={self.node.network.get_neighbors(self.node.node_id)})"
-
-
-def get_current_time():
-    return time.time()
