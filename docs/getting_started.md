@@ -187,6 +187,6 @@ Together, these components work in an interconnected manner to provide a flexibl
 
 - [API Reference](./api_reference.md)
 - Algorithms
-  - [Q Routing][./algorithms/q_routing.md]
-  - [Dijkstra][./algorithms/dijkstra.md]
+  - [Q Routing](./algorithms/q_routing.md)
+  - [Dijkstra](./algorithms/dijkstra.md)
   - [Bellman-Ford](./algorithms/bellman_ford.md)
