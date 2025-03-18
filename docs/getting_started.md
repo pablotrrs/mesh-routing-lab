@@ -182,3 +182,11 @@ One of the most important components in the system is the `MetricsManager`, resp
 Every packet sent through the network is logged in the `PacketRegistry`, which is also implemented as a singleton. This ensures precise tracking of packet journeys, facilitates debugging of algorithm behavior, and enables visualization of each packet’s path within the simulation.
 
 Together, these components work in an interconnected manner to provide a flexible and precise environment for mesh network routing simulation. The modular structure of the system allows for easy addition of new routing algorithms, modification of simulation parameters, and evaluation of different scenarios without disrupting the project's core architecture.
+
+## Read next
+
+- [API Reference](./api_reference.md)
+- Algorithms
+  - [Q Routing][./algorithms/q_routing.md]
+  - [Dijkstra][./algorithms/dijkstra.md]
+  - [Bellman-Ford](./algorithms/bellman_ford.md)
