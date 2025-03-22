@@ -303,7 +303,7 @@ class SenderQRoutingApplication(QRoutingApplication):
         PENALTY = penalty
         print(f'penalty setted to {PENALTY}')
 
-    def start_episode(self, episode_number, max_hops=None, functions_sequence=None, penalty=0.0, current_hop_count=0) -> None:
+    def start_episode(self, episode_number, max_hops=None, functions_sequence=None, penalty=0.0, current_hop_count=0, reset_episode=False) -> None:
         """Initiates an episode by creating a packet and sending it to chosen node."""
         self.max_hops=max_hops
 

@@ -154,7 +154,7 @@ class Simulation:
                     print(f'\n\n=== Episode #{episode_number} ended ===\n')
             else:
                 try:
-                    self.sender_node.start_episode(episode_number, self.max_hops, functions_sequence)
+                    self.sender_node.start_episode(episode_number, self.max_hops, functions_sequence, False)
                 except EpisodeEnded:
                     print(f'\n\n=== Episode #{episode_number} ended ===\n')
 
