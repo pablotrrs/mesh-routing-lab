@@ -21,9 +21,9 @@ class Network:
         dynamic_change_events (List[int]): List of times when dynamic changes occurred.
         running (bool): Indicates whether the network is running.
         lock (threading.Lock): Lock for thread-safe operations.
-        mean_interval_ms (Optional[float]): Mean interval between dynamic changes.
-        reconnect_interval_ms (Optional[float]): Interval for node reconnection.
-        disconnect_probability (Optional[float]): Probability of node disconnection.
+        mean_disconnection_interval_ms (Optional[float]): Mean interval between dynamic changes.
+        mean_reconnection_interval_ms (Optional[float]): Interval for node reconnection.
+        disconnection_probability (Optional[float]): Probability of node disconnection.
     """
 
     def __init__(self) -> None:
@@ -34,34 +34,34 @@ class Network:
         self.dynamic_change_events: List[int] = []
         self.running: bool = False
         self.lock: threading.Lock = threading.Lock()
-        self.mean_interval_ms: Optional[float] = None
-        self.reconnect_interval_ms: Optional[float] = None
-        self.disconnect_probability: Optional[float] = None
+        self.mean_disconnection_interval_ms: Optional[float] = None
+        self.mean_reconnection_interval_ms: Optional[float] = None
+        self.disconnection_probability: Optional[float] = None
         log.info("Network initialized.")
 
-    def set_mean_interval_ms(self, mean_interval_ms: float) -> None:
+    def set_mean_disconnection_interval_ms(self, mean_disconnection_interval_ms: float) -> None:
         """Sets the mean interval between dynamic changes.
 
         Args:
-            mean_interval_ms (float): Mean interval in milliseconds.
+            mean_disconnection_interval_ms (float): Mean interval in milliseconds.
         """
-        self.mean_interval_ms = mean_interval_ms
+        self.mean_disconnection_interval_ms = mean_disconnection_interval_ms
 
-    def set_reconnect_interval_ms(self, reconnect_interval_ms: float) -> None:
+    def set_mean_reconnection_interval_ms(self, mean_reconnection_interval_ms: float) -> None:
         """Sets the interval for node reconnection.
 
         Args:
-            reconnect_interval_ms (float): Reconnection interval in milliseconds.
+            mean_reconnection_interval_ms (float): Reconnection interval in milliseconds.
         """
-        self.reconnect_interval_ms = reconnect_interval_ms
+        self.mean_reconnection_interval_ms = mean_reconnection_interval_ms
 
-    def set_disconnect_probability(self, disconnect_probability: float) -> None:
+    def set_disconnection_probability(self, disconnection_probability: float) -> None:
         """Sets the probability of node disconnection.
 
         Args:
-            disconnect_probability (float): Probability of disconnection (0.0 to 1.0).
+            disconnection_probability (float): Probability of disconnection (0.0 to 1.0).
         """
-        self.disconnect_probability = disconnect_probability
+        self.disconnection_probability = disconnection_probability
 
     def generate_next_dynamic_change(self) -> int:
         """Generates the next dynamic change time based on an exponential distribution.
@@ -69,9 +69,9 @@ class Network:
         Returns:
             int: Time (ms) for the next dynamic change.
         """
-        if self.mean_interval_ms == float("inf"):
+        if self.mean_disconnection_interval_ms == float("inf"):
             return int(1e12)  # A very large number to simulate no changes
-        return int(np.random.exponential(self.mean_interval_ms))
+        return int(np.random.exponential(self.mean_disconnection_interval_ms))
 
     def start_dynamic_changes(self) -> None:
         """Starts a thread to apply dynamic changes based on the central clock."""
@@ -102,10 +102,10 @@ class Network:
     def trigger_dynamic_change(self) -> None:
         """Applies the logic for dynamic changes in the network (e.g., random node disconnections)."""
         for node_id in list(self.active_nodes):
-            if np.random.rand() < self.disconnect_probability:
+            if np.random.rand() < self.disconnection_probability:
                 self.nodes[node_id].status = False
                 self.nodes[node_id].reconnect_time = np.random.exponential(
-                    scale=self.reconnect_interval_ms
+                    scale=self.mean_reconnection_interval_ms
                 )
 
                 current_time = clock.get_current_time()
