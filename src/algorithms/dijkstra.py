@@ -69,7 +69,7 @@ class DijkstraApplication(Application):
         next_function = packet["functions_sequence"][
             0
         ]
-        neighbors = self.node.network.get_neighbors(self.node.node_id)
+        neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.nodes[neighbor].status]
 
         log.info(
             f"[Node_ID={self.node.node_id}] Selecting next node to process function: {next_function}"
@@ -162,11 +162,26 @@ class SenderDijkstraApplication(DijkstraApplication):
         self.routes = {}
         self.previous_node_id = None
 
-    def start_episode(self, episode_number):
+    def start_episode(self, episode_number, reset_episode):
 
         global broken_path
-        if broken_path or episode_number == 1:
+        if broken_path or episode_number == 1 or reset_episode:
             broken_path = False
+
+            if reset_episode:
+                node_info = [
+                    [node.node_id, node.status, node.lifetime, node.reconnect_time]
+                    for node in self.node.network.nodes.values()
+                ]
+                headers = ["Node ID", "Connected", "Lifetime", "Reconnect Time"]
+                print(tabulate(node_info, headers=headers, tablefmt="grid"))
+
+                for node_id in self.node.network.nodes:
+                    if node_id != 0:
+                        self.node.network.nodes[node_id].application.assigned_function = None
+                        self.node.network.nodes[node_id].application.previous_node_id = None
+                        self.node.network.nodes[node_id].application.broadcast_state = None
+
             log.info(
                 f"[Node_ID={self.node.node_id}] Starting broadcast for episode {episode_number}"
             )
@@ -184,7 +199,7 @@ class SenderDijkstraApplication(DijkstraApplication):
             log.info(
                 f"[Node_ID={self.node.node_id}] Broadcast completed. Computing shortest paths..."
             )
-            self.compute_shortest_paths()
+            self.compute_shortest_paths(episode_number)
 
             while not self.paths_computed:
                 pass
@@ -217,7 +232,7 @@ class SenderDijkstraApplication(DijkstraApplication):
         """
         Inicia el proceso de broadcast desde el nodo sender.
         """
-        neighbors = self.node.network.get_neighbors(self.node.node_id)
+        neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.nodes[neighbor].status]
         broadcast_packet = {
             "type": PacketType.BROADCAST,
             "message_id": message_id,
@@ -266,7 +281,7 @@ class SenderDijkstraApplication(DijkstraApplication):
             )
         )
 
-    def compute_shortest_paths(self):
+    def compute_shortest_paths(self, episode_number):
         """
         Calcula las rutas más cortas desde el nodo de origen a todos los demás nodos,
         utilizando una cola de prioridad para manejar eficientemente las latencias definidas en la clase Network.
@@ -302,9 +317,12 @@ class SenderDijkstraApplication(DijkstraApplication):
                     )
 
         self.routes = self._reconstruct_paths(self.node.node_id, previous_nodes)
-        self._log_routes()
-
-        self.paths_computed = True
+        result = self._log_routes()
+        if not result:
+            print(f"[Node_ID={self.node.node_id}] No routes found. Retrying...")
+            self.start_episode(episode_number, True)
+        else:
+            self.paths_computed = True
 
     def _reconstruct_paths(self, sender_node_id, previous_nodes):
         """
@@ -554,7 +572,15 @@ class SenderDijkstraApplication(DijkstraApplication):
         for destination, route_info in self.routes.items():
             path = route_info["path"]
 
-            functions = [node_function_map.get(node, "None") for node in path]
+            functions = []
+            for node in path:
+                assigned_function = node_function_map.get(node, "None")
+                print(f"Node {node} assigned function: {assigned_function}")
+                if node != 0 and assigned_function == "None":
+                    # Si un nodo distinto de 0 no tiene función asignada, retornar False
+                    print(f"Node {node} has no assigned function. Returning False.")
+                    return False
+                functions.append(assigned_function)
 
             path_str = " -> ".join(map(str, path))
             functions_str = " -> ".join(map(str, functions))
@@ -572,6 +598,7 @@ class SenderDijkstraApplication(DijkstraApplication):
                 ]
             )
 
+        log.info("")
         log.info("Routes calculated:")
         log.info(
             tabulate(
@@ -580,6 +607,8 @@ class SenderDijkstraApplication(DijkstraApplication):
                 tablefmt="grid",
             )
         )
+
+        return True
 
 
 class IntermediateDijkstraApplication(DijkstraApplication):
@@ -664,7 +693,7 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                         f"[Node_ID={self.node.node_id}] Added function to node function dict: {self.broadcast_state.node_function_map}"
                     )
 
-                neighbors = self.node.network.get_neighbors(self.node.node_id)
+                neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.nodes[neighbor].status]
                 neighbors_to_broadcast = [
                     n for n in neighbors if n not in packet["visited_nodes"]
                 ]

@@ -57,7 +57,7 @@ class Node:
         else:
             self.status = None
 
-    def start_episode(self, episode_number: int) -> None:
+    def start_episode(self, episode_number: int, reset_episode: bool = False) -> None:
         """Starts a new episode for the node.
 
         Args:
@@ -67,7 +67,7 @@ class Node:
             RuntimeError: If no application is installed on the node.
         """
         if self.application:
-            self.application.start_episode(episode_number)
+            self.application.start_episode(episode_number, False)
         else:
             raise RuntimeError(f"Node {self.node_id} has no application installed.")
 
