@@ -22,7 +22,7 @@
 # learning for optimized packet routing in ESP-based mesh networks.
 #
 # The source code for this project is available at:
-# https://github.com/pablotrrs/py-q-mesh-routing
+# https://github.com/pablotrrs/mesh-routing-lab
 
 import argparse
 import logging as log
@@ -63,22 +63,30 @@ def setup_arguments():
         help="Maximum number of hops allowed for each episode (default: 10)",
     )
     parser.add_argument(
-        "--mean_interval_ms",
+        "--mean_disconnection_interval_ms",
         type=float,
-        default=float("inf"),
-        help="Mean interval (ms) for dynamic changes (default: inf, for a static network)",
+        help="Mean interval (ms) for disconnection using exponential distribution"
     )
     parser.add_argument(
-        "--reconnect_interval_ms",
+        "--mean_reconnection_interval_ms",
         type=float,
-        default=50,
-        help="Mean interval (ms) for node reconnection after disconnection (default: 5000 ms)",
+        help="Mean interval (ms) for reconnection using exponential distribution"
     )
     parser.add_argument(
-        "--disconnect_probability",
+        "--disconnection_interval_ms",
+        type=float,
+        help="Fixed interval (ms) for disconnection events"
+    )
+    parser.add_argument(
+        "--reconnection_interval_ms",
+        type=float,
+        help="Fixed interval (ms) for reconnection events"
+    )
+    parser.add_argument(
+        "--disconnection_probability",
         type=float,
         default=0.1,
-        help="Probability for a node to disconnect in a dynamic change (default: 0.1)",
+        help="Probability for a node to disconnect (default: 0.1)",
     )
     parser.add_argument(
         "--topology_file",
@@ -106,9 +114,22 @@ def setup_arguments():
 def initialize_network(args):
     topology_file_path = os.path.join(os.path.dirname(__file__), args.topology_file)
     network, sender_node = Network.from_yaml(topology_file_path)
-    network.set_mean_interval_ms(args.mean_interval_ms)
-    network.set_reconnect_interval_ms(args.reconnect_interval_ms)
-    network.set_disconnect_probability(args.disconnect_probability)
+
+    fixed_set = args.disconnection_interval_ms is not None or args.reconnection_interval_ms is not None
+    mean_set = args.mean_disconnection_interval_ms is not None or args.mean_reconnection_interval_ms is not None
+
+    if fixed_set and mean_set:
+        raise ValueError("Cannot set both fixed and mean-based disconnection/reconnection intervals. Choose one mode.")
+
+    if mean_set:
+        network.set_mean_disconnection_interval_ms(args.mean_disconnection_interval_ms)
+        network.set_mean_reconnection_interval_ms(args.mean_reconnection_interval_ms)
+    elif fixed_set:
+        network.set_disconnection_interval_ms(args.disconnection_interval_ms)
+        network.set_reconnection_interval_ms(args.reconnection_interval_ms)
+
+    network.set_disconnection_probability(args.disconnection_probability)
+    network.start_dynamic_changes()
     return network, sender_node
 
 
@@ -141,9 +162,9 @@ def main():
         max_hops=args.max_hops,
         topology_file=args.topology_file,
         functions_sequence=functions_sequence,
-        mean_interval_ms=args.mean_interval_ms,
-        reconnect_interval_ms=args.reconnect_interval_ms,
-        disconnect_probability=args.disconnect_probability,
+        mean_disconnection_interval_ms=args.mean_disconnection_interval_ms,
+        mean_reconnection_interval_ms=args.mean_reconnection_interval_ms,
+        disconnection_probability=args.disconnection_probability,
         algorithms=[algo.name for algo in selected_algorithms],
         penalty=args.penalty,
     )
@@ -155,7 +176,7 @@ def main():
             f"Running {args.episodes} episodes using the {algorithm.name} algorithm."
         )
         log.info(f"Maximum hops: {args.max_hops}")
-        log.info(f"Mean interval for dynamic changes: {args.mean_interval_ms} ms")
+        log.info(f"Mean interval for dynamic changes: {args.mean_disconnection_interval_ms} ms")
         log.info(f"Topology file: {args.topology_file}")
         log.info(f"Functions sequence: {functions_sequence}")
 

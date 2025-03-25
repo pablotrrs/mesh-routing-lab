@@ -101,7 +101,7 @@ def visualize_simulation(simulation_file):
                         f"Reconnect Interval: {data['parameters']['reconnect_interval_ms']} ms\n"
                         f"Topology File: {data['parameters']['topology_file']}\n"
                         f"Functions Sequence: {', '.join(data['parameters']['functions_sequence'])}\n"
-                        f"Disconnect Probability: {data['parameters']['disconnect_probability']}\n\n")
+                        f"Disconnect Probability: {data['parameters']['disconnection_probability']}\n\n")
 
     # Acelerar la animación
     ani = FuncAnimation(fig, update, frames=len(routes), fargs=(nodes, edges, routes, node_functions, algorithm_text), interval=100)

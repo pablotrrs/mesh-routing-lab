@@ -26,9 +26,9 @@ class MetricsManager:
         max_hops: int,
         topology_file: str,
         functions_sequence: List[str],
-        mean_interval_ms: float,
-        reconnect_interval_ms: float,
-        disconnect_probability: float,
+        mean_disconnection_interval_ms: float,
+        mean_reconnection_interval_ms: float,
+        disconnection_probability: float,
         algorithms: List[str],
         penalty: float,
     ) -> None:
@@ -38,9 +38,9 @@ class MetricsManager:
             max_hops (int): Maximum number of hops allowed.
             topology_file (str): Path to the topology file.
             functions_sequence (List[str]): Sequence of node functions.
-            mean_interval_ms (float): Mean interval for dynamic changes.
-            reconnect_interval_ms (float): Interval for node reconnection.
-            disconnect_probability (float): Probability of node disconnection.
+            mean_disconnection_interval_ms (float): Mean interval for dynamic changes.
+            mean_reconnection_interval_ms (float): Interval for node reconnection.
+            disconnection_probability (float): Probability of node disconnection.
             algorithms (List[str]): List of algorithms used in the simulation.
             penalty (float): Penalty for Q-Routing.
         """
@@ -49,11 +49,11 @@ class MetricsManager:
             "parameters": {
                 "max_hops": max_hops,
                 "algorithms": algorithms,
-                "mean_interval_ms": mean_interval_ms,
-                "reconnect_interval_ms": reconnect_interval_ms,
+                "mean_disconnection_interval_ms": mean_disconnection_interval_ms,
+                "mean_reconnection_interval_ms": mean_reconnection_interval_ms,
                 "topology_file": topology_file,
                 "functions_sequence": [func.value for func in functions_sequence],
-                "disconnect_probability": disconnect_probability,
+                "disconnection_probability": disconnection_probability,
             },
             "total_time": None,
             "runned_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
