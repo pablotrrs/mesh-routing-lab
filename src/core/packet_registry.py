@@ -56,7 +56,7 @@ class PacketRegistry:
                 "function": "N/A",
                 "node_status": "inactive",
                 "latency": 0,
-                "packet_type": packet_type,
+                "packet_type": str(packet_type),
             }
         )
 
@@ -99,8 +99,8 @@ class PacketRegistry:
                 "to": to_node_id,
                 "function": function,
                 "node_status": node_status,
-                "latency": latency,
-                "packet_type": packet_type,
+                "latency": float(latency),
+                "packet_type": str(packet_type),
             }
         )
         log.debug(

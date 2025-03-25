@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from core.packet_registry import registry
 
-
 class MetricsManager:
     """Manages and stores metrics for the simulation.
 
@@ -128,6 +127,13 @@ class MetricsManager:
         self.save_metrics_to_file()
         self.save_results_to_excel()
         log.info("Simulation finalized and results saved.")
+        self.generar_comparative_graphs_from_excel()
+
+        # q_tables = []
+        # if algorithm == "Q_ROUTING":
+        #     for node in self.network.nodes.values():
+        #         q_tables.append(node.application.q_table)
+        # self.generate_heat_map(q_tables)
 
     def save_metrics_to_file(self, directory: str = "../resources/results/single-run") -> None:
         """Saves the simulation metrics to a JSON file.
@@ -258,6 +264,9 @@ class MetricsManager:
     def generar_comparative_graphs_from_excel(
         self, filename: str = "../resources/results/resultados_simulacion.xlsx"
     ) -> None:
+        # now we turn off the logging
+        log.getLogger().setLevel(log.ERROR)
+
         """Generates comparative graphs based on simulation metrics.
 
         Args:

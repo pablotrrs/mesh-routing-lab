@@ -38,7 +38,7 @@ class Application(ABC):
         self.functions_sequence = functions_sequence
 
     @abstractmethod
-    def start_episode(self, episode_number: int) -> None:
+    def start_episode(self, episode_number: int, reset_episode: bool = False) -> None:
         """Starts a new episode.
 
         Args:

@@ -261,6 +261,7 @@ class QRoutingApplication(Application):
             "episode_number": packet["episode_number"],
             "from_node_id": self.node.node_id,
             "hops": packet["hops"],
+            "penalty": packet["penalty"],
         }
 
         callback_data = CALLBACK_STACK.pop()
