@@ -65,14 +65,22 @@ def setup_arguments():
     parser.add_argument(
         "--mean_disconnection_interval_ms",
         type=float,
-        default=float("inf"),
-        help="Mean interval (ms) for disconnection (default: inf, for a static network)",
+        help="Mean interval (ms) for disconnection using exponential distribution"
     )
     parser.add_argument(
         "--mean_reconnection_interval_ms",
         type=float,
-        default=50,
-        help="Mean interval (ms) for node reconnection after disconnection (default: 5000 ms)",
+        help="Mean interval (ms) for reconnection using exponential distribution"
+    )
+    parser.add_argument(
+        "--disconnection_interval_ms",
+        type=float,
+        help="Fixed interval (ms) for disconnection events"
+    )
+    parser.add_argument(
+        "--reconnection_interval_ms",
+        type=float,
+        help="Fixed interval (ms) for reconnection events"
     )
     parser.add_argument(
         "--disconnection_probability",
@@ -106,9 +114,22 @@ def setup_arguments():
 def initialize_network(args):
     topology_file_path = os.path.join(os.path.dirname(__file__), args.topology_file)
     network, sender_node = Network.from_yaml(topology_file_path)
-    network.set_mean_disconnection_interval_ms(args.mean_disconnection_interval_ms)
-    network.set_mean_reconnection_interval_ms(args.mean_reconnection_interval_ms)
+
+    fixed_set = args.disconnection_interval_ms is not None or args.reconnection_interval_ms is not None
+    mean_set = args.mean_disconnection_interval_ms is not None or args.mean_reconnection_interval_ms is not None
+
+    if fixed_set and mean_set:
+        raise ValueError("Cannot set both fixed and mean-based disconnection/reconnection intervals. Choose one mode.")
+
+    if mean_set:
+        network.set_mean_disconnection_interval_ms(args.mean_disconnection_interval_ms)
+        network.set_mean_reconnection_interval_ms(args.mean_reconnection_interval_ms)
+    elif fixed_set:
+        network.set_disconnection_interval_ms(args.disconnection_interval_ms)
+        network.set_reconnection_interval_ms(args.reconnection_interval_ms)
+
     network.set_disconnection_probability(args.disconnection_probability)
+    network.start_dynamic_changes()
     return network, sender_node
 
 
