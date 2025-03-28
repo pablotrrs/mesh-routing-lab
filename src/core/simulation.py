@@ -27,7 +27,7 @@ class Simulation:
         self.network = network
         self.sender_node = sender_node
         self.metrics_manager = metrics_manager
-        log.info("Simulation initialized.")
+        log.debug("Simulation initialized.")
 
     def start(self, algorithm_enum: "Algorithm", episodes: int) -> None:
         """Starts the simulation for a specified number of episodes.

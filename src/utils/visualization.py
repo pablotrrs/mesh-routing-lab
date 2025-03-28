@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from tabulate import tabulate
 import networkx as nx
 import os
+import logging as log
 
 output_folder = '../../resources/simulation_images'
 os.makedirs(output_folder, exist_ok=True)
@@ -148,5 +149,5 @@ def print_q_table(application):
             q_table_data.append([state, action, q_value])
 
     headers = ["State (Node ID)", "Action (Next Node ID)", "Q-Value"]
-    print(f'\n[Node_ID={application.node.node_id}] Q-Table:')
-    print(tabulate(q_table_data, headers=headers, tablefmt="grid"))
+    log.debug(f'\n[Node_ID={application.node.node_id}] Q-Table:\n' 
+        + tabulate(q_table_data, headers=headers, tablefmt="grid"))

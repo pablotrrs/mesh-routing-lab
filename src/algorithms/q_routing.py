@@ -55,7 +55,7 @@ class QRoutingApplication(Application):
         self.callback_stack = deque()
 
     def receive_packet(self, packet):
-        log.info(f"[Node_ID={self.node.node_id}] Received packet {packet}")
+        log.debug(f"[Node_ID={self.node.node_id}] Received packet {packet}")
 
         if packet["type"] == PacketType.PACKET_HOP:
             self.handle_packet_hop(packet)
@@ -86,7 +86,7 @@ class QRoutingApplication(Application):
 
         self.q_table[self.node.node_id][next_node] = new_q
 
-        log.info(
+        log.debug(
             f"[Node_ID={self.node.node_id}] Updated Q-Value for state {self.node.node_id} -> action {next_node} "
             f"from {old_q:.4f} to {new_q:.4f} (estimated time {t}, actual time {s})"
         )
@@ -103,7 +103,7 @@ class QRoutingApplication(Application):
         current_node_id = self.node.node_id
 
         if random.random() < EPSILON:
-            log.info(
+            log.debug(
                 f"[Node_ID={current_node_id}] Performing exploration with epsilon={EPSILON:.4f}"
             )
             valid_neighbors = [
@@ -118,7 +118,7 @@ class QRoutingApplication(Application):
             if valid_neighbors:
                 next_node = random.choice(valid_neighbors)
         else:
-            log.info(
+            log.debug(
                 f"[Node_ID={current_node_id}] Exploitation with epsilon={EPSILON:.4f}"
             )
             next_node = self.choose_best_action()
@@ -127,13 +127,13 @@ class QRoutingApplication(Application):
                 next_node == current_node_id
                 or not self.node.network.validate_connection(current_node_id, next_node)
             ):
-                log.info(
+                log.debug(
                     f"[Node_ID={current_node_id}] Exploitation selected an unreachable or self node. Falling back to exploration."
                 )
                 next_node = None
 
         if next_node is None:
-            log.info(
+            log.debug(
                 f"[Node_ID={current_node_id}] Exploitation failed, falling back to exploration"
             )
 
@@ -149,11 +149,11 @@ class QRoutingApplication(Application):
 
             if valid_neighbors:
                 next_node = random.choice(valid_neighbors)
-                log.info(
+                log.debug(
                     f"[Node_ID={current_node_id}] Exploration selected Node {next_node}"
                 )
             else:
-                log.info(
+                log.debug(
                     f"[Node_ID={current_node_id}] No available neighbors to send the packet. Dropping packet."
                 )
                 return None
@@ -176,7 +176,7 @@ class QRoutingApplication(Application):
         }
 
         if not neighbors_q_values:
-            log.info(
+            log.debug(
                 f"[Node_ID={self.node.node_id}] No available neighbors with status True"
             )
 
@@ -232,11 +232,11 @@ class QRoutingApplication(Application):
 
         packet["from_node_id"] = self.node.node_id
 
-        log.info(f"[Node_ID={self.node.node_id}] Sending packet to Node {to_node_id}\n")
+        log.debug(f"[Node_ID={self.node.node_id}] Sending packet to Node {to_node_id}\n")
         self.node.network.send(self.node.node_id, to_node_id, packet)
 
         if packet["hops"] > packet.get("max_hops", float("inf")):
-            log.info(
+            log.debug(
                 f"[Node_ID={self.node.node_id}] Max hops reached. Initiating full echo callback"
             )
             return False
@@ -264,7 +264,7 @@ class QRoutingApplication(Application):
         }
 
         callback_data = CALLBACK_STACK.pop()
-        log.info(
+        log.debug(
             f"\033[91m[CALLBACK_STACK] Desencolando {callback_data}, callback_stack: {CALLBACK_STACK}\033[0m"
         )
 
@@ -307,7 +307,7 @@ class QRoutingApplication(Application):
             new_q, 0
         )
 
-        log.info(
+        log.debug(
             f"[Node_ID={self.node.node_id}] Penalized by {penalty} Q-Value for state {self.node.node_id} -> action {next_node} "
             f"from {old_q:.4f} to {new_q:.4f} (hard penalty applied)"
         )
@@ -342,7 +342,7 @@ class SenderQRoutingApplication(QRoutingApplication):
         global EPISODE_COMPLETED
         EPISODE_COMPLETED = False
 
-        log.info(f"\n\033[93mClearing callback stacks for Episode {episode_number}\033[0m")
+        log.debug(f"\n\033[93mClearing callback stacks for Episode {episode_number}\033[0m")
         global CALLBACK_STACK
         CALLBACK_STACK.clear()
 
@@ -363,7 +363,7 @@ class SenderQRoutingApplication(QRoutingApplication):
         next_node = self.select_next_node()
 
         if next_node is None:
-            log.info(
+            log.debug(
                 f"[Node_ID={self.node.node_id}] No valid next node found. Can't initiate episode!."
             )
             # movement: none
@@ -371,7 +371,7 @@ class SenderQRoutingApplication(QRoutingApplication):
             registry.mark_packet_lost(
                 packet["episode_number"], packet["from_node_id"], None, packet["type"]
             )
-            log.info(f'[Node_ID={self.node.node_id}] Packet hop count {packet["hops"]}')
+            log.debug(f'[Node_ID={self.node.node_id}] Packet hop count {packet["hops"]}')
 
             if packet["hops"] > self.max_hops:
                 self.mark_episode_result(packet, success=False)
@@ -394,7 +394,7 @@ class SenderQRoutingApplication(QRoutingApplication):
         next_node = self.select_next_node()
 
         if next_node is None:
-            log.info(
+            log.debug(
                 f"[Node_ID={self.node.node_id}] No valid next node found. Stopping packet hop."
             )
             # movement: none
@@ -427,11 +427,11 @@ class SenderQRoutingApplication(QRoutingApplication):
 
         global CALLBACK_STACK
         CALLBACK_STACK.append(callback_chain_step)
-        log.info(
+        log.debug(
             f"\033[92m[CALLBACK_STACK] Encolando {callback_chain_step}, callback_stack: {CALLBACK_STACK}\033[0m"
         )
 
-        log.info(
+        log.debug(
             f"[Node_ID={self.node.node_id}] Adding step to callback chain stack: {callback_chain_step}"
         )
 
@@ -446,7 +446,7 @@ class SenderQRoutingApplication(QRoutingApplication):
         global CALLBACK_STACK
         if len(CALLBACK_STACK) > 0:
             callback_data = CALLBACK_STACK.pop()
-            log.info(
+            log.debug(
                 f"\033[91m[CALLBACK_STACK] Desencolando {callback_data}, callback_stack: {CALLBACK_STACK}\033[0m"
             )
 
@@ -461,7 +461,7 @@ class SenderQRoutingApplication(QRoutingApplication):
             return
         else:
             print_q_table(self)
-            log.info(
+            log.debug(
                 f'\n[Node_ID={self.node.node_id}] Episode {packet["episode_number"]} finished.'
             )
 
@@ -469,7 +469,7 @@ class SenderQRoutingApplication(QRoutingApplication):
 
     def handle_lost_packet(self, packet) -> None:
         episode_number = packet["episode_number"]
-        log.info(f"\n[Node_ID={self.node.node_id}] Episode {episode_number} failed.")
+        log.debug(f"\n[Node_ID={self.node.node_id}] Episode {episode_number} failed.")
 
         self.mark_episode_result(packet, success=False)
 
@@ -486,7 +486,7 @@ class SenderQRoutingApplication(QRoutingApplication):
 
         status_text = "SUCCESS" if success else "FAILURE"
         episode_number = packet["episode_number"]
-        log.info(
+        log.debug(
             f"\n[Node_ID={self.node.node_id}] Marking Episode {episode_number} as {status_text}."
         )
 
@@ -516,14 +516,14 @@ class IntermediateQRoutingApplication(QRoutingApplication):
         if packet["hops"] > packet["max_hops"]:
             global EPISODE_COMPLETED
 
-            log.info(f"episode completion {EPISODE_COMPLETED}")
+            log.debug(f"episode completion {EPISODE_COMPLETED}")
             if EPISODE_COMPLETED:
                 episode_number = packet["episode_number"]
-                log.info(
+                log.debug(
                     f"\033[91m[Node_ID={self.node.node_id}] Episode {episode_number} already ended or not found. Ignoring packet.\033[0m"
                 )
                 return
-            log.info(
+            log.debug(
                 f"[Node_ID={self.node.node_id}] Max hops reached. Initiating full echo callback"
             )
             self.initiate_max_hops_callback(packet)
@@ -538,7 +538,7 @@ class IntermediateQRoutingApplication(QRoutingApplication):
             if packet["functions_sequence"]
             else None
         ):
-            log.info(
+            log.debug(
                 f"[Node_ID={self.node.node_id}] Removing function {self.assigned_function} from functions to process"
             )
             if packet["functions_sequence"]:
@@ -546,7 +546,7 @@ class IntermediateQRoutingApplication(QRoutingApplication):
 
         # if all functions have been processed
         if len(packet["functions_sequence"]) == 0:
-            log.info(
+            log.debug(
                 f"[Node_ID={self.node.node_id}] Function sequence is complete! Initiating full echo callback"
             )
             self.initiate_full_echo_callback(packet)
@@ -554,7 +554,7 @@ class IntermediateQRoutingApplication(QRoutingApplication):
 
         next_node = self.select_next_node()
 
-        log.info(f"[Node_ID={self.node.node_id}] Next node is {next_node}")
+        log.debug(f"[Node_ID={self.node.node_id}] Next node is {next_node}")
         if next_node is not None:
             estimated_time_remaining = self.estimate_remaining_time(next_node)
 
@@ -568,11 +568,11 @@ class IntermediateQRoutingApplication(QRoutingApplication):
             )
             global CALLBACK_STACK
             CALLBACK_STACK.append(callback_chain_step)
-            log.info(
+            log.debug(
                 f"\033[92m[CALLBACK_STACK] Encolando {callback_chain_step}, callback_stack: {CALLBACK_STACK}\033[0m"
             )
 
-            log.info(
+            log.debug(
                 f"[Node_ID={self.node.node_id}] Adding step to callback chain stack: {callback_chain_step}"
             )
 
@@ -604,7 +604,7 @@ class IntermediateQRoutingApplication(QRoutingApplication):
         """Maneja el callback cuando regresa el paquete."""
         global CALLBACK_STACK
         callback_data = CALLBACK_STACK.pop()
-        log.info(
+        log.debug(
             f"\033[91m[CALLBACK_STACK] Desencolando {callback_data}, callback_stack: {CALLBACK_STACK}\033[0m"
         )
 
@@ -621,7 +621,7 @@ class IntermediateQRoutingApplication(QRoutingApplication):
     def handle_lost_packet(self, packet) -> None:
         global CALLBACK_STACK
         callback_data = CALLBACK_STACK.pop()
-        log.info(
+        log.debug(
             f"\033[91m[CALLBACK_STACK] Desencolando {callback_data}, callback_stack: {CALLBACK_STACK}\033[0m"
         )
 
@@ -661,7 +661,7 @@ class IntermediateQRoutingApplication(QRoutingApplication):
         else:
             function_to_assign = random.choice(least_assigned_functions)
 
-        log.info(
+        log.debug(
             f"[Node_ID={self.node.node_id}] Node has no function, assigning function {function_to_assign}"
         )
         self.assigned_function = function_to_assign

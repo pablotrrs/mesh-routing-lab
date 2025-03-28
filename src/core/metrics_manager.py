@@ -19,7 +19,7 @@ class MetricsManager:
     def __init__(self) -> None:
         """Initializes the MetricsManager with an empty metrics dictionary."""
         self.metrics: Dict[str, Union[int, float, str, List, Dict]] = {}
-        log.info("MetricsManager initialized.")
+        log.debug("MetricsManager initialized.")
 
     def initialize(
         self,
@@ -65,7 +65,7 @@ class MetricsManager:
             if algorithm == "Q_ROUTING":
                 self.metrics[algorithm]["penalty"] = penalty
 
-        log.info("Metrics initialized for simulation.")
+        log.debug("Metrics initialized for simulation.")
 
     def log_episode(
         self,
@@ -127,7 +127,7 @@ class MetricsManager:
 
         self.save_metrics_to_file()
         self.save_results_to_excel()
-        log.info("Simulation finalized and results saved.")
+        log.debug("Simulation finalized and results saved.")
 
     def save_metrics_to_file(self, directory: str = "../resources/results/single-run") -> None:
         """Saves the simulation metrics to a JSON file.
@@ -142,7 +142,7 @@ class MetricsManager:
         with open(filename, "w", encoding="utf-8") as file:
             json.dump(self.metrics, file, indent=4)
 
-        log.info(f"Simulation metrics saved to {filename}.")
+        log.debug(f"Simulation metrics saved to {filename}.")
 
     def save_results_to_excel(
         self, filename: str = "../resources/results/resultados_simulacion.xlsx"
@@ -189,7 +189,7 @@ class MetricsManager:
             if algorithm
             not in ["simulation_id", "parameters", "total_time", "runned_at"]
         }
-        log.info(
+        log.debug(
             f"Algorithms found in metrics: {list(metrics_data.keys())}"
         )
 
@@ -253,7 +253,7 @@ class MetricsManager:
                 )
         wb.save(filename)
 
-        log.info(f"\nresults saved in {filename}.")
+        log.debug(f"\nresults saved in {filename}.")
 
     def generar_comparative_graphs_from_excel(
         self, filename: str = "../resources/results/resultados_simulacion.xlsx"
@@ -386,7 +386,7 @@ class MetricsManager:
         plt.savefig("../resources/results/Tasa_Exito_Columnas.png")
         plt.close()
 
-        log.info("Comparative graphs generated in: '../resources/results/'.")
+        log.debug("Comparative graphs generated in: '../resources/results/'.")
 
     def generate_heat_map(self, q_tables):
         q_table_data = []
@@ -439,4 +439,4 @@ class MetricsManager:
         plt.savefig(filename)
         plt.close()
 
-        log.info(f"Heat map saved to {filename}")
+        log.debug(f"Heat map saved to {filename}")

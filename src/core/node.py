@@ -39,7 +39,7 @@ class Node:
         self.disconnected_at: Optional[float] = None
         self.status: Optional[bool] = None
         self.position: Optional[Tuple[float, float, float]] = position
-        log.info(f"Node {node_id} initialized.")
+        log.debug(f"Node {node_id} initialized.")
 
     def install_application(self, application_class: Type["Application"]) -> None:
         """Installs an application on the node.
@@ -48,7 +48,7 @@ class Node:
             application_class (Type[Application]): The application class to install.
         """
         self.application = application_class(self)
-        log.info(
+        log.debug(
             f"Node {self.node_id} installed {self.application.__class__.__name__}."
         )
 

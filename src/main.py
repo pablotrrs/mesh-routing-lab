@@ -37,7 +37,7 @@ from core.metrics_manager import MetricsManager
 def setup_logging():
     log.root.handlers = []
     log.basicConfig(
-        level=log.DEBUG,
+        level=log.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         handlers=[log.StreamHandler()],
     )
@@ -146,7 +146,7 @@ def main():
         log.error(f"Error parsing functions sequence from args: {e}")
         sys.exit(1)
 
-    log.info(f"Using functions sequence: {[f.value for f in functions_sequence]}")
+    log.debug(f"Using functions sequence: {[f.value for f in functions_sequence]}")
 
     selected_algorithms = (
         [Algorithm(args.algorithm)]
@@ -155,7 +155,7 @@ def main():
     )
 
     network, sender_node = initialize_network(args)
-    log.info(network)
+    log.debug(network)
 
     metrics_manager = MetricsManager()
     metrics_manager.initialize(
@@ -172,13 +172,13 @@ def main():
     simulation = Simulation(network, sender_node, metrics_manager)
 
     for algorithm in selected_algorithms:
-        log.info(
+        log.debug(
             f"Running {args.episodes} episodes using the {algorithm.name} algorithm."
         )
-        log.info(f"Maximum hops: {args.max_hops}")
-        log.info(f"Mean interval for dynamic changes: {args.mean_disconnection_interval_ms} ms")
-        log.info(f"Topology file: {args.topology_file}")
-        log.info(f"Functions sequence: {functions_sequence}")
+        log.debug(f"Maximum hops: {args.max_hops}")
+        log.debug(f"Mean interval for dynamic changes: {args.mean_disconnection_interval_ms} ms")
+        log.debug(f"Topology file: {args.topology_file}")
+        log.debug(f"Functions sequence: {functions_sequence}")
 
         match algorithm:
             case Algorithm.Q_ROUTING:

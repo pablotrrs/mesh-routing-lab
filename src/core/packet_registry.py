@@ -12,7 +12,7 @@ class PacketRegistry:
     def __init__(self) -> None:
         """Initializes the PacketRegistry with an empty packet log."""
         self.packet_log: Dict[int, Dict] = {}
-        log.info("PacketRegistry initialized.")
+        log.debug("PacketRegistry initialized.")
 
     def initialize_episode(self, episode_number: int) -> None:
         """Initializes the packet log for a new episode.
@@ -31,7 +31,7 @@ class PacketRegistry:
     def restart_packet_log(self) -> None:
         """Clears the packet log."""
         self.packet_log = {}
-        log.info("Packet log restarted.")
+        log.debug("Packet log restarted.")
 
     def mark_packet_lost(
         self,
@@ -67,7 +67,7 @@ class PacketRegistry:
             episode_number (int): The number of the episode.
             episode_success (bool): Whether the episode was successful.
         """
-        log.info(
+        log.debug(
             f"Marking episode {episode_number} as {'successful' if episode_success else 'failed'}."
         )
         self.packet_log[episode_number]["episode_success"] = episode_success
