@@ -236,7 +236,7 @@ class Application(ABC):
         Returns the function currently assigned to this node.
 
         Returns:
-            str: The function label (e.g., "A", "B", etc.).
+            str: The function assigned to the node (e.g., "A", "B", etc.).
         """
         pass
 
