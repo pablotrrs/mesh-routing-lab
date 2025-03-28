@@ -3,7 +3,7 @@ import logging as log
 from enum import Enum
 from queue import PriorityQueue
 
-from core.base import Application, EpisodeEnded
+from core.base import Application
 from core.clock import clock
 from core.packet_registry import registry
 from tabulate import tabulate
@@ -66,16 +66,14 @@ class DijkstraApplication(Application):
         Selecciona el siguiente nodo que debe procesar la próxima función faltante.
         Si todos los nodos vecinos no tienen la función correspondiente en el mapa, elige el nodo con menor peso en la arista.
         """
-        next_function = packet["functions_sequence"][
-            0
-        ]
+        next_function = packet["functions_sequence"][0]
         neighbors = self.node.network.get_neighbors(self.node.node_id)
 
-        log.info(
+        log.debug(
             f"[Node_ID={self.node.node_id}] Selecting next node to process function: {next_function}"
         )
-        log.info(f"[Node_ID={self.node.node_id}] Neighbors: {neighbors}")
-        log.info(
+        log.debug(f"[Node_ID={self.node.node_id}] Neighbors: {neighbors}")
+        log.debug(
             f"[Node_ID={self.node.node_id}] Functions to node map: {packet['node_function_map']}"
         )
 
@@ -85,7 +83,7 @@ class DijkstraApplication(Application):
             if packet["node_function_map"].get(neighbor) == next_function
         ]
 
-        log.info(
+        log.debug(
             f"[Node_ID={self.node.node_id}] Valid neighbors for function {next_function}: {valid_neighbors}"
         )
 
@@ -94,7 +92,7 @@ class DijkstraApplication(Application):
                 valid_neighbors,
                 key=lambda n: self.node.network.get_latency(self.node.node_id, n),
             )
-            log.info(
+            log.debug(
                 f"[Node_ID={self.node.node_id}] Selected node {selected_node} to process function {next_function}"
             )
             return selected_node
@@ -105,7 +103,7 @@ class DijkstraApplication(Application):
             if neighbor not in packet["node_function_map"] and neighbor != 0
         ]
 
-        log.info(
+        log.debug(
             f"[Node_ID={self.node.node_id}] Neighbors without assigned function: {neighbors_without_function}"
         )
 
@@ -114,7 +112,7 @@ class DijkstraApplication(Application):
                 neighbors_without_function,
                 key=lambda n: self.node.network.get_latency(self.node.node_id, n),
             )
-            log.info(
+            log.debug(
                 f"[Node_ID={self.node.node_id}] Selected node {selected_node} without assigned function"
             )
             return selected_node
@@ -126,12 +124,12 @@ class DijkstraApplication(Application):
                 valid_closest_neighbors,
                 key=lambda n: self.node.network.get_latency(self.node.node_id, n),
             )
-            log.info(
+            log.debug(
                 f"[Node_ID={self.node.node_id}] Selected closest node {selected_node} (excluding 0)"
             )
             return selected_node
 
-        log.info(
+        log.debug(
             f"[Node_ID={self.node.node_id}] No other nodes available. Defaulting to node 0."
         )
         return 0
@@ -146,7 +144,7 @@ class DijkstraApplication(Application):
         if "from_node_id" in packet:
             packet["from_node_id"] = self.node.node_id
 
-        log.info(f"\n[Node_ID={self.node.node_id}] Sending packet to Node {to_node_id}\n")
+        log.debug(f"\n[Node_ID={self.node.node_id}] Sending packet to Node {to_node_id}\n")
         self.node.network.send(self.node.node_id, to_node_id, packet)
 
     def get_assigned_function(self) -> str:
@@ -167,7 +165,7 @@ class SenderDijkstraApplication(DijkstraApplication):
         global broken_path
         if broken_path or episode_number == 1:
             broken_path = False
-            log.info(
+            log.debug(
                 f"[Node_ID={self.node.node_id}] Starting broadcast for episode {episode_number}"
             )
 
@@ -181,7 +179,7 @@ class SenderDijkstraApplication(DijkstraApplication):
             ):
                 pass
 
-            log.info(
+            log.debug(
                 f"[Node_ID={self.node.node_id}] Broadcast completed. Computing shortest paths..."
             )
             self.compute_shortest_paths()
@@ -189,7 +187,7 @@ class SenderDijkstraApplication(DijkstraApplication):
             while not self.paths_computed:
                 pass
 
-        log.info(f"[Node_ID={self.node.node_id}] Starting episode {episode_number}")
+        log.debug(f"[Node_ID={self.node.node_id}] Starting episode {episode_number}")
 
         packet = {
             "type": PacketType.PACKET_HOP,
@@ -207,7 +205,7 @@ class SenderDijkstraApplication(DijkstraApplication):
         next_node = self.select_next_function_node(packet)
 
         if next_node is None:
-            log.info("No suitable next node found.")
+            log.debug("No suitable next node found.")
             return
 
         self.send_packet(next_node, packet)
@@ -232,7 +230,7 @@ class SenderDijkstraApplication(DijkstraApplication):
 
         self.broadcast_state = BroadcastState()
         self.broadcast_state.expected_acks = len(neighbors)
-        log.info(
+        log.debug(
             f"[Node_ID={self.node.node_id}] Expected ACKs: {self.broadcast_state.expected_acks}"
         )
 
@@ -257,8 +255,8 @@ class SenderDijkstraApplication(DijkstraApplication):
             [src, dst, latency]
             for (src, dst), latency in self.broadcast_state.latency_map.items()
         ]
-        log.info(f"\n[Node_ID={self.node.node_id}] Latency Map After Broadcast:\n")
-        log.info(
+        log.debug(f"\n[Node_ID={self.node.node_id}] Latency Map After Broadcast:\n")
+        log.debug(
             tabulate(
                 latency_table,
                 headers=["Source Node", "Destination Node", "Latency (ms)"],
@@ -340,26 +338,26 @@ class SenderDijkstraApplication(DijkstraApplication):
         Maneja los paquetes recibidos según su tipo.
         Finaliza el episodio cuando el paquete regresa al nodo sender.
         """
-        log.info(f"[Node_ID={self.node.node_id}] Received packet {packet}")
+        log.debug(f"[Node_ID={self.node.node_id}] Received packet {packet}")
 
         match packet["type"]:
 
             case PacketType.MAX_HOPS:
                 episode_number = packet["episode_number"]
-                log.info(
+                log.debug(
                     f"\n[Node_ID={self.node.node_id}] Episode {episode_number} failed."
                 )
 
-                self.mark_episode_result(packet, success=False)
+                self.end_episode(success=False)
 
             case PacketType.PACKET_HOP:
-                log.info(
+                log.debug(
                     f"[Node_ID={self.node.node_id}] Processing packet at node {self.node}: {packet}"
                 )
 
                 # lógica para reenviar el paquete al siguiente nodo si faltan funciones
                 if packet["functions_sequence"]:
-                    log.info(
+                    log.debug(
                         f"[Node_ID={self.node.node_id}] Remaining functions: {packet['functions_sequence']}"
                     )
                     self.previous_node_id = packet["from_node_id"]
@@ -370,7 +368,7 @@ class SenderDijkstraApplication(DijkstraApplication):
                         next_node is None or self.node.network.nodes[next_node].status
                     ):
                         episode_number = packet["episode_number"]
-                        log.info(
+                        log.debug(
                             f"[Node_ID={self.node.node_id}] Restarting episode {episode_number} because pre calculated shortest path is broken. Packet={packet}"
                         )
                         self.start_episode(episode_number, True)
@@ -378,23 +376,23 @@ class SenderDijkstraApplication(DijkstraApplication):
                         self.callback_stack.append(packet["from_node_id"])
                         self.send_packet(next_node, packet)
                 else:
-                    log.info(f"[Node_ID={self.node.node_id}] Function sequence completed.")
+                    log.debug(f"[Node_ID={self.node.node_id}] Function sequence completed.")
                     episode_number = packet["episode_number"]
-                    log.info(
+                    log.debug(
                         f"[Node_ID={self.node.node_id}] Episode {episode_number} completed"
                     )
 
             case PacketType.SUCCESS:
                 episode_number = packet["episode_number"]
-                self.mark_episode_result(packet, success=True)
+                self.end_episode(success=True)
 
             case PacketType.BROADCAST:
-                log.info(
+                log.debug(
                     f"[Node_ID={self.node.node_id}] Received BROADCAST packet with ID {packet.message_id}"
                 )
 
                 if packet.message_id in self.broadcast_state.received_messages:
-                    log.info(
+                    log.debug(
                         f"[Node_ID={self.node.node_id}] Ignoring duplicate BROADCAST packet."
                     )
                     return
@@ -422,7 +420,7 @@ class SenderDijkstraApplication(DijkstraApplication):
                     self.broadcast_state.expected_acks = len(neighbors) - 1
 
             case PacketType.ACK:
-                log.info(
+                log.debug(
                     f"[Node_ID={self.node.node_id}] Received ACK for message ID {packet['message_id']}"
                 )
 
@@ -432,7 +430,7 @@ class SenderDijkstraApplication(DijkstraApplication):
                     self.broadcast_state.node_function_map.update(
                         packet["node_function_map"]
                     )
-                    log.info(
+                    log.debug(
                         f"[Node_ID={self.node.node_id}] Updated node-function map: {self.broadcast_state.node_function_map}"
                     )
 
@@ -443,7 +441,7 @@ class SenderDijkstraApplication(DijkstraApplication):
                             or latency < self.broadcast_state.latency_map[(src, dst)]
                         ):
                             self.broadcast_state.latency_map[(src, dst)] = latency
-                            log.info(
+                            log.debug(
                                 f"[Node_ID={self.node.node_id}] Added latency {latency} ms for route {src} -> {dst}"
                             )
 
@@ -453,7 +451,7 @@ class SenderDijkstraApplication(DijkstraApplication):
                         self.broadcast_state.expected_acks
                         - self.broadcast_state.acks_received
                     )
-                    log.info(f"[Node_ID={self.node.node_id}] {acks_left} ACKs left")
+                    log.debug(f"[Node_ID={self.node.node_id}] {acks_left} ACKs left")
 
                     if (
                         packet["from_node_id"],
@@ -466,12 +464,12 @@ class SenderDijkstraApplication(DijkstraApplication):
                         self.broadcast_state.latency_map[
                             (packet["from_node_id"], self.node.node_id)
                         ] = latency
-                        log.info(
+                        log.debug(
                             f"[Node_ID={self.node.node_id}] Measured latency from {packet['from_node_id']}: {latency} ms"
                         )
 
                 else:
-                    log.info(
+                    log.debug(
                         f"[Node_ID={self.node.node_id}] Duplicate ACK received from Node {packet['from_node_id']}. Ignoring."
                     )
 
@@ -479,13 +477,13 @@ class SenderDijkstraApplication(DijkstraApplication):
                     self.broadcast_state.acks_received
                     == self.broadcast_state.expected_acks
                 ):
-                    log.info(
+                    log.debug(
                         f"[Node_ID={self.node.node_id}] Broadcast completed successfully."
                     )
-                    log.info(
+                    log.debug(
                         f"[Node_ID={self.node.node_id}] Final node-function map: {self.broadcast_state.node_function_map}"
                     )
-                    log.info(
+                    log.debug(
                         f"[Node_ID={self.node.node_id}] Final latency map: {self.broadcast_state.latency_map}"
                     )
                     self.broadcast_state.mark_completed()
@@ -503,7 +501,7 @@ class SenderDijkstraApplication(DijkstraApplication):
 
             case PacketType.BROKEN_PATH:
                 episode_number = packet["episode_number"]
-                log.info(
+                log.debug(
                     f"[Node_ID={self.node.node_id}] Episode {episode_number} detected a broken path. Packet={packet}"
                 )
                 global broken_path
@@ -518,27 +516,9 @@ class SenderDijkstraApplication(DijkstraApplication):
 
             case _:
                 packet_type = packet["type"]
-                log.info(
+                log.debug(
                     f"[Node_ID={self.node.node_id}] Received unknown packet type: {packet_type}"
                 )
-
-    def mark_episode_result(self, packet, success=True):
-        """
-        Marca un episodio como exitoso o fallido y lo notifica a la red.
-
-        Args:
-            packet (Packet): El paquete asociado al episodio.
-            success (bool): `True` si el episodio fue exitoso, `False` si falló.
-        """
-        status_text = "SUCCESS" if success else "FAILURE"
-        episode_number = packet["episode_number"]
-        log.info(
-            f"\n[Node_ID={self.node.node_id}] Marking Episode {episode_number} as {status_text}."
-        )
-
-        registry.mark_episode_complete(episode_number, success)
-
-        raise EpisodeEnded()
 
     def _log_routes(self):
         """
@@ -572,8 +552,8 @@ class SenderDijkstraApplication(DijkstraApplication):
                 ]
             )
 
-        log.info("Routes calculated:")
-        log.info(
+        log.debug("Routes calculated:")
+        log.debug(
             tabulate(
                 table,
                 headers=["Route", "Path", "Functions", "Total Latency"],
@@ -594,17 +574,17 @@ class IntermediateDijkstraApplication(DijkstraApplication):
 
     def receive_packet(self, packet):
         packet_type = packet["type"]
-        log.info(f"[Node_ID={self.node.node_id}] Received {packet_type} packet.")
+        log.debug(f"[Node_ID={self.node.node_id}] Received {packet_type} packet.")
         match packet_type:
             case PacketType.BROADCAST:
-                log.info(packet)
+                log.debug(packet)
                 message_id = packet["message_id"]
 
                 if (
                     self.broadcast_state
                     and message_id in self.broadcast_state.received_messages
                 ):
-                    log.info(
+                    log.debug(
                         f"[Node_ID={self.node.node_id}] Received duplicate BROADCAST packet. Sending ACK back."
                     )
 
@@ -649,7 +629,7 @@ class IntermediateDijkstraApplication(DijkstraApplication):
 
                     packet["function_counters"][function_to_assign] += 1
 
-                    log.info(
+                    log.debug(
                         f"[Node_ID={self.node.node_id}] Assigned function: {self.assigned_function}"
                     )
 
@@ -660,7 +640,7 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                         self.node.node_id
                     ] = self.assigned_function
 
-                    log.info(
+                    log.debug(
                         f"[Node_ID={self.node.node_id}] Added function to node function dict: {self.broadcast_state.node_function_map}"
                     )
 
@@ -676,7 +656,7 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                     ] = clock.get_current_time()
 
                 self.broadcast_state.expected_acks = len(neighbors_to_broadcast)
-                log.info(
+                log.debug(
                     f"[Node_ID={self.node.node_id}] {self.broadcast_state.expected_acks} expected ACKs from nodes {neighbors_to_broadcast}"
                 )
 
@@ -718,10 +698,10 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                     self.send_packet(self.broadcast_state.parent_node, ack_packet)
 
             case PacketType.ACK:
-                log.info(
+                log.debug(
                     f"[Node_ID={self.node.node_id}] Received ACK for message ID {packet['message_id']}"
                 )
-                log.info(packet)
+                log.debug(packet)
 
                 ack_from = packet["from_node_id"]
                 end_time = clock.get_current_time()
@@ -730,7 +710,7 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                     start_time = packet["latency_map"][(self.node.node_id, ack_from)]
                     latency = end_time - start_time
                     packet["latency_map"][(self.node.node_id, ack_from)] = latency
-                    log.info(
+                    log.debug(
                         f"[Node_ID={self.node.node_id}] Measured latency from {ack_from}: {latency} ms"
                     )
 
@@ -746,7 +726,7 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                         self.broadcast_state.expected_acks
                         - self.broadcast_state.acks_received
                     )
-                    log.info(f"[Node_ID={self.node.node_id}] {acks_left} ACKs left")
+                    log.debug(f"[Node_ID={self.node.node_id}] {acks_left} ACKs left")
 
                 if "node_function_map" not in packet:
                     packet["node_function_map"] = self.broadcast_state.node_function_map
@@ -761,7 +741,7 @@ class IntermediateDijkstraApplication(DijkstraApplication):
 
                 self.broadcast_state.node_function_map = combined_node_function_map
 
-                log.info(
+                log.debug(
                     f"[Node_ID={self.node.node_id}] add node function to node function map {self.broadcast_state.node_function_map}"
                 )
 
@@ -769,7 +749,7 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                     self.broadcast_state.acks_received
                     == self.broadcast_state.expected_acks
                 ):
-                    log.info(
+                    log.debug(
                         f"[Node_ID={self.node.node_id}] All ACKs received. Sending ACK to parent node {self.broadcast_state.parent_node}."
                     )
 
@@ -811,7 +791,7 @@ class IntermediateDijkstraApplication(DijkstraApplication):
             case PacketType.PACKET_HOP:
 
                 if packet["hops"] > packet["max_hops"]:
-                    log.info(
+                    log.debug(
                         f"[Node_ID={self.node.node_id}] Max hops reached. Initiating callback"
                     )
 
@@ -823,7 +803,7 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                     }
 
                     from_node_id = packet["from_node_id"]
-                    log.info(
+                    log.debug(
                         f"[Node_ID={self.node.node_id}] Sending MAX_HOPS packet back to node {from_node_id}."
                     )
                     self.send_packet(from_node_id, failure_packet)
@@ -834,29 +814,29 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                         packet["functions_sequence"]
                         and packet["functions_sequence"][0] == self.assigned_function
                     ):
-                        log.info(
+                        log.debug(
                             f"[Node_ID={self.node.node_id}] Processing assigned function: {self.assigned_function}"
                         )
 
                         packet["functions_sequence"].pop(0)
-                        log.info(
+                        log.debug(
                             f"[Node_ID={self.node.node_id}] Function {self.assigned_function} removed from sequence. Remaining: {packet['functions_sequence']}"
                         )
                 else:
                     function_to_assign = packet.next_function()
                     self.assigned_function = function_to_assign
                     packet.increment_function_counter(function_to_assign)
-                    log.info(
+                    log.debug(
                         f"[Node_ID={self.node.node_id}] Assigned function: {self.assigned_function}"
                     )
 
-                    log.info(
+                    log.debug(
                         f"[Node_ID={self.node.node_id}] Processing assigned function: {self.assigned_function}"
                     )
 
                     packet["functions_sequence"].pop(0)
 
-                    log.info(
+                    log.debug(
                         f"[Node_ID={self.node.node_id}] Function {self.assigned_function} removed from sequence. Remaining: {packet['functions_sequence']}"
                     )
 
@@ -866,12 +846,12 @@ class IntermediateDijkstraApplication(DijkstraApplication):
 
                     next_node = self.select_next_function_node(packet)
 
-                    log.info(
+                    log.debug(
                         next_node is None
                         or not self.node.network.nodes[next_node].status
                     )
 
-                    log.info(
+                    log.debug(
                         f"[Node_ID={self.node.node_id}] Next node 2: {next_node is None or not self.node.network.nodes[next_node].status}"
                     )
 
@@ -879,7 +859,7 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                         next_node is None
                         or not self.node.network.nodes[next_node].status
                     ):
-                        log.info(
+                        log.debug(
                             f"[Node_ID={self.node.node_id}] Broken path at node {self.node.node_id}: {packet}"
                         )
 
@@ -895,7 +875,7 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                         self.callback_stack.append(packet["from_node_id"])
                         self.send_packet(next_node, packet)
                 else:
-                    log.info(f"[Node_ID={self.node.node_id}] Function sequence completed.")
+                    log.debug(f"[Node_ID={self.node.node_id}] Function sequence completed.")
 
                     success_packet = {
                         "type": PacketType.SUCCESS,
@@ -905,7 +885,7 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                     }
 
                     from_node_id = packet["from_node_id"]
-                    log.info(
+                    log.debug(
                         f"[Node_ID={self.node.node_id}] Sending SUCCESS packet back to node {from_node_id}."
                     )
                     self.send_packet(from_node_id, success_packet)

@@ -1,8 +1,8 @@
 import logging as log
 
-from core.base import EpisodeEnded
-from core.clock import clock
+from core.base import Algorithm, EpisodeEnded, EpisodeTimeout, SimulationConfig
 from core.packet_registry import registry
+from core.clock import clock
 
 
 class Simulation:
@@ -11,79 +11,107 @@ class Simulation:
     Attributes:
         network (Network): The network to simulate.
         sender_node (Node): The sender node in the network.
-        metrics_manager (MetricsManager): The metrics manager to log simulation results.
     """
 
-    def __init__(
-        self, network: "Network", sender_node: "Node", metrics_manager: "MetricsManager"
-    ) -> None:
-        """Initializes the Simulation with the network, sender node, and metrics manager.
+    def __init__(self) -> None:
+        self.network: Network = None
+        self.sender_node: Node = None
+        self.config: SimulationConfig = None
 
-        Args:
-            network (Network): The network to simulate.
-            sender_node (Node): The sender node in the network.
-            metrics_manager (MetricsManager): The metrics manager to log simulation results.
-        """
-        self.network = network
-        self.sender_node = sender_node
-        self.metrics_manager = metrics_manager
-        log.info("Simulation initialized.")
+    def initialize(self, config, network, sender_node):
+        self.network: Network = network
+        self.sender_node: Node = sender_node
+        self.config: SimulationConfig = config
 
-    def start(self, algorithm_enum: "Algorithm", episodes: int) -> None:
-        """Starts the simulation for a specified number of episodes.
+        registry.initialize_simulation(config)
+        log.debug("Simulation initialized.")
 
-        Args:
-            algorithm_enum (Algorithm): The algorithm to use for routing.
-            episodes (int): The number of episodes to run.
-        """
+    def run(self):
+        for algorithm in self.config.algorithms:
+            self._run_algorithm(algorithm)
+
+        self._finalize_simulation()
+
+    def _run_algorithm(self, algorithm: Algorithm) -> None:
+        """Método privado para configurar y ejecutar un algoritmo"""
+        registry.set_current_algorithm(algorithm.name)
+
+        self._setup_algorithm(algorithm)
+
         clock.start()
         self.network.start_dynamic_changes()
-        successful_episodes = 0
 
-        algorithm = algorithm_enum.name
-        log.info(f"Starting simulation with {episodes} episodes using {algorithm}.")
-
-        for episode_number in range(1, episodes + 1):
-            log.info(f"=== Starting Episode #{episode_number} ({algorithm}) ===")
-
-            start_time = clock.get_current_time()
-            registry.initialize_episode(episode_number)
-
-            try:
-                self.sender_node.start_episode(episode_number)
-            except EpisodeEnded:
-                log.info(f"=== Episode #{episode_number} ended ===")
-
-            end_time = clock.get_current_time()
-
-            episode_data = registry.packet_log.get(episode_number, {})
-            episode_success = episode_data.get("episode_success", False)
-            route = episode_data.get("route", [])
-            total_hops = len(route)
-            dynamic_changes = self.network.get_dynamic_changes_by_episode(
-                start_time, end_time
-            )
-
-            self.metrics_manager.log_episode(
-                algorithm,
-                episode_number,
-                start_time,
-                end_time,
-                episode_success,
-                route,
-                total_hops,
-                dynamic_changes,
-            )
-
-            if episode_success:
-                successful_episodes += 1
+        for episode_number in range(1, self.config.episodes + 1):
+            self._run_episode(episode_number)
 
         clock.stop()
         self.network.stop_dynamic_changes()
-        registry.restart_packet_log()
+        registry.finalize_algorithm()
 
-        self.metrics_manager.finalize_simulation(
-            clock.get_current_time(), successful_episodes, episodes
-        )
+    def _setup_algorithm(self, algorithm: Algorithm) -> None:
+        """Configura las aplicaciones según el algoritmo"""
+        match algorithm:
+            case Algorithm.Q_ROUTING:
+                from algorithms.q_routing import (
+                    IntermediateQRoutingApplication,
+                    QRoutingApplication,
+                    SenderQRoutingApplication,
+                )
 
-        log.info("Simulation finished and clock stopped.")
+                self.sender_node.install_application(SenderQRoutingApplication)
+                self.sender_node.application.set_params(self.config.max_hops, self.config.functions_sequence)
+
+                if isinstance(self.sender_node.application, QRoutingApplication):
+                    self.sender_node.application.set_penalty(self.config.penalty)
+
+                for node_id, node in self.network.nodes.items():
+                    if node_id != self.sender_node.node_id:
+                        node.install_application(IntermediateQRoutingApplication)
+                        node.application.set_params(self.config.max_hops, self.config.functions_sequence)
+
+            case Algorithm.DIJKSTRA:
+                from algorithms.dijkstra import (
+                    IntermediateDijkstraApplication,
+                    SenderDijkstraApplication,
+                )
+
+                self.sender_node.install_application(SenderDijkstraApplication)
+                self.sender_node.application.set_params(self.config.max_hops, self.config.functions_sequence)
+
+                for node_id, node in self.network.nodes.items():
+                    if node_id != self.sender_node.node_id:
+                        node.install_application(IntermediateDijkstraApplication)
+                        node.application.set_params(self.config.max_hops, self.config.functions_sequence)
+
+            case Algorithm.BELLMAN_FORD:
+                from algorithms.bellman_ford import (
+                    IntermediateBellmanFordApplication,
+                    SenderBellmanFordApplication,
+                )
+
+                self.sender_node.install_application(SenderBellmanFordApplication)
+                self.sender_node.application.set_params(self.config.max_hops, self.config.functions_sequence)
+
+                for node_id, node in self.network.nodes.items():
+                    if node_id != self.sender_node.node_id:
+                        node.install_application(IntermediateBellmanFordApplication)
+                        node.application.set_params(self.config.max_hops, self.config.functions_sequence)
+
+    def _run_episode(self, episode_number: int) -> None:
+        """Ejecuta un episodio individual"""
+        registry.initialize_episode(episode_number)
+
+        try:
+            self.sender_node.start_episode(episode_number)
+            registry.mark_episode_complete(episode_number, success=False)
+
+        except EpisodeEnded as e:
+            registry.mark_episode_complete(episode_number, success=e.success)
+
+        except EpisodeTimeout:
+            registry.mark_episode_complete(episode_number, success=False)
+
+    def _finalize_simulation(self) -> None:
+        """Finaliza toda la simulación"""
+        registry.finalize_simulation()
+        log.info("Simulation completed")

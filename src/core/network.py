@@ -37,7 +37,7 @@ class Network:
         self.mean_disconnection_interval_ms: Optional[float] = None
         self.mean_reconnection_interval_ms: Optional[float] = None
         self.disconnection_probability: Optional[float] = None
-        log.info("Network initialized.")
+        log.debug("Network initialized.")
 
     def set_mean_disconnection_interval_ms(self, mean_disconnection_interval_ms: float) -> None:
         """Sets the mean interval between dynamic changes.
@@ -95,13 +95,13 @@ class Network:
     def start_dynamic_changes(self) -> None:
         """Starts a thread to apply dynamic changes based on the central clock."""
         current_time = clock.get_current_time()
-        log.info(f"Network clock starts: {current_time}")
+        log.debug(f"Network clock starts: {current_time}")
         threading.Thread(target=self._monitor_dynamic_changes, daemon=True).start()
 
     def stop_dynamic_changes(self) -> None:
         """Stops the dynamic changes thread."""
         self.running = False
-        log.info("Dynamic changes stopped.")
+        log.debug("Dynamic changes stopped.")
 
     def _monitor_dynamic_changes(self) -> None:
         """Monitors the central clock and applies dynamic changes automatically."""
@@ -135,7 +135,7 @@ class Network:
                         scale=self.mean_reconnection_interval_ms
                     )
 
-                log.warning(f"Node {node_id} disconnected at {current_time:.2f}.")
+                log.debug(f"Node {node_id} disconnected at {current_time:.2f}.")
 
     def _handle_reconnections(self) -> None:
         """Handles reconnections of previously disconnected nodes."""
@@ -150,7 +150,7 @@ class Network:
                     if current_time >= node.disconnected_at + self.reconnection_interval_ms:
                         node.status = True
                         delattr(node, "disconnected_at")
-                        log.info(f"Node {node_id} reconnected at {current_time:.2f}.")
+                        log.debug(f"Node {node_id} reconnected at {current_time:.2f}.")
                 # Mean reconnection mode
                 elif self.mean_reconnection_interval_ms is not None:
                     if not hasattr(node, "reconnect_time"):
@@ -158,7 +158,7 @@ class Network:
                     if current_time >= node.reconnect_time:
                         node.status = True
                         delattr(node, "reconnect_time")
-                        log.info(f"Node {node_id} reconnected at {current_time:.2f}.")
+                        log.debug(f"Node {node_id} reconnected at {current_time:.2f}.")
 
     def validate_connection(self, from_node_id: int, to_node_id: int) -> bool:
         """Validates if a connection between two nodes is valid.
@@ -275,13 +275,13 @@ class Network:
         )
 
         if self.is_node_reachable(from_node_id, to_node_id):
-            log.info(
+            log.debug(
                 f"Sending packet from Node {from_node_id} to Node {to_node_id} with latency {latency:.6f} seconds"
             )
             time.sleep(latency)
             self.nodes[to_node_id].application.receive_packet(packet)
         else:
-            log.warning(
+            log.debug(
                 f"Failed to send packet: Node {to_node_id} is not reachable from Node {from_node_id}"
             )
 
@@ -324,7 +324,7 @@ class Network:
             for neighbor_id in neighbors:
                 network.connect_nodes(node_id, neighbor_id)
 
-        log.info(f"Network loaded from {file_path}.")
+        log.debug(f"Network loaded from {file_path}.")
         return network, sender_node
 
     def get_distance(self, node_id1: int, node_id2: int) -> float:
