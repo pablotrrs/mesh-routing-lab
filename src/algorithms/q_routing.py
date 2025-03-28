@@ -494,7 +494,7 @@ class SenderQRoutingApplication(QRoutingApplication):
 
         global CURRENT_HOP_COUNT
         CURRENT_HOP_COUNT = 0
-        raise EpisodeEnded()
+        raise EpisodeEnded(success)
 
     def __str__(self) -> str:
         return f"SenderNode(id={self.node.node_id}, neighbors={self.node.network.get_neighbors(self.node.node_id)})"

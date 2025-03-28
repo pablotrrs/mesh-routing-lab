@@ -1,6 +1,5 @@
-from .base import Application, EpisodeEnded
+from .base import Algorithm, NodeFunction, Application, EpisodeEnded
 from .clock import clock
-from .enums import Algorithm, NodeFunction
 from .metrics_manager import MetricsManager
 from .network import Network
 from .node import Node

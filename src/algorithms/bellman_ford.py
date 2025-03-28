@@ -557,7 +557,7 @@ class SenderBellmanFordApplication(BellmanFordApplication):
         registry.mark_episode_complete(episode_number, success)
 
         self.stop_route_monitoring()
-        raise EpisodeEnded()
+        raise EpisodeEnded(success)
 
     def _log_routes(self):
         """

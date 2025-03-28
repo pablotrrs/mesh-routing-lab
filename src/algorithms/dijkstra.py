@@ -538,7 +538,7 @@ class SenderDijkstraApplication(DijkstraApplication):
 
         registry.mark_episode_complete(episode_number, success)
 
-        raise EpisodeEnded()
+        raise EpisodeEnded(success)
 
     def _log_routes(self):
         """
