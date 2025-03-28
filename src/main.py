@@ -132,6 +132,7 @@ def initialize_network(config):
         network.set_reconnection_interval_ms(config.reconnection_interval_ms)
 
     network.set_disconnection_probability(config.disconnection_probability)
+    log.info(network)
     network.start_dynamic_changes()
     return network, sender_node
 
@@ -170,79 +171,13 @@ def main():
         penalty=args.penalty,
     )
 
+    log.info(config)
+
     network, sender_node = initialize_network(config)
 
-    metrics_manager = MetricsManager()
-    metrics_manager.initialize(
-        max_hops=args.max_hops,
-        topology_file=args.topology_file,
-        functions_sequence=functions_sequence,
-        mean_disconnection_interval_ms=args.mean_disconnection_interval_ms,
-        mean_reconnection_interval_ms=args.mean_reconnection_interval_ms,
-        disconnection_probability=args.disconnection_probability,
-        algorithms=[algo.name for algo in selected_algorithms],
-        penalty=args.penalty,
-    )
-
-    simulation = Simulation(network, sender_node, metrics_manager)
-
-    for algorithm in selected_algorithms:
-        log.debug(
-            f"Running {args.episodes} episodes using the {algorithm.name} algorithm."
-        )
-        log.debug(f"Maximum hops: {args.max_hops}")
-        log.debug(f"Mean interval for dynamic changes: {args.mean_disconnection_interval_ms} ms")
-        log.debug(f"Topology file: {args.topology_file}")
-        log.debug(f"Functions sequence: {functions_sequence}")
-
-        match algorithm:
-            case Algorithm.Q_ROUTING:
-                from algorithms.q_routing import (
-                    IntermediateQRoutingApplication,
-                    QRoutingApplication,
-                    SenderQRoutingApplication,
-                )
-
-                sender_node.install_application(SenderQRoutingApplication)
-                sender_node.application.set_params(args.max_hops, functions_sequence)
-
-                if isinstance(sender_node.application, QRoutingApplication):
-                    sender_node.application.set_penalty(args.penalty)
-
-                for node_id, node in network.nodes.items():
-                    if node_id != sender_node.node_id:
-                        node.install_application(IntermediateQRoutingApplication)
-                        node.application.set_params(args.max_hops, functions_sequence)
-
-            case Algorithm.DIJKSTRA:
-                from algorithms.dijkstra import (
-                    IntermediateDijkstraApplication,
-                    SenderDijkstraApplication,
-                )
-
-                sender_node.install_application(SenderDijkstraApplication)
-                sender_node.application.set_params(args.max_hops, functions_sequence)
-
-                for node_id, node in network.nodes.items():
-                    if node_id != sender_node.node_id:
-                        node.install_application(IntermediateDijkstraApplication)
-                        node.application.set_params(args.max_hops, functions_sequence)
-
-            case Algorithm.BELLMAN_FORD:
-                from algorithms.bellman_ford import (
-                    IntermediateBellmanFordApplication,
-                    SenderBellmanFordApplication,
-                )
-
-                sender_node.install_application(SenderBellmanFordApplication)
-                sender_node.application.set_params(args.max_hops, functions_sequence)
-
-                for node_id, node in network.nodes.items():
-                    if node_id != sender_node.node_id:
-                        node.install_application(IntermediateBellmanFordApplication)
-                        node.application.set_params(args.max_hops, functions_sequence)
-
-        simulation.start(algorithm, args.episodes)
+    simulation = Simulation()
+    simulation.initialize(config, network, sender_node)
+    simulation.run()
 
 if __name__ == "__main__":
     main()

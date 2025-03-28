@@ -135,7 +135,7 @@ class Network:
                         scale=self.mean_reconnection_interval_ms
                     )
 
-                log.warning(f"Node {node_id} disconnected at {current_time:.2f}.")
+                log.debug(f"Node {node_id} disconnected at {current_time:.2f}.")
 
     def _handle_reconnections(self) -> None:
         """Handles reconnections of previously disconnected nodes."""

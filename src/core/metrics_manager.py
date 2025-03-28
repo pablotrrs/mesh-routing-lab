@@ -109,6 +109,7 @@ class MetricsManager:
 
         log.debug(f"Logged episode {episode_number} for algorithm {algorithm}.")
 
+    # TODO: este método finaliza la simulación para un algoritmo, no para todos
     def finalize_simulation(
         self, total_time: float, successful_episodes: int, episodes: int
     ) -> None:
@@ -235,7 +236,7 @@ class MetricsManager:
         with pd.ExcelWriter(filename, engine="openpyxl", mode="w") as writer:
             for algorithm, data in metrics_data.items():
                 if not data["episode"]:
-                    log.error(f"no episodes for algorithm {algorithm}.")
+                    log.debug(f"no episodes for algorithm {algorithm}.")
                     continue
 
                 df = pd.DataFrame(data)
