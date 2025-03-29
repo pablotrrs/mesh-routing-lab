@@ -37,6 +37,7 @@ class Network:
         self.mean_disconnection_interval_ms: Optional[float] = None
         self.mean_reconnection_interval_ms: Optional[float] = None
         self.disconnection_probability: Optional[float] = None
+        self.reconnection_interval_ms: Optional[float] = None
         log.info("Network initialized.")
 
     def set_mean_disconnection_interval_ms(self, mean_disconnection_interval_ms: float) -> None:
@@ -153,7 +154,7 @@ class Network:
                         log.info(f"Node {node_id} reconnected at {current_time:.2f}.")
                 # Mean reconnection mode
                 elif self.mean_reconnection_interval_ms is not None:
-                    if not hasattr(node, "reconnect_time"):
+                    if not hasattr(node, "reconnect_time") or node.reconnect_time is None:
                         node.reconnect_time = current_time + np.random.exponential(self.mean_reconnection_interval_ms)
                     if current_time >= node.reconnect_time:
                         node.status = True
