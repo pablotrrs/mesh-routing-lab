@@ -48,7 +48,7 @@ class PacketRegistry:
             to_node_id (Optional[int]): ID of the destination node (or None if not applicable).
             packet_type (str): Type of the packet.
         """
-        log.warning(f"Packet from {from_node_id} to {to_node_id} lost.")
+        log.debug(f"Packet from {from_node_id} to {to_node_id} lost.")
         self.packet_log[episode_number]["route"].append(
             {
                 "from": from_node_id,

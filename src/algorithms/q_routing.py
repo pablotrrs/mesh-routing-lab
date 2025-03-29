@@ -3,11 +3,13 @@ import logging as log
 from dataclasses import dataclass
 from collections import deque
 from enum import Enum
+import threading
 
 from core.clock import clock
-from core.base import Application, EpisodeEnded
+from core.base import Application, EpisodeEnded, EpisodeTimeout
 from core.packet_registry import registry
 from utils.visualization import print_q_table
+from utils.custom_excep_hook import custom_thread_excepthook
 
 ALPHA = 0.1
 GAMMA = 0.9
@@ -31,7 +33,7 @@ CALLBACK_STACK = deque()
 BELLMAN_EQ = lambda s, t, q_current: q_current + ALPHA * (s + t - q_current)
 
 
-class PacketType(Enum):
+class PacketType(str, Enum):
     PACKET_HOP = "PACKET_HOP"
     CALLBACK = "CALLBACK"
     MAX_HOPS_REACHED = "MAX_HOPS_REACHED"
@@ -226,23 +228,6 @@ class QRoutingApplication(Application):
         self.q_table[self.node.node_id][next_node] = updated_q
         return
 
-    def send_packet(self, to_node_id, packet) -> None:
-        if packet.get("hops") is not None:
-            packet["hops"] += 1
-
-        packet["from_node_id"] = self.node.node_id
-
-        log.debug(f"[Node_ID={self.node.node_id}] Sending packet to Node {to_node_id}\n")
-        self.node.network.send(self.node.node_id, to_node_id, packet)
-
-        if packet["hops"] > packet.get("max_hops", float("inf")):
-            log.debug(
-                f"[Node_ID={self.node.node_id}] Max hops reached. Initiating full echo callback"
-            )
-            return False
-        else:
-            return True
-
     def initiate_max_hops_callback(self, packet):
         global CALLBACK_STACK
 
@@ -336,59 +321,106 @@ class SenderQRoutingApplication(QRoutingApplication):
     def set_penalty(self, penalty):
         self.penalty = penalty
 
-    def start_episode(self, episode_number, current_hop_count=0) -> None:
-        """Initiates an episode by creating a packet and sending it to chosen node."""
+    def start_episode(self, episode_number: int) -> None:
+        """Initiates an episode by creating a packet and sending it asynchronously."""
+        if not hasattr(self, "episode_start_time") or self.episode_start_time is None:
+            self.episode_start_time = clock.get_current_time()
 
-        global EPISODE_COMPLETED
-        EPISODE_COMPLETED = False
+        log.debug(f"[Sender Node] Starting Episode {episode_number}")
 
-        log.debug(f"\n\033[93mClearing callback stacks for Episode {episode_number}\033[0m")
-        global CALLBACK_STACK
-        CALLBACK_STACK.clear()
+        episode_thread = threading.Thread(target=self._process_episode, args=(episode_number,0,))
+        timeout_watcher_thread = threading.Thread(target=self._monitor_timeout, args=(episode_number,))
+        threading.excepthook = custom_thread_excepthook
 
-        packet = {
-            "type": PacketType.PACKET_HOP,
-            "episode_number": episode_number,
-            "from_node_id": self.node.node_id,
-            "functions_sequence": self.functions_sequence.copy(),
-            "function_counters": {func: 0 for func in self.functions_sequence},
-            "hops": current_hop_count,
-            "max_hops": self.max_hops,
-            "is_delivered": False,
-            "penalty": self.penalty,
-        }
+        episode_thread.start()
+        timeout_watcher_thread.start()
 
-        self.initialize_or_update_q_table()
+        episode_thread.join()
 
-        next_node = self.select_next_node()
+        if timeout_watcher_thread.is_alive():
+            timeout_watcher_thread.join()
 
-        if next_node is None:
-            log.debug(
-                f"[Node_ID={self.node.node_id}] No valid next node found. Can't initiate episode!."
-            )
-            # movement: none
-            packet["hops"] += 1
-            registry.mark_packet_lost(
-                packet["episode_number"], packet["from_node_id"], None, packet["type"]
-            )
-            log.debug(f'[Node_ID={self.node.node_id}] Packet hop count {packet["hops"]}')
+    def _process_episode(self, episode_number: int, current_hop_count: int) -> None:
+        """Core logic for processing an episode, runs asynchronously."""
+        try:
+            global EPISODE_COMPLETED
+            EPISODE_COMPLETED = False
 
-            if packet["hops"] > self.max_hops:
-                self.mark_episode_result(packet, success=False)
+            log.debug(f"\n\033[93mClearing callback stacks for Episode {episode_number}\033[0m")
+            global CALLBACK_STACK
+            CALLBACK_STACK.clear()
 
-            # si no se puede empezar el episodio, se sigue intentando hasta que se pueda
-            self.start_episode(episode_number, packet["hops"])
+            packet = {
+                "type": PacketType.PACKET_HOP,
+                "episode_number": episode_number,
+                "from_node_id": self.node.node_id,
+                "functions_sequence": self.functions_sequence.copy(),
+                "function_counters": {func: 0 for func in self.functions_sequence},
+                "hops": current_hop_count,
+                "max_hops": self.max_hops,
+                "is_delivered": False,
+                "penalty": self.penalty,
+            }
+
+            self.initialize_or_update_q_table()
+
+            next_node = self.select_next_node()
+
+            if next_node is None:
+                log.debug(
+                    f"[Node_ID={self.node.node_id}] No valid next node found. Can't initiate episode!."
+                )
+                # movement: none
+                packet["hops"] += 1
+                registry.mark_packet_lost(
+                    packet["episode_number"], packet["from_node_id"], None, packet["type"]
+                )
+                log.debug(f'[Node_ID={self.node.node_id}] Packet hop count {packet["hops"]}')
+
+                if packet["hops"] > self.max_hops:
+                    self.mark_episode_result(packet, success=False)
+
+                # si no se puede empezar el episodio, se sigue intentando hasta que se pueda
+                self._process_episode(episode_number, packet["hops"])
+                return
+            else:
+                estimated_time_remaining = self.estimate_remaining_time(next_node)
+
+                self.update_q_table_with_incomplete_info(
+                    next_node=next_node, estimated_time_remaining=estimated_time_remaining
+                )
+
+                # movement: forward
+                self.send_packet(next_node, packet)
+                return
+
+        except EpisodeEnded as e:
+            log.info(f"[Sender Node] Episode ended with success={e.success}")
+            raise e
+
+        except EpisodeTimeout as e:
+            log.warning(f"[Sender Node] Episode timed out!")
+            raise e
+
+    def _monitor_timeout(self, episode_number: int) -> None:
+        """Continuously monitors the timeout and interrupts the episode if exceeded."""
+        if self.episode_timeout_ms is None or self.episode_start_time is None:
             return
-        else:
-            estimated_time_remaining = self.estimate_remaining_time(next_node)
 
-            self.update_q_table_with_incomplete_info(
-                next_node=next_node, estimated_time_remaining=estimated_time_remaining
-            )
+        while True:
+            current_time = clock.get_current_time()
+            elapsed_time = current_time - self.episode_start_time
 
-            # movement: forward
-            self.send_packet(next_node, packet)
-            return
+            if elapsed_time >= self.episode_timeout_ms:
+                log.warning(f"[Sender Node] Timeout reached after {elapsed_time} ms.")
+                raise EpisodeTimeout(f"[Sender Node] Episode timeout reached.")
+
+            import time
+            time.sleep(0.001)
+
+            global EPISODE_COMPLETED
+            if EPISODE_COMPLETED:
+                break
 
     def handle_packet_hop(self, packet) -> None:
         next_node = self.select_next_node()

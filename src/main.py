@@ -32,7 +32,7 @@ import sys
 from core.network import Network
 from core.simulation import Simulation
 from core.base import Algorithm, NodeFunction, SimulationConfig
-from core.metrics_manager import MetricsManager
+from utils.custom_excep_hook import custom_excepthook
 
 def setup_logging():
     log.root.handlers = []
@@ -141,6 +141,7 @@ def main():
     setup_logging()
     args = setup_arguments()
     sys.setrecursionlimit(200000)
+    sys.excepthook = custom_excepthook
 
     try:
         functions_sequence = [

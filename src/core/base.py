@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
-from utils import enforce_timeout_check
 from enum import Enum
 from dataclasses import dataclass
-from tabulate import tabulate
+import logging as log
+from core.clock import clock
 
 
 class Algorithm(str, Enum):
@@ -184,15 +184,6 @@ class Application(ABC):
         self.functions_sequence = functions_sequence
         self.episode_timeout_ms = episode_timeout_ms
 
-    def set_episode_start_time(self, start_time: int) -> None:
-        """
-        Sets the start time of the episode for timeout tracking.
-
-        Args:
-            start_time (int): Episode start time in milliseconds.
-        """
-        self.episode_start_time = start_time
-
     # === Core episode lifecycle methods ===
 
     @abstractmethod
@@ -205,20 +196,34 @@ class Application(ABC):
         """
         pass
 
-    @abstractmethod
-    @enforce_timeout_check
     def send_packet(self, to_node_id: int, packet: dict) -> bool:
-        """
-        Sends a packet to the given neighbor node.
+        """Sends a packet after checking timeout and verifying hop limits.
+
+        This method handles the logic of incrementing hops, setting the sender ID,
+        and checking if the packet exceeds the maximum allowed hops.
 
         Args:
             to_node_id (int): Target node ID.
             packet (dict): Packet contents.
 
         Returns:
-            bool: True if the packet was sent, False otherwise.
+            bool: True if the packet was sent successfully, False otherwise.
         """
-        pass
+        if packet.get("hops") is not None:
+            packet["hops"] += 1
+        else:
+            packet["hops"] = 1
+
+        packet["from_node_id"] = self.node.node_id
+
+        log.debug(f"[Node_ID={self.node.node_id}] Sending packet to Node {to_node_id}\n")
+        self.node.network.send(self.node.node_id, to_node_id, packet)
+
+        if packet["hops"] > packet.get("max_hops", float("inf")):
+            log.debug(f"[Node_ID={self.node.node_id}] Max hops reached. Dropping packet.")
+            return False
+
+        return True
 
     @abstractmethod
     def receive_packet(self, packet: dict) -> None:
@@ -259,8 +264,6 @@ class Application(ABC):
         Raises:
             EpisodeTimeout: If elapsed time exceeds the configured timeout.
         """
-        if self.episode_timeout_ms is None or self.episode_start_time is None:
-            return
         current_time = clock.get_current_time()
         if current_time - self.episode_start_time >= self.episode_timeout_ms:
             raise EpisodeTimeout(f"[Node_ID={self.node.node_id}] Episode timeout reached")

@@ -200,6 +200,6 @@ class Simulation:
 
     def _finalize_simulation(self) -> None:
         """Finalizes the simulation and generates reports."""
-        log.debug("Finalizing simulation.")
+        log.info("Finalizing simulation.")
         clock.stop()
         self.network.stop_dynamic_changes()
