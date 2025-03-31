@@ -89,8 +89,10 @@ class Network:
             return self.disconnection_interval_ms
         elif self.mean_disconnection_interval_ms == float("inf"):
             return int(1e12)  # A very large number to simulate no changes
-        else:
+        elif hasattr(self, "mean_disconnection_interval_ms") and self.mean_disconnection_interval_ms is not None:
             return int(np.random.exponential(self.mean_disconnection_interval_ms))
+        else:
+            return int(1e12)  # A very large number to simulate no changes
 
     def start_dynamic_changes(self) -> None:
         """Starts a thread to apply dynamic changes based on the central clock."""
@@ -144,7 +146,7 @@ class Network:
         for node_id, node in self.nodes.items():
             if not node.status:
                 # Fixed reconnection mode
-                if self.reconnection_interval_ms is not None:
+                if hasattr(self, "reconnection_interval_ms") and self.reconnection_interval_ms is not None:
                     if not hasattr(node, "disconnected_at") or node.disconnected_at is None:
                         continue
                     if current_time >= node.disconnected_at + self.reconnection_interval_ms:

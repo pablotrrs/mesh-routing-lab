@@ -3,10 +3,15 @@ import logging as log
 from enum import Enum
 from queue import PriorityQueue
 
-from core.base import Application, EpisodeEnded
+from core.base import Application, EpisodeEnded, EpisodeTimeout
 from core.clock import clock
 from core.packet_registry import registry
 from tabulate import tabulate
+import threading
+from utils.custom_excep_hook import custom_thread_excepthook
+from utils.thread_killer import kill_thread
+
+EPISODE_COMPLETED = False
 
 broken_path = False
 
@@ -163,55 +168,100 @@ class SenderDijkstraApplication(DijkstraApplication):
         self.previous_node_id = None
 
     def start_episode(self, episode_number):
+        """Initiates an episode by creating a packet and sending it asynchronously."""
+        if not hasattr(self, "episode_start_time") or self.episode_start_time is None:
+            self.episode_start_time = clock.get_current_time()
 
-        global broken_path
-        if broken_path or episode_number == 1:
-            broken_path = False
-            log.debug(
-                f"[Node_ID={self.node.node_id}] Starting broadcast for episode {episode_number}"
-            )
+        episode_thread = threading.Thread(target=self._process_episode, args=(episode_number,))
+        timeout_watcher_thread = threading.Thread(target=self._monitor_timeout, args=(episode_thread, episode_number))
 
-            message_id = f"broadcast_{self.node.node_id}_{episode_number}"
+        threading.excepthook = custom_thread_excepthook
 
-            self.broadcast_state = BroadcastState()
-            self.start_broadcast(message_id, episode_number)
+        episode_thread.start()
+        timeout_watcher_thread.start()
 
-            while (
-                self.broadcast_state.acks_received < self.broadcast_state.expected_acks
-            ):
-                pass
+        episode_thread.join()
 
-            log.debug(
-                f"[Node_ID={self.node.node_id}] Broadcast completed. Computing shortest paths..."
-            )
-            self.compute_shortest_paths()
+        if timeout_watcher_thread.is_alive():
+            timeout_watcher_thread.join()
 
-            while not self.paths_computed:
-                pass
+    def _process_episode(self, episode_number: int) -> None:
+        """Core logic for processing an episode, runs asynchronously."""
+        try:
+            global broken_path
+            if broken_path or episode_number == 1:
+                broken_path = False
+                log.debug(
+                    f"[Node_ID={self.node.node_id}] Starting broadcast for episode {episode_number}"
+                )
 
-        log.debug(f"[Node_ID={self.node.node_id}] Starting episode {episode_number}")
+                message_id = f"broadcast_{self.node.node_id}_{episode_number}"
 
-        packet = {
-            "type": PacketType.PACKET_HOP,
-            "episode_number": episode_number,
-            "from_node_id": self.node.node_id,
-            "functions_sequence": self.functions_sequence.copy(),
-            "function_counters": {
-                func: 0 for func in self.functions_sequence
-            },
-            "hops": 0,
-            "time": 0,
-            "max_hops": self.max_hops,
-            "node_function_map": self.broadcast_state.node_function_map,
-        }
-        next_node = self.select_next_function_node(packet)
+                self.broadcast_state = BroadcastState()
+                self.start_broadcast(message_id, episode_number)
 
-        if next_node is None:
-            log.debug("No suitable next node found.")
+                while (
+                    self.broadcast_state.acks_received < self.broadcast_state.expected_acks
+                ):
+                    pass
+
+                log.debug(
+                    f"[Node_ID={self.node.node_id}] Broadcast completed. Computing shortest paths..."
+                )
+                self.compute_shortest_paths()
+
+                while not self.paths_computed:
+                    pass
+
+            log.debug(f"[Node_ID={self.node.node_id}] Starting episode {episode_number}")
+
+            packet = {
+                "type": PacketType.PACKET_HOP,
+                "episode_number": episode_number,
+                "from_node_id": self.node.node_id,
+                "functions_sequence": self.functions_sequence.copy(),
+                "function_counters": {
+                    func: 0 for func in self.functions_sequence
+                },
+                "hops": 0,
+                "time": 0,
+                "max_hops": self.max_hops,
+                "node_function_map": self.broadcast_state.node_function_map,
+            }
+            next_node = self.select_next_function_node(packet)
+
+            if next_node is None:
+                log.debug("No suitable next node found.")
+                return
+
+            self.send_packet(next_node, packet)
             return
 
-        self.send_packet(next_node, packet)
-        return
+        except EpisodeEnded as e:
+            log.info(f"[Sender Node] Episode ended with success={e.success}")
+            raise e
+
+        except EpisodeTimeout as e:
+            log.warning(f"[Sender Node] Episode timed out!")
+            raise e
+
+    def _monitor_timeout(self, episode_thread: threading.Thread, episode_number: int) -> None:
+        """Continuously monitors the timeout and kills the episode thread if exceeded."""
+        if self.episode_timeout_ms is None or self.episode_start_time is None:
+            return
+
+        while episode_thread.is_alive():
+            current_time = clock.get_current_time()
+            elapsed_time = current_time - self.episode_start_time
+
+            if elapsed_time >= self.episode_timeout_ms:
+                log.debug(f"[Sender Node] Timeout reached after {elapsed_time} ms. Terminating episode...")
+                kill_thread(episode_thread)
+                log.info(f"[Episode #{episode_number}] Episode forcefully terminated due to timeout.")
+                return
+
+            import time
+            time.sleep(0.001)
 
     def start_broadcast(self, message_id, episode_number):
         """
@@ -530,6 +580,9 @@ class SenderDijkstraApplication(DijkstraApplication):
             packet (Packet): El paquete asociado al episodio.
             success (bool): `True` si el episodio fue exitoso, `False` si falló.
         """
+        global EPISODE_COMPLETED
+        EPISODE_COMPLETED = True
+
         status_text = "SUCCESS" if success else "FAILURE"
         episode_number = packet["episode_number"]
         log.debug(
