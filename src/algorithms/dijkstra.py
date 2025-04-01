@@ -10,6 +10,7 @@ from tabulate import tabulate
 import threading
 from utils.custom_excep_hook import custom_thread_excepthook
 from utils.thread_killer import kill_thread
+from utils.custom_excep_hook import custom_thread_excepthook
 
 EPISODE_COMPLETED = False
 
@@ -167,10 +168,13 @@ class SenderDijkstraApplication(DijkstraApplication):
         self.routes = {}
         self.previous_node_id = None
 
-    def start_episode(self, episode_number):
+    def start_episode(self, episode_number: int) -> None:
         """Initiates an episode by creating a packet and sending it asynchronously."""
-        if not hasattr(self, "episode_start_time") or self.episode_start_time is None:
-            self.episode_start_time = clock.get_current_time()
+
+        global EPISODE_COMPLETED
+        EPISODE_COMPLETED = False
+
+        self.episode_start_time = clock.get_current_time()
 
         episode_thread = threading.Thread(target=self._process_episode, args=(episode_number,))
         timeout_watcher_thread = threading.Thread(target=self._monitor_timeout, args=(episode_thread, episode_number))
@@ -258,6 +262,10 @@ class SenderDijkstraApplication(DijkstraApplication):
                 log.debug(f"[Sender Node] Timeout reached after {elapsed_time} ms. Terminating episode...")
                 kill_thread(episode_thread)
                 log.info(f"[Episode #{episode_number}] Episode forcefully terminated due to timeout.")
+                return
+
+            if EPISODE_COMPLETED:
+                log.debug(f"[Episode #{episode_number}] Episode completed. Stopping timeout watcher.")
                 return
 
             import time

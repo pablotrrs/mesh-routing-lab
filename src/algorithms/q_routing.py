@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from collections import deque
 from enum import Enum
 import threading
+from utils.thread_killer import kill_thread
 
 from core.clock import clock
 from core.base import Application, EpisodeEnded, EpisodeTimeout
@@ -323,13 +324,15 @@ class SenderQRoutingApplication(QRoutingApplication):
 
     def start_episode(self, episode_number: int) -> None:
         """Initiates an episode by creating a packet and sending it asynchronously."""
-        if not hasattr(self, "episode_start_time") or self.episode_start_time is None:
-            self.episode_start_time = clock.get_current_time()
 
-        log.debug(f"[Sender Node] Starting Episode {episode_number}")
+        global EPISODE_COMPLETED
+        EPISODE_COMPLETED = False
 
-        episode_thread = threading.Thread(target=self._process_episode, args=(episode_number,0,))
-        timeout_watcher_thread = threading.Thread(target=self._monitor_timeout, args=(episode_number,))
+        self.episode_start_time = clock.get_current_time()
+
+        episode_thread = threading.Thread(target=self._process_episode, args=(episode_number,0))
+        timeout_watcher_thread = threading.Thread(target=self._monitor_timeout, args=(episode_thread, episode_number))
+
         threading.excepthook = custom_thread_excepthook
 
         episode_thread.start()
@@ -402,25 +405,27 @@ class SenderQRoutingApplication(QRoutingApplication):
             log.warning(f"[Sender Node] Episode timed out!")
             raise e
 
-    def _monitor_timeout(self, episode_number: int) -> None:
-        """Continuously monitors the timeout and interrupts the episode if exceeded."""
+    def _monitor_timeout(self, episode_thread: threading.Thread, episode_number: int) -> None:
+        """Continuously monitors the timeout and kills the episode thread if exceeded."""
         if self.episode_timeout_ms is None or self.episode_start_time is None:
             return
 
-        while True:
+        while episode_thread.is_alive():
             current_time = clock.get_current_time()
             elapsed_time = current_time - self.episode_start_time
 
             if elapsed_time >= self.episode_timeout_ms:
-                log.warning(f"[Sender Node] Timeout reached after {elapsed_time} ms.")
-                raise EpisodeTimeout(f"[Sender Node] Episode timeout reached.")
+                log.debug(f"[Sender Node] Timeout reached after {elapsed_time} ms. Terminating episode...")
+                kill_thread(episode_thread)
+                log.info(f"[Episode #{episode_number}] Episode forcefully terminated due to timeout.")
+                return
+
+            if EPISODE_COMPLETED:
+                log.debug(f"[Episode #{episode_number}] Episode completed. Stopping timeout watcher.")
+                return
 
             import time
             time.sleep(0.001)
-
-            global EPISODE_COMPLETED
-            if EPISODE_COMPLETED:
-                break
 
     def handle_packet_hop(self, packet) -> None:
         next_node = self.select_next_node()

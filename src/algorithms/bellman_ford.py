@@ -8,7 +8,10 @@ from core.base import Application, EpisodeEnded
 from core.clock import clock
 from core.packet_registry import registry
 from tabulate import tabulate
+from utils.thread_killer import kill_thread
+from utils.custom_excep_hook import custom_thread_excepthook
 
+EPISODE_COMPLETED = False
 
 class BroadcastState:
     def __init__(self):
@@ -189,53 +192,106 @@ class SenderBellmanFordApplication(BellmanFordApplication):
 
             time.sleep(0.1)
 
-    def start_episode(self, episode_number):
-        self.start_route_monitoring()
+    def start_episode(self, episode_number: int) -> None:
+        """Initiates an episode by creating a packet and sending it asynchronously."""
 
-        if episode_number == 1:
-            log.debug(
-                f"[Node_ID={self.node.node_id}] Starting broadcast for episode {episode_number}"
-            )
+        global EPISODE_COMPLETED
+        EPISODE_COMPLETED = False
 
-            message_id = f"broadcast_{self.node.node_id}_{episode_number}"
+        self.episode_start_time = clock.get_current_time()
 
-            self.broadcast_state = BroadcastState()
-            self.start_broadcast(message_id, episode_number)
+        episode_thread = threading.Thread(target=self._process_episode, args=(episode_number,))
+        timeout_watcher_thread = threading.Thread(target=self._monitor_timeout, args=(episode_thread, episode_number))
 
-            while (
-                self.broadcast_state.acks_received < self.broadcast_state.expected_acks
-            ):
-                pass
+        threading.excepthook = custom_thread_excepthook
 
-            log.debug(
-                f"[Node_ID={self.node.node_id}] Broadcast completed. Computing shortest paths..."
-            )
-            self.compute_shortest_paths()
+        episode_thread.start()
+        timeout_watcher_thread.start()
 
-            while not self.paths_computed:
-                pass
+        episode_thread.join()
 
-        log.debug(f"[Node_ID={self.node.node_id}] Starting episode {episode_number}")
-        packet = {
-            "type": PacketType.PACKET_HOP,
-            "episode_number": episode_number,
-            "from_node_id": self.node.node_id,
-            "functions_sequence": self.functions_sequence.copy(),
-            "function_counters": {
-                func: 0 for func in self.functions_sequence
-            },
-            "hops": 0,
-            "max_hops": self.max_hops,
-            "node_function_map": self.broadcast_state.node_function_map,
-        }
-        next_node = self.select_next_function_node(packet)
+        if timeout_watcher_thread.is_alive():
+            timeout_watcher_thread.join()
 
-        if next_node is None:
-            log.debug("No suitable next node found.")
+    def _process_episode(self, episode_number: int) -> None:
+        """Core logic for processing an episode, runs asynchronously."""
+        try:
+            self.start_route_monitoring()
+
+            if episode_number == 1:
+                log.debug(
+                    f"[Node_ID={self.node.node_id}] Starting broadcast for episode {episode_number}"
+                )
+
+                message_id = f"broadcast_{self.node.node_id}_{episode_number}"
+
+                self.broadcast_state = BroadcastState()
+                self.start_broadcast(message_id, episode_number)
+
+                while (
+                    self.broadcast_state.acks_received < self.broadcast_state.expected_acks
+                ):
+                    pass
+
+                log.debug(
+                    f"[Node_ID={self.node.node_id}] Broadcast completed. Computing shortest paths..."
+                )
+                self.compute_shortest_paths()
+
+                while not self.paths_computed:
+                    pass
+
+            log.debug(f"[Node_ID={self.node.node_id}] Starting episode {episode_number}")
+            packet = {
+                "type": PacketType.PACKET_HOP,
+                "episode_number": episode_number,
+                "from_node_id": self.node.node_id,
+                "functions_sequence": self.functions_sequence.copy(),
+                "function_counters": {
+                    func: 0 for func in self.functions_sequence
+                },
+                "hops": 0,
+                "max_hops": self.max_hops,
+                "node_function_map": self.broadcast_state.node_function_map,
+            }
+            next_node = self.select_next_function_node(packet)
+
+            if next_node is None:
+                log.debug("No suitable next node found.")
+                return
+
+            self.send_packet(next_node, packet)
             return
 
-        self.send_packet(next_node, packet)
-        return
+        except EpisodeEnded as e:
+            log.info(f"[Sender Node] Episode ended with success={e.success}")
+            raise e
+
+        except EpisodeTimeout as e:
+            log.warning(f"[Sender Node] Episode timed out!")
+            raise e
+
+    def _monitor_timeout(self, episode_thread: threading.Thread, episode_number: int) -> None:
+        """Continuously monitors the timeout and kills the episode thread if exceeded."""
+        if self.episode_timeout_ms is None or self.episode_start_time is None:
+            return
+
+        while episode_thread.is_alive():
+            current_time = clock.get_current_time()
+            elapsed_time = current_time - self.episode_start_time
+
+            if elapsed_time >= self.episode_timeout_ms:
+                log.debug(f"[Sender Node] Timeout reached after {elapsed_time} ms. Terminating episode...")
+                kill_thread(episode_thread)
+                log.info(f"[Episode #{episode_number}] Episode forcefully terminated due to timeout.")
+                return
+
+            if EPISODE_COMPLETED:
+                log.debug(f"[Episode #{episode_number}] Episode completed. Stopping timeout watcher.")
+                return
+
+            import time
+            time.sleep(0.001)
 
     def start_broadcast(self, message_id, episode_number):
         """
