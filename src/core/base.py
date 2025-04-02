@@ -1,8 +1,9 @@
-from abc import ABC, abstractmethod
-from typing import List, Optional
-from enum import Enum
-from dataclasses import dataclass
 import logging as log
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from enum import Enum
+from typing import List, Optional
+
 from core.clock import clock
 
 
@@ -96,28 +97,49 @@ class SimulationConfig:
     penalty: float = 0.0
 
     def __post_init__(self):
-        fixed_set = self.disconnection_interval_ms is not None or self.reconnection_interval_ms is not None
-        mean_set = self.mean_disconnection_interval_ms is not None or self.mean_reconnection_interval_ms is not None
+        fixed_set = (
+            self.disconnection_interval_ms is not None
+            or self.reconnection_interval_ms is not None
+        )
+        mean_set = (
+            self.mean_disconnection_interval_ms is not None
+            or self.mean_reconnection_interval_ms is not None
+        )
         if fixed_set and mean_set:
-            raise ValueError("Cannot set both fixed and mean-based disconnection/reconnection intervals. Choose one mode.")
+            raise ValueError(
+                "Cannot set both fixed and mean-based disconnection/reconnection intervals. Choose one mode."
+            )
 
     def __str__(self):
         from tabulate import tabulate
+
         table = [
             ["Episodes", self.episodes],
             ["Algorithms", ", ".join(alg.name for alg in self.algorithms)],
             ["Max hops", self.max_hops],
             ["Topology file", self.topology_file],
-            ["Function sequence", " → ".join(func.value for func in self.functions_sequence)],
-            ["Disconnection interval (mean)", f"{self.mean_disconnection_interval_ms} ms"],
-            ["Reconnection interval (mean)", f"{self.mean_reconnection_interval_ms} ms"],
+            [
+                "Function sequence",
+                " → ".join(func.value for func in self.functions_sequence),
+            ],
+            [
+                "Disconnection interval (mean)",
+                f"{self.mean_disconnection_interval_ms} ms",
+            ],
+            [
+                "Reconnection interval (mean)",
+                f"{self.mean_reconnection_interval_ms} ms",
+            ],
             ["Disconnection interval (fixed)", f"{self.disconnection_interval_ms} ms"],
             ["Reconnection interval (fixed)", f"{self.reconnection_interval_ms} ms"],
             ["Episode timeout", f"{self.episode_timeout_ms} ms"],
             ["Disconnection probability", self.disconnection_probability],
             ["Penalty (Q-Routing)", self.penalty],
         ]
-        return "\n" + tabulate(table, headers=["Parameter", "Value"], tablefmt="fancy_grid")
+        return "\n" + tabulate(
+            table, headers=["Parameter", "Value"], tablefmt="fancy_grid"
+        )
+
 
 class EpisodeEnded(Exception):
     """Exception raised when an episode ends.
@@ -125,6 +147,7 @@ class EpisodeEnded(Exception):
     Attributes:
         success (bool): Indicates whether the episode was successful.
     """
+
     def __init__(self, success: bool) -> None:
         super().__init__(f"Episode ended. Success: {success}")
         self.success = success
@@ -132,6 +155,7 @@ class EpisodeEnded(Exception):
 
 class EpisodeTimeout(Exception):
     """Exception raised when the episode timeout is reached by the sender node."""
+
     def __init__(self, message: str = "Episode timeout reached.") -> None:
         super().__init__(message)
 
@@ -170,7 +194,7 @@ class Application(ABC):
         self,
         max_hops: int,
         functions_sequence: List[str],
-        episode_timeout_ms: Optional[int] = None
+        episode_timeout_ms: Optional[int] = None,
     ) -> None:
         """
         Sets routing parameters for the application.
@@ -216,11 +240,15 @@ class Application(ABC):
 
         packet["from_node_id"] = self.node.node_id
 
-        log.debug(f"[Node_ID={self.node.node_id}] Sending packet to Node {to_node_id}\n")
+        log.debug(
+            f"[Node_ID={self.node.node_id}] Sending packet to Node {to_node_id}\n"
+        )
         self.node.network.send(self.node.node_id, to_node_id, packet)
 
         if packet["hops"] > packet.get("max_hops", float("inf")):
-            log.debug(f"[Node_ID={self.node.node_id}] Max hops reached. Dropping packet.")
+            log.debug(
+                f"[Node_ID={self.node.node_id}] Max hops reached. Dropping packet."
+            )
             return False
 
         return True
@@ -266,7 +294,9 @@ class Application(ABC):
         """
         current_time = clock.get_current_time()
         if current_time - self.episode_start_time >= self.episode_timeout_ms:
-            raise EpisodeTimeout(f"[Node_ID={self.node.node_id}] Episode timeout reached")
+            raise EpisodeTimeout(
+                f"[Node_ID={self.node.node_id}] Episode timeout reached"
+            )
 
     # === Optional episode hooks ===
 

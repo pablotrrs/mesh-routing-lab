@@ -1,9 +1,9 @@
 import logging as log
 
-from core.clock import clock
 from core.base import Algorithm, EpisodeEnded, EpisodeTimeout, SimulationConfig
-from core.node import Node
+from core.clock import clock
 from core.metrics_manager import MetricsManager
+from core.node import Node
 from core.packet_registry import registry
 
 
@@ -88,7 +88,6 @@ class Simulation:
             case Algorithm.Q_ROUTING:
                 from algorithms.q_routing import (
                     IntermediateQRoutingApplication,
-                    QRoutingApplication,
                     SenderQRoutingApplication,
                 )
 
@@ -152,7 +151,9 @@ class Simulation:
                             self.config.episode_timeout_ms,
                         )
 
-    def _run_episode(self, episode_number: int, successful_episodes: int, algorithm: Algorithm) -> None:
+    def _run_episode(
+        self, episode_number: int, successful_episodes: int, algorithm: Algorithm
+    ) -> None:
         """Runs a single episode for the selected algorithm.
 
         Args:

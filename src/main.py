@@ -29,10 +29,11 @@ import logging as log
 import os
 import sys
 
+from core.base import Algorithm, NodeFunction, SimulationConfig
 from core.network import Network
 from core.simulation import Simulation
-from core.base import Algorithm, NodeFunction, SimulationConfig
 from utils.custom_excep_hook import custom_excepthook
+
 
 def setup_logging():
     log.root.handlers = []
@@ -41,6 +42,7 @@ def setup_logging():
         format="%(asctime)s - %(filename)s:%(lineno)d - %(funcName)s() - %(levelname)s - %(message)s",
         handlers=[log.StreamHandler()],
     )
+
 
 def setup_arguments():
     parser = argparse.ArgumentParser(description="Run network simulation.")
@@ -65,22 +67,22 @@ def setup_arguments():
     parser.add_argument(
         "--mean_disconnection_interval_ms",
         type=float,
-        help="Mean interval (ms) for disconnection using exponential distribution"
+        help="Mean interval (ms) for disconnection using exponential distribution",
     )
     parser.add_argument(
         "--mean_reconnection_interval_ms",
         type=float,
-        help="Mean interval (ms) for reconnection using exponential distribution"
+        help="Mean interval (ms) for reconnection using exponential distribution",
     )
     parser.add_argument(
         "--disconnection_interval_ms",
         type=float,
-        help="Fixed interval (ms) for disconnection events"
+        help="Fixed interval (ms) for disconnection events",
     )
     parser.add_argument(
         "--reconnection_interval_ms",
         type=float,
-        help="Fixed interval (ms) for reconnection events"
+        help="Fixed interval (ms) for reconnection events",
     )
     parser.add_argument(
         "--disconnection_probability",
@@ -91,8 +93,8 @@ def setup_arguments():
     parser.add_argument(
         "--episode_timeout_ms",
         type=float,
-        default=float('inf'),
-        help="Period of time (ms) for sender node to assume packet is lost"
+        default=float("inf"),
+        help="Period of time (ms) for sender node to assume packet is lost",
     )
     parser.add_argument(
         "--topology_file",
@@ -121,11 +123,19 @@ def initialize_network(config):
     topology_file_path = os.path.join(os.path.dirname(__file__), config.topology_file)
     network, sender_node = Network.from_yaml(topology_file_path)
 
-    fixed_set = config.disconnection_interval_ms is not None or config.reconnection_interval_ms is not None
-    mean_set = config.mean_disconnection_interval_ms is not None or config.mean_reconnection_interval_ms is not None
+    fixed_set = (
+        config.disconnection_interval_ms is not None
+        or config.reconnection_interval_ms is not None
+    )
+    mean_set = (
+        config.mean_disconnection_interval_ms is not None
+        or config.mean_reconnection_interval_ms is not None
+    )
 
     if mean_set:
-        network.set_mean_disconnection_interval_ms(config.mean_disconnection_interval_ms)
+        network.set_mean_disconnection_interval_ms(
+            config.mean_disconnection_interval_ms
+        )
         network.set_mean_reconnection_interval_ms(config.mean_reconnection_interval_ms)
     elif fixed_set:
         network.set_disconnection_interval_ms(config.disconnection_interval_ms)
@@ -179,6 +189,7 @@ def main():
     simulation = Simulation()
     simulation.initialize(config, network, sender_node)
     simulation.run()
+
 
 if __name__ == "__main__":
     main()
