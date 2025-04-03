@@ -2,7 +2,6 @@ import logging as log
 
 from core.base import Algorithm, EpisodeEnded, EpisodeTimeout, SimulationConfig
 from core.clock import clock
-from core.metrics_manager import MetricsManager
 from core.node import Node
 from core.packet_registry import registry
 
@@ -21,7 +20,6 @@ class Simulation:
         self.config: SimulationConfig = None
         self.network: Network = None
         self.sender_node: Node = None
-        self.metrics_manager: MetricsManager = None
 
     def initialize(
         self, config: SimulationConfig, network: "Network", sender_node: "Node"
@@ -36,8 +34,7 @@ class Simulation:
         self.config = config
         self.network = network
         self.sender_node = sender_node
-        self.metrics_manager = MetricsManager()
-        self.metrics_manager.initialize(
+        registry.initialize(
             max_hops=config.max_hops,
             topology_file=config.topology_file,
             functions_sequence=config.functions_sequence,
@@ -61,7 +58,7 @@ class Simulation:
 
             registry.restart_packet_log()
 
-            self.metrics_manager.finalize_simulation(
+            registry.finalize_simulation_for_algorithm(
                 clock.get_current_time(), successful_episodes, self.config.episodes
             )
 
@@ -185,7 +182,7 @@ class Simulation:
             start_time, end_time
         )
 
-        self.metrics_manager.log_episode(
+        registry.log_episode(
             algorithm,
             episode_number,
             start_time,

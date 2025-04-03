@@ -1,12 +1,10 @@
-import datetime
 import json
 import logging as log
 import os
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
-from core.packet_registry import registry
 
 
 class MetricsManager:
@@ -21,115 +19,6 @@ class MetricsManager:
         self.metrics: Dict[str, Union[int, float, str, List, Dict]] = {}
         log.debug("MetricsManager initialized.")
 
-    def initialize(
-        self,
-        max_hops: int,
-        topology_file: str,
-        functions_sequence: List[str],
-        mean_disconnection_interval_ms: float,
-        mean_reconnection_interval_ms: float,
-        disconnection_probability: float,
-        algorithms: List[str],
-        penalty: float,
-    ) -> None:
-        """Initializes the metrics for a new simulation with multiple algorithms.
-
-        Args:
-            max_hops (int): Maximum number of hops allowed.
-            topology_file (str): Path to the topology file.
-            functions_sequence (List[str]): Sequence of node functions.
-            mean_disconnection_interval_ms (float): Mean interval for dynamic changes.
-            mean_reconnection_interval_ms (float): Interval for node reconnection.
-            disconnection_probability (float): Probability of node disconnection.
-            algorithms (List[str]): List of algorithms used in the simulation.
-            penalty (float): Penalty for Q-Routing.
-        """
-        self.metrics = {
-            "simulation_id": 1,
-            "parameters": {
-                "max_hops": max_hops,
-                "algorithms": algorithms,
-                "mean_disconnection_interval_ms": mean_disconnection_interval_ms,
-                "mean_reconnection_interval_ms": mean_reconnection_interval_ms,
-                "topology_file": topology_file,
-                "functions_sequence": [func.value for func in functions_sequence],
-                "disconnection_probability": disconnection_probability,
-            },
-            "total_time": None,
-            "runned_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        }
-
-        for algorithm in algorithms:
-            self.metrics[algorithm] = {"success_rate": 0.0, "episodes": []}
-
-            if algorithm == "Q_ROUTING":
-                self.metrics[algorithm]["penalty"] = penalty
-
-        log.debug("Metrics initialized for simulation.")
-
-    def log_episode(
-        self,
-        algorithm: str,
-        episode_number: int,
-        start_time: float,
-        end_time: float,
-        episode_success: bool,
-        route: List[str],
-        total_hops: int,
-        dynamic_changes: List[Dict],
-    ) -> None:
-        """Logs the metrics of an episode for a specific algorithm.
-
-        Args:
-            algorithm (str): The algorithm used in the episode.
-            episode_number (int): The number of the episode.
-            start_time (float): Start time of the episode.
-            end_time (float): End time of the episode.
-            episode_success (bool): Whether the episode was successful.
-            route (List[str]): The route taken in the episode.
-            total_hops (int): Total number of hops in the episode.
-            dynamic_changes (List[Dict]): List of dynamic changes during the episode.
-        """
-        if algorithm not in self.metrics:
-            self.metrics[algorithm] = {"success_rate": 0.0, "episodes": []}
-
-        self.metrics[algorithm]["episodes"].append(
-            {
-                "episode_number": episode_number,
-                "start_time": start_time,
-                "end_time": end_time,
-                "episode_duration": end_time - start_time,
-                "episode_success": episode_success,
-                "route": route,
-                "total_hops": total_hops,
-                "dynamic_changes": dynamic_changes,
-                "dynamic_changes_count": len(dynamic_changes),
-            }
-        )
-
-        log.debug(f"Logged episode {episode_number} for algorithm {algorithm}.")
-
-    # TODO: este método finaliza la simulación para un algoritmo, no para todos
-    def finalize_simulation(
-        self, total_time: float, successful_episodes: int, episodes: int
-    ) -> None:
-        """Finalizes the simulation and saves the results.
-
-        Args:
-            total_time (float): Total time taken for the simulation.
-            successful_episodes (int): Number of successful episodes.
-            episodes (int): Total number of episodes.
-        """
-        algorithm = self.metrics["parameters"]["algorithms"][-1]
-        self.metrics[algorithm]["success_rate"] = (
-            successful_episodes / episodes if episodes > 0 else 0.0
-        )
-        self.metrics["total_time"] = total_time
-
-        self.save_metrics_to_file()
-        self.save_results_to_excel()
-        log.debug("Simulation finalized and results saved.")
-
     def save_metrics_to_file(self, directory: str = "../resources/results/single-run") -> None:
         """Saves the simulation metrics to a JSON file.
 
@@ -138,10 +27,11 @@ class MetricsManager:
         """
         os.makedirs(directory, exist_ok=True)
 
-        filename = f"{directory}/simulation_{self.metrics['simulation_id']}.json"
+        from core.packet_registry import registry
+        filename = f"{directory}/simulation_{registry.metrics['simulation_id']}.json"
 
         with open(filename, "w", encoding="utf-8") as file:
-            json.dump(self.metrics, file, indent=4)
+            json.dump(registry.metrics, file, indent=4)
 
         log.debug(f"Simulation metrics saved to {filename}.")
 
@@ -171,8 +61,11 @@ class MetricsManager:
                 )
                 os.remove(filename)
 
-        if not self.metrics:
-            log.error("self.metrics is empty")
+
+        from core.packet_registry import registry
+        metrics = registry.metrics
+        if not metrics:
+            log.error("metrics are empty")
             return
 
         metrics_data = {
@@ -186,7 +79,7 @@ class MetricsManager:
                 "dynamic_changes": [],
                 "packet_log_raw": [],
             }
-            for algorithm in self.metrics.keys()
+            for algorithm in metrics.keys()
             if algorithm
             not in ["simulation_id", "parameters", "total_time", "runned_at"]
         }
@@ -194,7 +87,7 @@ class MetricsManager:
             f"Algorithms found in metrics: {list(metrics_data.keys())}"
         )
 
-        for algorithm, episodes in self.metrics.items():
+        for algorithm, episodes in metrics.items():
             if algorithm in ["simulation_id", "parameters", "total_time", "runned_at"]:
                 continue
             for episode_data in episodes["episodes"]:
