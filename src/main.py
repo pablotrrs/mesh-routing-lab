@@ -35,10 +35,15 @@ from core.simulation import Simulation
 from utils.custom_excep_hook import custom_excepthook
 
 
-def setup_logging():
+def setup_logging(log_level_str="INFO"):
+    """Configure logging with specified log level string."""
+    import logging as log
     log.root.handlers = []
+
+    level = getattr(log, log_level_str.upper(), log.INFO)
+
     log.basicConfig(
-        level=log.INFO,
+        level=level,
         format="%(asctime)s - %(filename)s:%(lineno)d - %(funcName)s() - %(levelname)s - %(message)s",
         handlers=[log.StreamHandler()],
     )
@@ -46,6 +51,13 @@ def setup_logging():
 
 def setup_arguments():
     parser = argparse.ArgumentParser(description="Run network simulation.")
+    parser.add_argument(
+        "--log_level",
+        type=str,
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        default="INFO",
+        help="Logging level for the simulation (default: INFO)",
+    )
     parser.add_argument(
         "--episodes",
         type=int,
@@ -148,8 +160,8 @@ def initialize_network(config):
 
 
 def main():
-    setup_logging()
     args = setup_arguments()
+    setup_logging(args.log_level)
     sys.setrecursionlimit(200000)
     sys.excepthook = custom_excepthook
 
