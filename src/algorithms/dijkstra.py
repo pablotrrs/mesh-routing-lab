@@ -242,7 +242,7 @@ class SenderDijkstraApplication(DijkstraApplication):
             return
 
         except EpisodeEnded as e:
-            log.info(f"[Sender Node] Episode ended with success={e.success}")
+            log.debug(f"[Sender Node] Episode ended with success={e.success}")
             raise e
 
         except EpisodeTimeout as e:
@@ -567,7 +567,7 @@ class SenderDijkstraApplication(DijkstraApplication):
                 global broken_path
                 broken_path = True
                 packet["hops"] += 1
-                registry.mark_packet_lost(
+                registry.log_lost_packet(
                     packet["episode_number"],
                     packet["from_node_id"],
                     None,
@@ -597,7 +597,7 @@ class SenderDijkstraApplication(DijkstraApplication):
             f"\n[Node_ID={self.node.node_id}] Marking Episode {episode_number} as {status_text}."
         )
 
-        registry.mark_episode_complete(episode_number, success)
+        registry.log_complete_episode(episode_number, success)
 
         raise EpisodeEnded(success)
 

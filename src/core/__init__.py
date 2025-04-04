@@ -1,6 +1,6 @@
 from .base import Algorithm, NodeFunction, Application, EpisodeEnded
 from .clock import clock
-from .metrics_manager import MetricsManager
+from .reports_manager import ReportsManager
 from .network import Network
 from .node import Node
 from .packet_registry import registry
@@ -10,7 +10,7 @@ __all__ = [
     "Network",
     "Node",
     "Simulation",
-    "MetricsManager",
+    "ReportsManager",
     "clock",
     "Algorithm",
     "NodeFunction",

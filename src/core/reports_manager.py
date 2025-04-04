@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-class MetricsManager:
+class ReportsManager:
     """Manages and stores metrics for the simulation.
 
     Attributes:
@@ -19,7 +19,9 @@ class MetricsManager:
         self.metrics: Dict[str, Union[int, float, str, List, Dict]] = {}
         log.debug("MetricsManager initialized.")
 
-    def save_metrics_to_file(self, directory: str = "../resources/results/single-run") -> None:
+    def save_metrics_to_file(
+        self, directory: str = "../resources/results/single-run"
+    ) -> None:
         """Saves the simulation metrics to a JSON file.
 
         Args:
@@ -28,6 +30,7 @@ class MetricsManager:
         os.makedirs(directory, exist_ok=True)
 
         from core.packet_registry import registry
+
         filename = f"{directory}/simulation_{registry.metrics['simulation_id']}.json"
 
         with open(filename, "w", encoding="utf-8") as file:
@@ -61,8 +64,8 @@ class MetricsManager:
                 )
                 os.remove(filename)
 
-
         from core.packet_registry import registry
+
         metrics = registry.metrics
         if not metrics:
             log.error("metrics are empty")
@@ -83,9 +86,7 @@ class MetricsManager:
             if algorithm
             not in ["simulation_id", "parameters", "total_time", "runned_at"]
         }
-        log.debug(
-            f"Algorithms found in metrics: {list(metrics_data.keys())}"
-        )
+        log.debug(f"Algorithms found in metrics: {list(metrics_data.keys())}")
 
         for algorithm, episodes in metrics.items():
             if algorithm in ["simulation_id", "parameters", "total_time", "runned_at"]:
@@ -133,7 +134,7 @@ class MetricsManager:
                     continue
 
                 df = pd.DataFrame(data)
-                df.to_excel(writer, sheet_name=algorithm, index=False)
+                df.to_excel(writer, sheet_name=str(algorithm), index=False)
 
         wb = load_workbook(filename)
         for sheet_name in wb.sheetnames:

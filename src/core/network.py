@@ -1,6 +1,6 @@
+import logging as log
 import math
 import threading
-import logging as log
 import time
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -8,7 +8,6 @@ import numpy as np
 import yaml
 from core.clock import clock
 from core.node import Node
-from core.packet_registry import registry
 
 
 class Network:
@@ -39,7 +38,9 @@ class Network:
         self.disconnection_probability: Optional[float] = None
         log.debug("Network initialized.")
 
-    def set_mean_disconnection_interval_ms(self, mean_disconnection_interval_ms: float) -> None:
+    def set_mean_disconnection_interval_ms(
+        self, mean_disconnection_interval_ms: float
+    ) -> None:
         """Sets the mean interval between dynamic changes.
 
         Args:
@@ -47,7 +48,9 @@ class Network:
         """
         self.mean_disconnection_interval_ms = mean_disconnection_interval_ms
 
-    def set_mean_reconnection_interval_ms(self, mean_reconnection_interval_ms: float) -> None:
+    def set_mean_reconnection_interval_ms(
+        self, mean_reconnection_interval_ms: float
+    ) -> None:
         """Sets a mean interval for node reconnection when disconnected.
 
         Args:
@@ -85,11 +88,17 @@ class Network:
         Returns:
             int: Time (ms) for the next dynamic change.
         """
-        if hasattr(self, "disconnection_interval_ms") and self.disconnection_interval_ms is not None:
+        if (
+            hasattr(self, "disconnection_interval_ms")
+            and self.disconnection_interval_ms is not None
+        ):
             return self.disconnection_interval_ms
         elif self.mean_disconnection_interval_ms == float("inf"):
             return int(1e12)  # A very large number to simulate no changes
-        elif hasattr(self, "mean_disconnection_interval_ms") and self.mean_disconnection_interval_ms is not None:
+        elif (
+            hasattr(self, "mean_disconnection_interval_ms")
+            and self.mean_disconnection_interval_ms is not None
+        ):
             return int(np.random.exponential(self.mean_disconnection_interval_ms))
         else:
             return int(1e12)  # A very large number to simulate no changes
@@ -146,17 +155,28 @@ class Network:
         for node_id, node in self.nodes.items():
             if not node.status:
                 # Fixed reconnection mode
-                if hasattr(self, "reconnection_interval_ms") and self.reconnection_interval_ms is not None:
-                    if not hasattr(node, "disconnected_at") or node.disconnected_at is None:
+                if (
+                    hasattr(self, "reconnection_interval_ms")
+                    and self.reconnection_interval_ms is not None
+                ):
+                    if (
+                        not hasattr(node, "disconnected_at")
+                        or node.disconnected_at is None
+                    ):
                         continue
-                    if current_time >= node.disconnected_at + self.reconnection_interval_ms:
+                    if (
+                        current_time
+                        >= node.disconnected_at + self.reconnection_interval_ms
+                    ):
                         node.status = True
                         delattr(node, "disconnected_at")
                         log.debug(f"Node {node_id} reconnected at {current_time:.2f}.")
                 # Mean reconnection mode
                 elif self.mean_reconnection_interval_ms is not None:
                     if not hasattr(node, "reconnect_time"):
-                        node.reconnect_time = current_time + np.random.exponential(self.mean_reconnection_interval_ms)
+                        node.reconnect_time = current_time + np.random.exponential(
+                            self.mean_reconnection_interval_ms
+                        )
                     if current_time >= node.reconnect_time:
                         node.status = True
                         delattr(node, "reconnect_time")
@@ -248,16 +268,17 @@ class Network:
             packet (Dict): The packet to send.
         """
         episode_number = packet.get("episode_number")
-        registry.initialize_episode(episode_number)
+
+        from core.packet_registry import registry
 
         if not self.is_node_reachable(from_node_id, to_node_id):
-            registry.mark_packet_lost(
+            registry.log_lost_packet(
                 episode_number, from_node_id, to_node_id, packet["type"].value
             )
             return
 
         if to_node_id is None:
-            registry.mark_episode_complete(episode_number, True)
+            registry.log_complete_episode(episode_number, True)
             return
 
         latency = (

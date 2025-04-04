@@ -375,7 +375,7 @@ class SenderQRoutingApplication(QRoutingApplication):
                 )
                 # movement: none
                 packet["hops"] += 1
-                registry.mark_packet_lost(
+                registry.log_lost_packet(
                     packet["episode_number"], packet["from_node_id"], None, packet["type"]
                 )
                 log.debug(f'[Node_ID={self.node.node_id}] Packet hop count {packet["hops"]}')
@@ -398,7 +398,7 @@ class SenderQRoutingApplication(QRoutingApplication):
                 return
 
         except EpisodeEnded as e:
-            log.info(f"[Sender Node] Episode ended with success={e.success}")
+            log.debug(f"[Sender Node] Episode ended with success={e.success}")
             raise e
 
         except EpisodeTimeout as e:
@@ -436,7 +436,7 @@ class SenderQRoutingApplication(QRoutingApplication):
             )
             # movement: none
             packet["hops"] += 1
-            registry.mark_packet_lost(
+            registry.log_lost_packet(
                 packet["episode_number"], packet["from_node_id"], None, packet["type"]
             )
             if packet["hops"] > packet["max_hops"]:
@@ -527,7 +527,7 @@ class SenderQRoutingApplication(QRoutingApplication):
             f"\n[Node_ID={self.node.node_id}] Marking Episode {episode_number} as {status_text}."
         )
 
-        registry.mark_episode_complete(episode_number, success)
+        registry.log_complete_episode(episode_number, success)
 
         global CURRENT_HOP_COUNT
         CURRENT_HOP_COUNT = 0
@@ -623,7 +623,7 @@ class IntermediateQRoutingApplication(QRoutingApplication):
         else:
             # movement: none
             packet["hops"] += 1
-            registry.mark_packet_lost(
+            registry.log_lost_packet(
                 packet["episode_number"], packet["from_node_id"], None, packet["type"]
             )
             still_hops_remaining = packet["hops"] < packet["max_hops"]

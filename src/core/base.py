@@ -88,15 +88,24 @@ class SimulationConfig:
     max_hops: int
     topology_file: str
     functions_sequence: List[NodeFunction]
-    mean_disconnection_interval_ms: Optional[float] = None
-    mean_reconnection_interval_ms: Optional[float] = None
-    disconnection_interval_ms: Optional[float] = None
-    reconnection_interval_ms: Optional[float] = None
-    episode_timeout_ms: Optional[float] = None
+    mean_disconnection_interval_ms: Optional[float] = float("inf")
+    mean_reconnection_interval_ms: Optional[float] = float("inf")
+    disconnection_interval_ms: Optional[float] = float("inf")
+    reconnection_interval_ms: Optional[float] = float("inf")
+    episode_timeout_ms: Optional[float] = 0.0
     disconnection_probability: float = 0.0
     penalty: float = 0.0
 
     def __post_init__(self):
+        if self.episode_timeout_ms is None:
+            self.episode_timeout_ms = 0.0
+
+        if self.disconnection_probability is None:
+            self.disconnection_probability = 0.0
+
+        if self.penalty is None:
+            self.penalty = 0.0
+
         fixed_set = (
             self.disconnection_interval_ms is not None
             or self.reconnection_interval_ms is not None

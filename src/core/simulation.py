@@ -34,37 +34,25 @@ class Simulation:
         self.config = config
         self.network = network
         self.sender_node = sender_node
-        registry.initialize(
-            max_hops=config.max_hops,
-            topology_file=config.topology_file,
-            functions_sequence=config.functions_sequence,
-            mean_disconnection_interval_ms=config.mean_disconnection_interval_ms,
-            mean_reconnection_interval_ms=config.mean_reconnection_interval_ms,
-            disconnection_probability=config.disconnection_probability,
-            algorithms=[algo.name for algo in config.algorithms],
-            penalty=config.penalty,
-        )
-        log.debug("Simulation initialized with the given configuration.")
 
     def run(self) -> None:
         """Runs the simulation for all selected algorithms."""
+        log.info("Simulation started")
+        registry.log_simulation_start(self.config, self.network)
         clock.start()
         self.network.start_dynamic_changes()
 
         for algorithm in self.config.algorithms:
-            successful_episodes = 0
+            registry.log_algorithm_start(algorithm)
+            self._run_algorithm(algorithm)
+            registry.log_algorithm_end()
 
-            self._run_algorithm(algorithm, successful_episodes)
+        registry.log_simulation_end()
+        clock.stop()
+        self.network.stop_dynamic_changes()
+        log.info("Simulation finished")
 
-            registry.restart_packet_log()
-
-            registry.finalize_simulation_for_algorithm(
-                clock.get_current_time(), successful_episodes, self.config.episodes
-            )
-
-        self._finalize_simulation()
-
-    def _run_algorithm(self, algorithm: Algorithm, successful_episodes: int) -> None:
+    def _run_algorithm(self, algorithm: Algorithm) -> None:
         """Sets up and runs a specific algorithm.
 
         Args:
@@ -73,7 +61,34 @@ class Simulation:
         log.info(f"[{algorithm.name}] Running {self.config.episodes} episodes")
         self._setup_algorithm(algorithm)
         for episode_number in range(1, self.config.episodes + 1):
-            self._run_episode(episode_number, successful_episodes, algorithm)
+            self._run_episode(episode_number, algorithm)
+
+        log.info(
+            f"[{algorithm}] Finished running {self.config.episodes} episodes"
+        )
+
+    def _run_episode(self, episode_number: int, algorithm: Algorithm) -> None:
+        """Runs a single episode for the selected algorithm.
+
+        Args:
+            episode_number (int): The number of the episode to run.
+        """
+        log.info(f"[{algorithm}] Starting Episode #{episode_number}")
+
+        registry.log_episode_start(episode_number)
+
+        try:
+            self.sender_node.start_episode(episode_number)
+        except EpisodeEnded as e:
+            log.info(f"[{algorithm}] Episode #{episode_number} ended successfully")
+        except EpisodeTimeout:
+            log.warning(f"[{algorithm}] Episode #{episode_number} timed out")
+        # else:
+        #     error_msg = f"[{algorithm}] Episode #{episode_number} finished without an EpisodeEnded or EpisodeTimeout exception"
+        #     log.error(error_msg)
+        #     raise ValueError(error_msg)
+
+        registry.log_episode_end()
 
     def _setup_algorithm(self, algorithm: Algorithm) -> None:
         """Installs the appropriate application on nodes based on the algorithm.
@@ -147,57 +162,3 @@ class Simulation:
                             self.config.functions_sequence,
                             self.config.episode_timeout_ms,
                         )
-
-    def _run_episode(
-        self, episode_number: int, successful_episodes: int, algorithm: Algorithm
-    ) -> None:
-        """Runs a single episode for the selected algorithm.
-
-        Args:
-            episode_number (int): The number of the episode to run.
-        """
-        log.info(f"[{algorithm}] Starting Episode #{episode_number}")
-
-        start_time = clock.get_current_time()
-        registry.initialize_episode(episode_number)
-
-        try:
-            self.sender_node.start_episode(episode_number)
-        except EpisodeEnded as e:
-            log.info(f"[{algorithm}] Episode #{episode_number} ended successfully")
-        except EpisodeTimeout:
-            log.warning(f"[{algorithm}] Episode #{episode_number} timed out")
-        # else: #TODO: dijkstra y bellman ford fallan esta validación, no debería pasar!
-        #     error_msg = f"[{algorithm}] Episode #{episode_number} finished without an EpisodeEnded or EpisodeTimeout exception"
-        #     log.error(error_msg)
-        #     raise ValueError(error_msg)
-
-        end_time = clock.get_current_time()
-
-        episode_data = registry.packet_log.get(episode_number, {})
-        episode_success = episode_data.get("episode_success", False)
-        route = episode_data.get("route", [])
-        total_hops = len(route)
-        dynamic_changes = self.network.get_dynamic_changes_by_episode(
-            start_time, end_time
-        )
-
-        registry.log_episode(
-            algorithm,
-            episode_number,
-            start_time,
-            end_time,
-            episode_success,
-            route,
-            total_hops,
-            dynamic_changes,
-        )
-
-        if episode_success:
-            successful_episodes += 1
-
-    def _finalize_simulation(self) -> None:
-        """Finalizes the simulation and generates reports."""
-        log.info("Finalizing simulation.")
-        clock.stop()
-        self.network.stop_dynamic_changes()
