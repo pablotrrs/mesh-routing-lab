@@ -22,28 +22,42 @@
 # learning for optimized packet routing in ESP-based mesh networks.
 #
 # The source code for this project is available at:
-# https://github.com/pablotrrs/py-q-mesh-routing
+# https://github.com/pablotrrs/mesh-routing-lab
 
 import argparse
 import logging as log
 import os
 import sys
 
+from core.base import Algorithm, NodeFunction, SimulationConfig
 from core.network import Network
 from core.simulation import Simulation
-from core.enums import Algorithm, NodeFunction
-from core.metrics_manager import MetricsManager
+from utils.custom_excep_hook import custom_excepthook
 
-def setup_logging():
+
+def setup_logging(log_level_str="INFO"):
+    """Configure logging with specified log level string."""
+    import logging as log
     log.root.handlers = []
+
+    level = getattr(log, log_level_str.upper(), log.INFO)
+
     log.basicConfig(
-        level=log.DEBUG,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        level=level,
+        format="%(asctime)s - %(filename)s:%(lineno)d - %(funcName)s() - %(levelname)s - %(message)s",
         handlers=[log.StreamHandler()],
     )
 
+
 def setup_arguments():
     parser = argparse.ArgumentParser(description="Run network simulation.")
+    parser.add_argument(
+        "--log_level",
+        type=str,
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        default="INFO",
+        help="Logging level for the simulation (default: INFO)",
+    )
     parser.add_argument(
         "--episodes",
         type=int,
@@ -63,22 +77,36 @@ def setup_arguments():
         help="Maximum number of hops allowed for each episode (default: 10)",
     )
     parser.add_argument(
-        "--mean_interval_ms",
+        "--mean_disconnection_interval_ms",
         type=float,
-        default=float("inf"),
-        help="Mean interval (ms) for dynamic changes (default: inf, for a static network)",
+        help="Mean interval (ms) for disconnection using exponential distribution",
     )
     parser.add_argument(
-        "--reconnect_interval_ms",
+        "--mean_reconnection_interval_ms",
         type=float,
-        default=50,
-        help="Mean interval (ms) for node reconnection after disconnection (default: 5000 ms)",
+        help="Mean interval (ms) for reconnection using exponential distribution",
     )
     parser.add_argument(
-        "--disconnect_probability",
+        "--disconnection_interval_ms",
+        type=float,
+        help="Fixed interval (ms) for disconnection events",
+    )
+    parser.add_argument(
+        "--reconnection_interval_ms",
+        type=float,
+        help="Fixed interval (ms) for reconnection events",
+    )
+    parser.add_argument(
+        "--disconnection_probability",
         type=float,
         default=0.1,
-        help="Probability for a node to disconnect in a dynamic change (default: 0.1)",
+        help="Probability for a node to disconnect (default: 0.1)",
+    )
+    parser.add_argument(
+        "--episode_timeout_ms",
+        type=float,
+        default=float("inf"),
+        help="Period of time (ms) for sender node to assume packet is lost",
     )
     parser.add_argument(
         "--topology_file",
@@ -103,19 +131,39 @@ def setup_arguments():
     return parser.parse_args()
 
 
-def initialize_network(args):
-    topology_file_path = os.path.join(os.path.dirname(__file__), args.topology_file)
+def initialize_network(config):
+    topology_file_path = os.path.join(os.path.dirname(__file__), config.topology_file)
     network, sender_node = Network.from_yaml(topology_file_path)
-    network.set_mean_interval_ms(args.mean_interval_ms)
-    network.set_reconnect_interval_ms(args.reconnect_interval_ms)
-    network.set_disconnect_probability(args.disconnect_probability)
+
+    fixed_set = (
+        config.disconnection_interval_ms is not None
+        or config.reconnection_interval_ms is not None
+    )
+    mean_set = (
+        config.mean_disconnection_interval_ms is not None
+        or config.mean_reconnection_interval_ms is not None
+    )
+
+    if mean_set:
+        network.set_mean_disconnection_interval_ms(
+            config.mean_disconnection_interval_ms
+        )
+        network.set_mean_reconnection_interval_ms(config.mean_reconnection_interval_ms)
+    elif fixed_set:
+        network.set_disconnection_interval_ms(config.disconnection_interval_ms)
+        network.set_reconnection_interval_ms(config.reconnection_interval_ms)
+
+    network.set_disconnection_probability(config.disconnection_probability)
+    log.info(network)
+    network.start_dynamic_changes()
     return network, sender_node
 
 
 def main():
-    setup_logging()
     args = setup_arguments()
+    setup_logging(args.log_level)
     sys.setrecursionlimit(200000)
+    sys.excepthook = custom_excepthook
 
     try:
         functions_sequence = [
@@ -125,88 +173,35 @@ def main():
         log.error(f"Error parsing functions sequence from args: {e}")
         sys.exit(1)
 
-    log.info(f"Using functions sequence: {[f.value for f in functions_sequence]}")
-
     selected_algorithms = (
         [Algorithm(args.algorithm)]
         if args.algorithm
         else [Algorithm.Q_ROUTING, Algorithm.DIJKSTRA, Algorithm.BELLMAN_FORD]
     )
 
-    network, sender_node = initialize_network(args)
-    log.info(network)
-
-    metrics_manager = MetricsManager()
-    metrics_manager.initialize(
+    config = SimulationConfig(
+        episodes=args.episodes,
+        algorithms=selected_algorithms,
         max_hops=args.max_hops,
         topology_file=args.topology_file,
         functions_sequence=functions_sequence,
-        mean_interval_ms=args.mean_interval_ms,
-        reconnect_interval_ms=args.reconnect_interval_ms,
-        disconnect_probability=args.disconnect_probability,
-        algorithms=[algo.name for algo in selected_algorithms],
+        mean_disconnection_interval_ms=args.mean_disconnection_interval_ms,
+        mean_reconnection_interval_ms=args.mean_reconnection_interval_ms,
+        disconnection_interval_ms=args.disconnection_interval_ms,
+        reconnection_interval_ms=args.reconnection_interval_ms,
+        episode_timeout_ms=args.episode_timeout_ms,
+        disconnection_probability=args.disconnection_probability,
         penalty=args.penalty,
     )
 
-    simulation = Simulation(network, sender_node, metrics_manager)
+    log.info(config)
 
-    for algorithm in selected_algorithms:
-        log.info(
-            f"Running {args.episodes} episodes using the {algorithm.name} algorithm."
-        )
-        log.info(f"Maximum hops: {args.max_hops}")
-        log.info(f"Mean interval for dynamic changes: {args.mean_interval_ms} ms")
-        log.info(f"Topology file: {args.topology_file}")
-        log.info(f"Functions sequence: {functions_sequence}")
+    network, sender_node = initialize_network(config)
 
-        match algorithm:
-            case Algorithm.Q_ROUTING:
-                from algorithms.q_routing import (
-                    IntermediateQRoutingApplication,
-                    QRoutingApplication,
-                    SenderQRoutingApplication,
-                )
+    simulation = Simulation()
+    simulation.initialize(config, network, sender_node)
+    simulation.run()
 
-                sender_node.install_application(SenderQRoutingApplication)
-                sender_node.application.set_params(args.max_hops, functions_sequence)
-
-                if isinstance(sender_node.application, QRoutingApplication):
-                    sender_node.application.set_penalty(args.penalty)
-
-                for node_id, node in network.nodes.items():
-                    if node_id != sender_node.node_id:
-                        node.install_application(IntermediateQRoutingApplication)
-                        node.application.set_params(args.max_hops, functions_sequence)
-
-            case Algorithm.DIJKSTRA:
-                from algorithms.dijkstra import (
-                    IntermediateDijkstraApplication,
-                    SenderDijkstraApplication,
-                )
-
-                sender_node.install_application(SenderDijkstraApplication)
-                sender_node.application.set_params(args.max_hops, functions_sequence)
-
-                for node_id, node in network.nodes.items():
-                    if node_id != sender_node.node_id:
-                        node.install_application(IntermediateDijkstraApplication)
-                        node.application.set_params(args.max_hops, functions_sequence)
-
-            case Algorithm.BELLMAN_FORD:
-                from algorithms.bellman_ford import (
-                    IntermediateBellmanFordApplication,
-                    SenderBellmanFordApplication,
-                )
-
-                sender_node.install_application(SenderBellmanFordApplication)
-                sender_node.application.set_params(args.max_hops, functions_sequence)
-
-                for node_id, node in network.nodes.items():
-                    if node_id != sender_node.node_id:
-                        node.install_application(IntermediateBellmanFordApplication)
-                        node.application.set_params(args.max_hops, functions_sequence)
-
-        simulation.start(algorithm, args.episodes)
 
 if __name__ == "__main__":
     main()

@@ -35,11 +35,11 @@ class Node:
         self.network: "Network" = network
         self.application: Optional["Application"] = None
         self.is_sender: bool = False
-        self.lifetime: Optional[float] = None
         self.reconnect_time: Optional[float] = None
+        self.disconnected_at: Optional[float] = None
         self.status: Optional[bool] = None
         self.position: Optional[Tuple[float, float, float]] = position
-        log.info(f"Node {node_id} initialized.")
+        log.debug(f"Node {node_id} initialized.")
 
     def install_application(self, application_class: Type["Application"]) -> None:
         """Installs an application on the node.
@@ -48,7 +48,7 @@ class Node:
             application_class (Type[Application]): The application class to install.
         """
         self.application = application_class(self)
-        log.info(
+        log.debug(
             f"Node {self.node_id} installed {self.application.__class__.__name__}."
         )
 
@@ -80,30 +80,6 @@ class Node:
         if self.application and hasattr(self.application, "get_assigned_function"):
             return self.application.get_assigned_function()
         return "N/A"
-
-    def update_status(self) -> bool:
-        """Updates the status of the node based on its lifetime and reconnect time.
-
-        Returns:
-            bool: The updated status of the node (True = active, False = inactive).
-        """
-        if not self.is_sender:
-            if self.status:
-                self.lifetime -= 1
-
-                if self.lifetime <= 0:
-                    self.status = False
-                    self.reconnect_time = np.random.exponential(scale=2)
-                    log.warning(f"Node {self.node_id} disconnected.")
-            else:
-                self.reconnect_time -= 1
-
-                if self.reconnect_time <= 0:
-                    self.status = True
-                    self.lifetime = np.random.exponential(scale=2)
-                    log.info(f"Node {self.node_id} reconnected.")
-
-        return self.status
 
     def __str__(self) -> str:
         """Returns a string representation of the node.
