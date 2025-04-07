@@ -13,6 +13,9 @@ from utils.custom_excep_hook import custom_thread_excepthook
 
 EPISODE_COMPLETED = False
 
+broken_path = False
+
+
 class BroadcastState:
     def __init__(self):
         self.message_id = None
@@ -173,28 +176,6 @@ class SenderBellmanFordApplication(BellmanFordApplication):
         self.max_hops = None
         self.functions_sequence = None
 
-    # def start_route_monitoring(self):
-    #     """Inicia un hilo que verifica periódicamente si se debe ejecutar Bellman-Ford."""
-    #     threading.Thread(target=self._monitor_route_updates, daemon=True).start()
-
-    # def stop_route_monitoring(self):
-    #     """Detiene el monitoreo de actualización de rutas."""
-    #     self.running = False
-
-    # def _monitor_route_updates(self):
-    #     """Monitorea el reloj central y ejecuta Bellman-Ford cada 30 segundos."""
-    #     while self.running:
-    #         current_time = clock.get_current_time()
-
-    #         if current_time - self.last_route_update >= 30000:  # 30 segundos en ms
-    #             log.debug(
-    #                 f"[Node {self.node.node_id}] Recalculando rutas con Bellman-Ford en {current_time} ms"
-    #             )
-    #             self.compute_shortest_paths()
-    #             self.last_route_update = current_time
-
-    #         time.sleep(0.1)
-
     def start_episode(self, episode_number: int) -> None:
         """Initiates an episode by creating a packet and sending it asynchronously."""
 
@@ -219,9 +200,9 @@ class SenderBellmanFordApplication(BellmanFordApplication):
     def _process_episode(self, episode_number: int, reset_episode) -> None:
         """Core logic for processing an episode, runs asynchronously."""
         try:
-            # self.start_route_monitoring()
-
-            if episode_number == 1 or reset_episode:
+            global broken_path
+            if broken_path or episode_number == 1 or reset_episode:
+                broken_path = False
                 log.debug(
                     f"[Node_ID={self.node.node_id}] Starting broadcast for episode {episode_number}"
                 )
@@ -601,17 +582,18 @@ class SenderBellmanFordApplication(BellmanFordApplication):
                         self.send_packet(self.broadcast_state.parent_node, ack_packet)
 
             case PacketType.BROKEN_PATH:
+                episode_number = packet["episode_number"]
+                log.debug(
+                    f"[Node_ID={self.node.node_id}] Episode {episode_number} detected a broken path. Packet={packet}"
+                )
+                global broken_path
+                broken_path = True
                 packet["hops"] += 1
                 registry.log_lost_packet(
                     packet["episode_number"],
                     packet["from_node_id"],
                     None,
                     packet["type"].value,
-                )
-
-                episode_number = packet["episode_number"]
-                log.debug(
-                    f"[Node_ID={self.node.node_id}] Episode {episode_number} detected a broken path. Packet={packet}"
                 )
 
             case _:
@@ -636,7 +618,6 @@ class SenderBellmanFordApplication(BellmanFordApplication):
 
         registry.log_complete_episode(episode_number, success)
 
-        # self.stop_route_monitoring()
         raise EpisodeEnded(success)
 
     def _log_routes(self):
