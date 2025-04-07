@@ -75,7 +75,7 @@ class DijkstraApplication(Application):
         next_function = packet["functions_sequence"][
             0
         ]
-        neighbors = self.node.network.get_neighbors(self.node.node_id)
+        neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.nodes[neighbor].status]
 
         log.debug(
             f"[Node_ID={self.node.node_id}] Selecting next node to process function: {next_function}"
@@ -157,7 +157,10 @@ class DijkstraApplication(Application):
 
     def get_assigned_function(self) -> str:
         """Returns the function assigned to this node or 'N/A' if None."""
-        func = self.broadcast_state.node_function_map.get(self.node.node_id)
+        func = None
+
+        if self.broadcast_state is not None:
+            func = self.broadcast_state.node_function_map.get(self.node.node_id)
 
         return func.value if func is not None else "N/A"
 
@@ -194,7 +197,15 @@ class SenderDijkstraApplication(DijkstraApplication):
         try:
             global broken_path
             if broken_path or episode_number == 1:
+                if broken_path:
+                    for node_id in self.node.network.nodes:
+                        if node_id != 0:
+                            self.node.network.nodes[node_id].application.assigned_function = None
+                            self.node.network.nodes[node_id].application.previous_node_id = None
+                            self.node.network.nodes[node_id].application.broadcast_state = None
+
                 broken_path = False
+
                 log.debug(
                     f"[Node_ID={self.node.node_id}] Starting broadcast for episode {episode_number}"
                 )
@@ -275,7 +286,7 @@ class SenderDijkstraApplication(DijkstraApplication):
         """
         Inicia el proceso de broadcast desde el nodo sender.
         """
-        neighbors = self.node.network.get_neighbors(self.node.node_id)
+        neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.nodes[neighbor].status]
         broadcast_packet = {
             "type": PacketType.BROADCAST,
             "message_id": message_id,
@@ -461,7 +472,7 @@ class SenderDijkstraApplication(DijkstraApplication):
                 self.broadcast_state.parent_node = packet.from_node_id
 
                 # Propagar el paquete BROADCAST a los vecinos
-                neighbors = self.node.network.get_neighbors(self.node.node_id)
+                neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.nodes[neighbor].status]
                 for neighbor in neighbors:
                     if (
                         neighbor != packet.from_node_id
@@ -725,7 +736,7 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                         f"[Node_ID={self.node.node_id}] Added function to node function dict: {self.broadcast_state.node_function_map}"
                     )
 
-                neighbors = self.node.network.get_neighbors(self.node.node_id)
+                neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.nodes[neighbor].status]
                 neighbors_to_broadcast = [
                     n for n in neighbors if n not in packet["visited_nodes"]
                 ]

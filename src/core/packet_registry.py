@@ -214,9 +214,6 @@ class PacketRegistry:
         )
         self.metrics[algorithm]["successful_episodes"] = successful
 
-        self.reports_manager.save_metrics_to_file()
-        self.reports_manager.save_results_to_excel()
-
         self._current_algorithm = None
 
     def log_simulation_end(self) -> None:
@@ -224,6 +221,12 @@ class PacketRegistry:
         self.metrics["total_time"] = clock.get_current_time()
         self.reports_manager.save_metrics_to_file()
         self.reports_manager.save_results_to_excel()
+        self.reports_manager.generar_comparative_graphs_from_excel()
 
+        # q_tables = []
+        # if algorithm == "Q_ROUTING":
+        #     for node in self.network.nodes.values():
+        #         q_tables.append(node.application.q_table)
+        # self.generate_heat_map(q_tables)
 
 registry: PacketRegistry = PacketRegistry()

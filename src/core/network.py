@@ -121,7 +121,6 @@ class Network:
             current_time = clock.get_current_time()
             with self.lock:
                 if current_time >= next_event_time:
-                    log.debug("⚡ZZZAP⚡")  # Dynamic change event
                     self.trigger_dynamic_change()
                     self.dynamic_change_events.append(current_time)
                     next_event_time = current_time + self.generate_next_dynamic_change()
@@ -133,8 +132,10 @@ class Network:
         current_time = clock.get_current_time()
 
         for node_id in list(self.active_nodes):
-            if np.random.rand() < self.disconnection_probability:
-                node = self.nodes[node_id]
+            node = self.nodes[node_id]
+
+            if np.random.rand() < self.disconnection_probability and node.status:
+                log.debug("⚡ZZZAP⚡")  # Dynamic change event
                 node.status = False
 
                 # fixed reconnection mode
@@ -146,7 +147,7 @@ class Network:
                         scale=self.mean_reconnection_interval_ms
                     )
 
-                log.debug(f"Node {node_id} disconnected at {current_time:.2f}.")
+                log.debug(f"\033[91mNode {node_id} disconnected at {current_time:.2f}.\033[0m")
 
     def _handle_reconnections(self) -> None:
         """Handles reconnections of previously disconnected nodes."""
@@ -170,7 +171,8 @@ class Network:
                     ):
                         node.status = True
                         delattr(node, "disconnected_at")
-                        log.debug(f"Node {node_id} reconnected at {current_time:.2f}.")
+                        log.debug("⚡ZZZAP⚡")
+                        log.debug(f"\033[92mNode {node_id} reconnected at {current_time:.2f}.\033[0m")
                 # Mean reconnection mode
                 elif self.mean_reconnection_interval_ms is not None:
                     if not hasattr(node, "reconnect_time"):
@@ -180,7 +182,8 @@ class Network:
                     if current_time >= node.reconnect_time:
                         node.status = True
                         delattr(node, "reconnect_time")
-                        log.debug(f"Node {node_id} reconnected at {current_time:.2f}.")
+                        log.debug("⚡ZZZAP⚡")
+                        log.debug(f"\033[92mNode {node_id} reconnected at {current_time:.2f}.\033[0m")
 
     def validate_connection(self, from_node_id: int, to_node_id: int) -> bool:
         """Validates if a connection between two nodes is valid.
