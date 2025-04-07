@@ -158,6 +158,8 @@ class ReportsManager:
         Args:
             filename (str): Path to the Excel file. Defaults to "../resources/results/resultados_simulacion.xlsx".
         """
+        log.getLogger().setLevel(log.ERROR)
+
         import os
 
         import matplotlib.pyplot as plt
