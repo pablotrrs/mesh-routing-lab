@@ -453,6 +453,10 @@ class SenderDijkstraApplication(DijkstraApplication):
                         log.debug(
                             f"[Node_ID={self.node.node_id}] Restarting episode {episode_number} because pre calculated shortest path is broken. Packet={packet}"
                         )
+                        # FIXME: aca lo que deberia pasar es: se reintenta ese mismo hop hasta que se levante,
+                        # y si no se levanta va a fallar por timeout o por max_hops
+                        # porque si reiniciamos el episodio no es representativo (porque en una red real, cómo
+                        # se le comunica esto al sender de manera distribuida?)
                         self._process_episode(episode_number, True)
                     else:
                         self.callback_stack.append(packet["from_node_id"])
