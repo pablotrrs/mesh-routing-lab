@@ -4,7 +4,7 @@ import logging as log
 import time
 from enum import Enum
 
-from core.base import Application, EpisodeEnded
+from core.base import Application, EpisodeEnded, EpisodeTimeout
 from core.clock import clock
 from core.packet_registry import registry
 from tabulate import tabulate
@@ -73,7 +73,7 @@ class BellmanFordApplication(Application):
         next_function = packet["functions_sequence"][
             0
         ]
-        neighbors = self.node.network.get_neighbors(self.node.node_id)
+        neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.nodes[neighbor].status]
 
         log.debug(
             f"[Node_ID={self.node.node_id}] Selecting next node to process function: {next_function}"
@@ -158,7 +158,10 @@ class BellmanFordApplication(Application):
 
     def get_assigned_function(self) -> str:
         """Returns the function assigned to this node or 'N/A' if None."""
-        func = self.broadcast_state.node_function_map.get(self.node.node_id)
+        func = None
+
+        if self.broadcast_state is not None:
+            func = self.broadcast_state.node_function_map.get(self.node.node_id)
 
         return func.value if func is not None else "N/A"
 
@@ -181,7 +184,7 @@ class SenderBellmanFordApplication(BellmanFordApplication):
 
         self.episode_start_time = clock.get_current_time()
 
-        episode_thread = threading.Thread(target=self._process_episode, args=(episode_number,))
+        episode_thread = threading.Thread(target=self._process_episode, args=(episode_number, False))
         timeout_watcher_thread = threading.Thread(target=self._monitor_timeout, args=(episode_thread, episode_number))
 
         threading.excepthook = custom_thread_excepthook
@@ -194,15 +197,30 @@ class SenderBellmanFordApplication(BellmanFordApplication):
         if timeout_watcher_thread.is_alive():
             timeout_watcher_thread.join()
 
-    def _process_episode(self, episode_number: int) -> None:
+    def _process_episode(self, episode_number: int, reset_episode) -> None:
         """Core logic for processing an episode, runs asynchronously."""
         try:
             global broken_path
-            if broken_path or episode_number == 1:
+            if broken_path or episode_number == 1 or reset_episode:
                 broken_path = False
                 log.debug(
                     f"[Node_ID={self.node.node_id}] Starting broadcast for episode {episode_number}"
                 )
+
+                if reset_episode:
+                    log.debug(f"Nodes: {self.node.network.nodes.values()}")
+                    # node_info = [
+                    #     [node.node_id, node.status, node.disconnected_at, node.reconnect_time]
+                    #     for node in self.node.network.nodes.values()
+                    # ]
+                    # headers = ["Node ID", "Connected", "Disconnectet at", "Reconnect Time"]
+                    # print(tabulate(node_info, headers=headers, tablefmt="grid"))
+
+                    for node_id in self.node.network.nodes:
+                        if node_id != 0:
+                            self.node.network.nodes[node_id].application.assigned_function = None
+                            self.node.network.nodes[node_id].application.previous_node_id = None
+                            self.node.network.nodes[node_id].application.broadcast_state = None
 
                 message_id = f"broadcast_{self.node.node_id}_{episode_number}"
 
@@ -217,7 +235,8 @@ class SenderBellmanFordApplication(BellmanFordApplication):
                 log.debug(
                     f"[Node_ID={self.node.node_id}] Broadcast completed. Computing shortest paths..."
                 )
-                self.compute_shortest_paths()
+
+                self.compute_shortest_paths(episode_number)
 
                 while not self.paths_computed:
                     pass
@@ -278,7 +297,7 @@ class SenderBellmanFordApplication(BellmanFordApplication):
         """
         Inicia el proceso de broadcast desde el nodo sender.
         """
-        neighbors = self.node.network.get_neighbors(self.node.node_id)
+        neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.nodes[neighbor].status]
         broadcast_packet = {
             "type": PacketType.BROADCAST,
             "message_id": message_id,
@@ -327,7 +346,7 @@ class SenderBellmanFordApplication(BellmanFordApplication):
             )
         )
 
-    def compute_shortest_paths(self):
+    def compute_shortest_paths(self, episode_number):
         """
         Calcula las rutas más cortas desde el nodo de origen a todos los demás nodos,
         utilizando Bellman-Ford con las latencias medidas en el broadcast.
@@ -357,14 +376,19 @@ class SenderBellmanFordApplication(BellmanFordApplication):
                 raise ValueError("El grafo contiene un ciclo negativo")
 
         self.routes = self._reconstruct_paths(self.node.node_id, previous_nodes)
-        self._log_routes()
-        self.paths_computed = True
+        result = self._log_routes()
+        if not result:
+            print(f"[Node_ID={self.node.node_id}] No routes found. Retrying...")
+            self._process_episode(episode_number, True)
+        else:
+            self.paths_computed = True
 
     def _reconstruct_paths(self, sender_node_id, previous_nodes):
         """
         Reconstruye las rutas más cortas desde el diccionario de nodos previos,
         incluyendo las funciones que se procesan en cada nodo.
         """
+
         routes = {}
         for node_id in self.node.network.get_nodes():
             path = []
@@ -427,7 +451,7 @@ class SenderBellmanFordApplication(BellmanFordApplication):
                         log.debug(
                             f"[Node_ID={self.node.node_id}] Restarting episode {episode_number} because pre calculated shortest path is broken. Packet={packet}"
                         )
-                        self.start_episode(episode_number, True)
+                        self._process_episode(episode_number, True)
                     else:
                         self.callback_stack.append(packet["from_node_id"])
                         self.send_packet(next_node, packet)
@@ -459,7 +483,7 @@ class SenderBellmanFordApplication(BellmanFordApplication):
                 self.broadcast_state.received_messages.add(packet.message_id)
                 self.broadcast_state.parent_node = packet.from_node_id
 
-                neighbors = self.node.network.get_neighbors(self.node.node_id)
+                neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.nodes[neighbor].status]
                 for neighbor in neighbors:
                     if (
                         neighbor != packet.from_node_id
@@ -610,8 +634,16 @@ class SenderBellmanFordApplication(BellmanFordApplication):
         for destination, route_info in self.routes.items():
             path = route_info["path"]
 
-            functions = [node_function_map.get(node, "None") for node in path]
-
+            functions = []
+            for node in path:
+                assigned_function = node_function_map.get(node, "None")
+                print(f"Node {node} assigned function: {assigned_function}")
+                if node != 0 and assigned_function == "None":
+                    # Si un nodo distinto de 0 no tiene función asignada, retornar False
+                    print(f"Node {node} has no assigned function. Returning False.")
+                    return False
+                functions.append(assigned_function)
+                
             path_str = " -> ".join(map(str, path))
             functions_str = " -> ".join(map(str, functions))
             total_latency = sum(
@@ -637,6 +669,7 @@ class SenderBellmanFordApplication(BellmanFordApplication):
             )
         )
 
+        return True
 
 class IntermediateBellmanFordApplication(BellmanFordApplication):
     def __init__(self, node):
@@ -720,7 +753,7 @@ class IntermediateBellmanFordApplication(BellmanFordApplication):
                         f"[Node_ID={self.node.node_id}] Added function to node function dict: {self.broadcast_state.node_function_map}"
                     )
 
-                neighbors = self.node.network.get_neighbors(self.node.node_id)
+                neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.nodes[neighbor].status]
                 neighbors_to_broadcast = [
                     n for n in neighbors if n not in packet["visited_nodes"]
                 ]
