@@ -77,7 +77,7 @@ class DijkstraApplication(Application):
         next_function = packet["functions_sequence"][
             0
         ]
-        neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.nodes[neighbor].status]
+        neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.get_node(neighbor).status]
 
         log.debug(
             f"[Node_ID={self.node.node_id}] Selecting next node to process function: {next_function}"
@@ -213,11 +213,11 @@ class SenderDijkstraApplication(DijkstraApplication):
                     # headers = ["Node ID", "Connected", "Disconnectet at", "Reconnect Time"]
                     # print(tabulate(node_info, headers=headers, tablefmt="grid"))
 
-                    for node_id in self.node.network.nodes:
+                    for node_id in self.node.network.get_nodes:
                         if node_id != 0:
-                            self.node.network.nodes[node_id].application.assigned_function = None
-                            self.node.network.nodes[node_id].application.previous_node_id = None
-                            self.node.network.nodes[node_id].application.broadcast_state = None
+                            self.node.network.get_node(node_id).application.assigned_function = None
+                            self.node.network.get_node(node_id).application.previous_node_id = None
+                            self.node.network.get_node(node_id).application.broadcast_state = None
 
                 log.debug(
                     f"[Node_ID={self.node.node_id}] Starting broadcast for episode {episode_number}"
@@ -262,12 +262,12 @@ class SenderDijkstraApplication(DijkstraApplication):
 
             next_node = self.select_next_function_node(packet)
 
-            if next_node is None or not self.node.network.nodes[next_node].status:
+            if next_node is None or not self.node.network.get_node(next_node).status:
 
                 while True:
                     next_node = self.select_next_function_node(packet)
 
-                    if next_node is not None and self.node.network.nodes[next_node].status:
+                    if next_node is not None and self.node.network.get_node(next_node).status:
                         break
 
                     delay_ms = RETRY_BASE_DELAY_MS * (2 ** retry_count)
@@ -329,7 +329,7 @@ class SenderDijkstraApplication(DijkstraApplication):
         """
         Inicia el proceso de broadcast desde el nodo sender.
         """
-        neighbors =  [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.nodes[neighbor].status]
+        neighbors =  [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.get_node(neighbor).status]
         broadcast_packet = {
             "type": PacketType.BROADCAST,
             "message_id": message_id,
@@ -350,10 +350,10 @@ class SenderDijkstraApplication(DijkstraApplication):
 
         for neighbor in neighbors:
             if (
-                neighbor is None or self.node.network.nodes[neighbor].status
+                neighbor is None or self.node.network.get_node(neighbor).status
             ):
                 retry_count = 0
-                while neighbor is not None and not self.node.network.nodes[neighbor].status:
+                while neighbor is not None and not self.node.network.get_node(neighbor).status:
                     delay_ms = RETRY_BASE_DELAY_MS * (2 ** retry_count)
                     delay_ms = min(delay_ms, 100000)  # clamp para no pasarse de rosca
 
@@ -457,9 +457,9 @@ class SenderDijkstraApplication(DijkstraApplication):
             current = node_id
             while current is not None:
                 path.insert(0, current)
-                assigned_function = self.node.network.nodes[
+                assigned_function = self.node.network.get_node(
                     current
-                ].get_assigned_function()
+                ).get_assigned_function()
                 functions.insert(0, assigned_function if assigned_function else None)
                 current = previous_nodes[current]
             if path[0] == sender_node_id:  # Solo guarda rutas alcanzables
@@ -505,10 +505,10 @@ class SenderDijkstraApplication(DijkstraApplication):
 
                     # if next node is not available, exponential backoff retries until it is or timeout or max hops reached
                     if (
-                        next_node is None or self.node.network.nodes[next_node].status
+                        next_node is None or self.node.network.get_node(next_node).status
                     ):
                         retry_count = 0
-                        while next_node is not None and not self.node.network.nodes[next_node].status:
+                        while next_node is not None and not self.node.network.get_node(next_node).status:
                             delay_ms = RETRY_BASE_DELAY_MS * (2 ** retry_count)
                             delay_ms = min(delay_ms, 100000)  # clamp para no pasarse de rosca
 
@@ -829,7 +829,7 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                         f"[Node_ID={self.node.node_id}] Added function to node function dict: {self.broadcast_state.node_function_map}"
                     )
 
-                neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.nodes[neighbor].status]
+                neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.get_node(neighbor).status]
                 neighbors_to_broadcast = [
                     n for n in neighbors if n not in packet["visited_nodes"]
                 ]
@@ -1033,11 +1033,11 @@ class IntermediateDijkstraApplication(DijkstraApplication):
 
                     log.debug(
                         next_node is None
-                        or not self.node.network.nodes[next_node].status
+                        or not self.node.network.get_node(next_node).status
                     )
 
                     log.debug(
-                        f"[Node_ID={self.node.node_id}] Next node 2: {next_node is None or not self.node.network.nodes[next_node].status}"
+                        f"[Node_ID={self.node.node_id}] Next node 2: {next_node is None or not self.node.network.get_node(next_node).status}"
                     )
 
                     # if next node is not available, exponential backoff retries until it is or timeout or max hops reached
@@ -1046,7 +1046,7 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                     while True:
                         next_node = self.select_next_function_node(packet)
 
-                        if next_node is not None and self.node.network.nodes[next_node].status:
+                        if next_node is not None and self.node.network.get_node(next_node).status:
                             break
 
                         delay_ms = RETRY_BASE_DELAY_MS * (2 ** retry_count)
