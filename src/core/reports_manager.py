@@ -17,9 +17,26 @@ class ReportsManager:
     def __init__(self) -> None:
         """Initializes the MetricsManager with an empty metrics dictionary."""
         self.metrics: Dict[str, Union[int, float, str, List, Dict]] = {}
+        self.results_dir = self.get_next_results_directory()
         log.debug("MetricsManager initialized.")
 
-    def save_metrics_to_file(
+    def generate_reports(self):
+        self._save_metrics_to_file(self.results_dir)
+        self._save_results_to_excel(os.path.join(self.results_dir, "resultados_simulacion.xlsx"))
+        # self._generate_comparative_graphs_from_excel(os.path.join(self.results_dir, "resultados_simulacion.xlsx"))
+
+    @staticmethod
+    def get_next_results_directory(base_path="../resources/results"):
+        os.makedirs(base_path, exist_ok=True)
+        index = 1
+        while True:
+            candidate = os.path.join(base_path, str(index))
+            if not os.path.exists(candidate):
+                os.makedirs(candidate)
+                return candidate
+            index += 1
+
+    def _save_metrics_to_file(
         self, directory: str = "../resources/results/single-run"
     ) -> None:
         """Saves the simulation metrics to a JSON file.
@@ -31,14 +48,14 @@ class ReportsManager:
 
         from core.packet_registry import registry
 
-        filename = f"{directory}/simulation_{registry.metrics['simulation_id']}.json"
+        filename = f"{directory}/metrics.json"
 
         with open(filename, "w", encoding="utf-8") as file:
             json.dump(registry.metrics, file, indent=4)
 
         log.debug(f"Simulation metrics saved to {filename}.")
 
-    def save_results_to_excel(
+    def _save_results_to_excel(
         self, filename: str = "../resources/results/resultados_simulacion.xlsx"
     ) -> None:
         """Saves the simulation results to an Excel file.
@@ -150,7 +167,7 @@ class ReportsManager:
 
         log.debug(f"\nresults saved in {filename}.")
 
-    def generar_comparative_graphs_from_excel(
+    def _generate_comparative_graphs_from_excel(
         self, filename: str = "../resources/results/resultados_simulacion.xlsx"
     ) -> None:
         """Generates comparative graphs based on simulation metrics.
@@ -337,3 +354,5 @@ class ReportsManager:
         plt.close()
 
         log.debug(f"Heat map saved to {filename}")
+
+reports_manager = ReportsManager()

@@ -29,6 +29,7 @@ import logging as log
 import os
 import sys
 
+from core.reports_manager import reports_manager
 from core.base import Algorithm, NodeFunction, SimulationConfig
 from core.network import Network
 from core.simulation import Simulation
@@ -36,16 +37,18 @@ from utils.custom_excep_hook import custom_excepthook
 
 
 def setup_logging(log_level_str="INFO"):
-    """Configure logging with specified log level string."""
     import logging as log
+    handlers = [log.StreamHandler()]
+
+    log_file_path = os.path.join(reports_manager.results_dir, "logs.txt")
+    file_handler = log.FileHandler(log_file_path, mode="w")
+    handlers.append(file_handler)
+
     log.root.handlers = []
-
-    level = getattr(log, log_level_str.upper(), log.INFO)
-
     log.basicConfig(
-        level=level,
+        level=log_level_str,
         format="%(asctime)s - %(filename)s:%(lineno)d - %(funcName)s() - %(levelname)s - %(message)s",
-        handlers=[log.StreamHandler()],
+        handlers=handlers,
     )
 
 

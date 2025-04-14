@@ -47,9 +47,9 @@ class Simulation:
             self._run_algorithm(algorithm)
             registry.log_algorithm_end()
 
-        registry.log_simulation_end()
         clock.stop()
         self.network.stop_dynamic_changes()
+        registry.log_simulation_end()
         log.info("Simulation finished")
 
     def _run_algorithm(self, algorithm: Algorithm) -> None:
