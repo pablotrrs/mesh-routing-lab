@@ -178,7 +178,7 @@ class PacketRegistry:
 
         # TODO: refactorizar esto para usar el success del EpisodeEnded
         if episode_success:
-            self._successful_episodes[algorithm] = +1
+            self._successful_episodes[algorithm] += 1
 
         dynamic_changes = self.network.get_dynamic_changes_by_episode(
             start_time, end_time
