@@ -74,7 +74,7 @@ class BellmanFordApplication(Application):
         next_function = packet["functions_sequence"][
             0
         ]
-        neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.nodes[neighbor].status]
+        neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.get_node(neighbor).status]
 
         log.debug(
             f"[Node_ID={self.node.node_id}] Selecting next node to process function: {next_function}"
@@ -209,7 +209,7 @@ class SenderBellmanFordApplication(BellmanFordApplication):
                 )
 
                 if reset_episode:
-                    log.debug(f"Nodes: {self.node.network.nodes.values()}")
+                    log.debug(f"Nodes: {self.node.network.get_nodes().values()}")
                     # node_info = [
                     #     [node.node_id, node.status, node.disconnected_at, node.reconnect_time]
                     #     for node in self.node.network.nodes.values()
@@ -217,11 +217,11 @@ class SenderBellmanFordApplication(BellmanFordApplication):
                     # headers = ["Node ID", "Connected", "Disconnectet at", "Reconnect Time"]
                     # print(tabulate(node_info, headers=headers, tablefmt="grid"))
 
-                    for node_id in self.node.network.nodes:
+                    for node_id in self.node.network.get_nodes():
                         if node_id != 0:
-                            self.node.network.nodes[node_id].application.assigned_function = None
-                            self.node.network.nodes[node_id].application.previous_node_id = None
-                            self.node.network.nodes[node_id].application.broadcast_state = None
+                            self.node.network.get_node(node_id).application.assigned_function = None
+                            self.node.network.get_node(node_id).application.previous_node_id = None
+                            self.node.network.get_node(node_id).application.broadcast_state = None
 
                 message_id = f"broadcast_{self.node.node_id}_{episode_number}"
 
@@ -258,7 +258,7 @@ class SenderBellmanFordApplication(BellmanFordApplication):
             next_node = self.select_next_function_node(packet)
 
             retry_count = 0
-            while next_node is None or not self.node.network.nodes[next_node].status:
+            while next_node is None or not self.node.network.get_node(next_node).status:
                 delay_ms = RETRY_BASE_DELAY_MS * (2 ** retry_count)
                 delay_ms = min(delay_ms, 100000)  # clamp para evitar que se dispare
 
@@ -317,7 +317,7 @@ class SenderBellmanFordApplication(BellmanFordApplication):
         """
         Inicia el proceso de broadcast desde el nodo sender.
         """
-        neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.nodes[neighbor].status]
+        neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.get_node(neighbor).status]
         broadcast_packet = {
             "type": PacketType.BROADCAST,
             "message_id": message_id,
@@ -338,10 +338,10 @@ class SenderBellmanFordApplication(BellmanFordApplication):
 
         for neighbor in neighbors:
             if (
-                neighbor is None or self.node.network.nodes[neighbor].status
+                neighbor is None or self.node.network.get_node(neighbor).status
             ):
                 retry_count = 0
-                while neighbor is not None and not self.node.network.nodes[neighbor].status:
+                while neighbor is not None and not self.node.network.get_node(neighbor).status:
                     delay_ms = RETRY_BASE_DELAY_MS * (2 ** retry_count)
                     delay_ms = min(delay_ms, 100000)  # clamp para no pasarse de rosca
 
@@ -440,9 +440,9 @@ class SenderBellmanFordApplication(BellmanFordApplication):
             current = node_id
             while current is not None:
                 path.insert(0, current)
-                assigned_function = self.node.network.nodes[
+                assigned_function = self.node.network.get_node(
                     current
-                ].get_assigned_function()
+                ).get_assigned_function()
                 functions.insert(0, assigned_function if assigned_function else None)
                 current = previous_nodes[current]
             if path[0] == sender_node_id:
@@ -488,10 +488,10 @@ class SenderBellmanFordApplication(BellmanFordApplication):
 
                     # if next node is not available, exponential backoff retries until it is or timeout or max hops reached
                     if (
-                        next_node is None or self.node.network.nodes[next_node].status
+                        next_node is None or self.node.network.get_node(next_node).status
                     ):
                         retry_count = 0
-                        while next_node is not None and not self.node.network.nodes[next_node].status:
+                        while next_node is not None and not self.node.network.get_node(next_node).status:
                             delay_ms = RETRY_BASE_DELAY_MS * (2 ** retry_count)
                             delay_ms = min(delay_ms, 100000)  # clamp para no pasarse de rosca
 
@@ -537,7 +537,7 @@ class SenderBellmanFordApplication(BellmanFordApplication):
                 self.broadcast_state.received_messages.add(packet.message_id)
                 self.broadcast_state.parent_node = packet.from_node_id
 
-                neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.nodes[neighbor].status]
+                neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.get_node(neighbor).status]
                 for neighbor in neighbors:
                     if (
                         neighbor != packet.from_node_id
@@ -814,7 +814,7 @@ class IntermediateBellmanFordApplication(BellmanFordApplication):
                         f"[Node_ID={self.node.node_id}] Added function to node function dict: {self.broadcast_state.node_function_map}"
                     )
 
-                neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.nodes[neighbor].status]
+                neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.get_node(neighbor).status]
                 neighbors_to_broadcast = [
                     n for n in neighbors if n not in packet["visited_nodes"]
                 ]
@@ -1017,19 +1017,19 @@ class IntermediateBellmanFordApplication(BellmanFordApplication):
 
                     log.debug(
                         next_node is None
-                        or not self.node.network.nodes[next_node].status
+                        or not self.node.network.get_node(next_node).status
                     )
 
                     log.debug(
-                        f"[Node_ID={self.node.node_id}] Next node 2: {next_node is None or not self.node.network.nodes[next_node].status}"
+                        f"[Node_ID={self.node.node_id}] Next node 2: {next_node is None or not self.node.network.get_node(next_node).status}"
                     )
 
                     # if next node is not available, exponential backoff retries until it is or timeout or max hops reached
                     if (
-                        next_node is None or self.node.network.nodes[next_node].status
+                        next_node is None or self.node.network.get_node(next_node).status
                     ):
                         retry_count = 0
-                        while next_node is not None and not self.node.network.nodes[next_node].status:
+                        while next_node is not None and not self.node.network.get_node(next_node).status:
                             delay_ms = RETRY_BASE_DELAY_MS * (2 ** retry_count)
                             delay_ms = min(delay_ms, 100000)  # clamp para no pasarse de rosca
 

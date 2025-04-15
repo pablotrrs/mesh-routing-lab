@@ -112,7 +112,7 @@ class QRoutingApplication(Application):
             valid_neighbors = [
                 neighbor
                 for neighbor in self.node.network.get_neighbors(current_node_id)
-                if self.node.network.nodes[neighbor].status
+                if self.node.network.get_node(neighbor).status
                 and neighbor != current_node_id
                 and self.node.network.validate_connection(
                     current_node_id, neighbor
@@ -143,7 +143,7 @@ class QRoutingApplication(Application):
             valid_neighbors = [
                 neighbor
                 for neighbor in self.node.network.get_neighbors(current_node_id)
-                if self.node.network.nodes[neighbor].status
+                if self.node.network.get_node(neighbor).status
                 and neighbor != current_node_id
                 and self.node.network.validate_connection(
                     current_node_id, neighbor
@@ -175,7 +175,7 @@ class QRoutingApplication(Application):
         neighbors_q_values = {
             neighbor: q_value
             for neighbor, q_value in self.q_table[self.node.node_id].items()
-            if self.node.network.nodes[neighbor].status
+            if self.node.network.get_node(neighbor).status
         }
 
         if not neighbors_q_values:
