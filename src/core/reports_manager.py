@@ -23,7 +23,7 @@ class ReportsManager:
     def generate_reports(self):
         self._save_metrics_to_file(self.results_dir)
         self._save_results_to_excel(os.path.join(self.results_dir, "resultados_simulacion.xlsx"))
-        # self._generate_comparative_graphs_from_excel(os.path.join(self.results_dir, "resultados_simulacion.xlsx"))
+        self._generate_comparative_graphs_from_excel(os.path.join(self.results_dir, "resultados_simulacion.xlsx"))
 
     @staticmethod
     def get_next_results_directory(base_path="../resources/results"):
@@ -215,7 +215,7 @@ class ReportsManager:
         plt.ylabel("Duración (ms)")
         plt.grid()
         plt.legend()
-        plt.savefig("../resources/results/Comparacion_Duracion_Episodio.png")
+        plt.savefig(os.path.join(self.results_dir,"Comparacion_Duracion_Episodio.png"))
         plt.close()
 
         plt.figure(figsize=(10, 6))
@@ -226,7 +226,7 @@ class ReportsManager:
         plt.ylabel("Hops Promedio")
         plt.grid()
         plt.legend()
-        plt.savefig("../resources/results/Comparacion_Hops_Promedio.png")
+        plt.savefig(os.path.join(self.results_dir,"Comparacion_Hops_Promedio.png"))
         plt.close()
 
         plt.figure(figsize=(10, 6))
@@ -237,7 +237,7 @@ class ReportsManager:
         plt.ylabel("Tiempo Promedio de Entrega (ms)")
         plt.grid()
         plt.legend()
-        plt.savefig("../resources/results/Comparacion_Tiempo_Promedio_Entrega.png")
+        plt.savefig(os.path.join(self.results_dir,"Comparacion_Tiempo_Promedio_Entrega.png"))
         plt.close()
 
         plt.figure(figsize=(10, 6))
@@ -248,21 +248,19 @@ class ReportsManager:
         plt.ylabel("Tasa de Éxito")
         plt.grid()
         plt.legend()
-        plt.savefig("../resources/results/Comparacion_Tasa_Exito.png")
+        plt.savefig(os.path.join(self.results_dir,"Comparacion_Tasa_Exito.png"))
         plt.close()
 
         plt.figure(figsize=(10, 6))
 
         success_counts = {
-            algorithm: {"TRUE": 0, "FALSE": 0, "BLANK": 0}
+            algorithm: {"TRUE": 0, "FALSE": 0}
             for algorithm in all_data["episode_success"].keys()
         }
 
         for algorithm, data in all_data["episode_success"].items():
             for value in data:
-                if pd.isna(value):
-                    success_counts[algorithm]["BLANK"] += 1
-                elif value:
+                if value:
                     success_counts[algorithm]["TRUE"] += 1
                 else:
                     success_counts[algorithm]["FALSE"] += 1
@@ -270,26 +268,29 @@ class ReportsManager:
         bar_width = 0.25
         index = np.arange(len(success_counts))
 
-        plt.bar(
-            index,
-            [success_counts[alg]["TRUE"] for alg in success_counts],
-            bar_width,
-            label="TRUE",
-        )
+        true_values = [success_counts[alg]["TRUE"] for alg in success_counts]
+        false_values = [success_counts[alg]["FALSE"] for alg in success_counts]
 
-        plt.bar(
-            index + bar_width,
-            [success_counts[alg]["FALSE"] for alg in success_counts],
-            bar_width,
-            label="FALSE",
-        )
+        bars_true = plt.bar(index, true_values, bar_width, label="TRUE")
+        bars_false = plt.bar(index + bar_width, false_values, bar_width, label="FALSE")
 
-        plt.bar(
-            index + 2 * bar_width,
-            [success_counts[alg]["BLANK"] for alg in success_counts],
-            bar_width,
-            label="BLANK",
-        )
+        for bar in bars_true:
+            plt.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height(),
+                f"{int(bar.get_height())}",
+                ha="center",
+                va="bottom",
+            )
+
+        for bar in bars_false:
+            plt.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height(),
+                f"{int(bar.get_height())}",
+                ha="center",
+                va="bottom",
+            )
 
         plt.title("Tasa de Éxito por Episodio entre Algoritmos")
         plt.xlabel("Algoritmo")
@@ -297,10 +298,10 @@ class ReportsManager:
         plt.xticks(index + bar_width, success_counts.keys())
         plt.grid()
         plt.legend()
-        plt.savefig("../resources/results/Tasa_Exito_Columnas.png")
+        plt.savefig(os.path.join(self.results_dir,"Tasa_Exito_Columnas.png"))
         plt.close()
 
-        log.debug("Comparative graphs generated in: '../resources/results/'.")
+        log.debug(f"Comparative graphs generated in: {self.results_dir}.")
 
     def generate_heat_map(self, q_tables):
         q_table_data = []
