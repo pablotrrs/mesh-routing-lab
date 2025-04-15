@@ -1,4 +1,5 @@
 import random
+import time
 import logging as log
 from dataclasses import dataclass
 from collections import deque
@@ -19,6 +20,8 @@ EPSILON_DECAY = 0.99
 EPSILON_MIN = 0.1
 
 CURRENT_HOP_COUNT = 0
+
+RETRY_BASE_DELAY_MS = 50
 
 EPISODE_COMPLETED = False
 
@@ -96,75 +99,42 @@ class QRoutingApplication(Application):
         return
 
     def select_next_node(self) -> int:
-        """
-        Selecciona el siguiente nodo basado en la política ε-greedy con epsilon decay.
-        """
         self.initialize_or_update_q_table()
         global EPSILON
 
-        next_node = None
+        retry_count = 0
         current_node_id = self.node.node_id
 
-        if random.random() < EPSILON:
-            log.debug(
-                f"[Node_ID={current_node_id}] Performing exploration with epsilon={EPSILON:.4f}"
-            )
-            valid_neighbors = [
-                neighbor
-                for neighbor in self.node.network.get_neighbors(current_node_id)
-                if self.node.network.nodes[neighbor].status
-                and neighbor != current_node_id
-                and self.node.network.validate_connection(
-                    current_node_id, neighbor
-                )
-            ]
-            if valid_neighbors:
-                next_node = random.choice(valid_neighbors)
-        else:
-            log.debug(
-                f"[Node_ID={current_node_id}] Exploitation with epsilon={EPSILON:.4f}"
-            )
-            next_node = self.choose_best_action()
+        while True:
+            next_node = None
 
-            if (
-                next_node == current_node_id
-                or not self.node.network.validate_connection(current_node_id, next_node)
-            ):
-                log.debug(
-                    f"[Node_ID={current_node_id}] Exploitation selected an unreachable or self node. Falling back to exploration."
-                )
-                next_node = None
-
-        if next_node is None:
-            log.debug(
-                f"[Node_ID={current_node_id}] Exploitation failed, falling back to exploration"
-            )
-
-            valid_neighbors = [
-                neighbor
-                for neighbor in self.node.network.get_neighbors(current_node_id)
-                if self.node.network.nodes[neighbor].status
-                and neighbor != current_node_id
-                and self.node.network.validate_connection(
-                    current_node_id, neighbor
-                )
-            ]
-
-            if valid_neighbors:
-                next_node = random.choice(valid_neighbors)
-                log.debug(
-                    f"[Node_ID={current_node_id}] Exploration selected Node {next_node}"
-                )
+            if random.random() < EPSILON:
+                log.debug(f"[Node_ID={current_node_id}] Performing exploration with epsilon={EPSILON:.4f}")
+                valid_neighbors = [
+                    neighbor for neighbor in self.node.network.get_neighbors(current_node_id)
+                    if self.node.network.get_node(neighbor).status
+                    and neighbor != current_node_id
+                    and self.node.network.validate_connection(current_node_id, neighbor)
+                ]
+                if valid_neighbors:
+                    next_node = random.choice(valid_neighbors)
             else:
-                log.debug(
-                    f"[Node_ID={current_node_id}] No available neighbors to send the packet. Dropping packet."
-                )
-                return None
+                log.debug(f"[Node_ID={current_node_id}] Exploitation with epsilon={EPSILON:.4f}")
+                next_node = self.choose_best_action()
 
-        # Update epsilon after each decision
-        EPSILON = max(EPSILON * EPSILON_DECAY, EPSILON_MIN)
+                if next_node == current_node_id or not self.node.network.validate_connection(current_node_id, next_node):
+                    log.debug(f"[Node_ID={current_node_id}] Exploitation selected invalid node. Fallback to exploration.")
+                    next_node = None
 
-        return next_node
+            if next_node is not None:
+                EPSILON = max(EPSILON * EPSILON_DECAY, EPSILON_MIN)
+                return next_node
+
+            delay_ms = RETRY_BASE_DELAY_MS * (2 ** retry_count)
+            delay_ms = min(delay_ms, 10000)
+            log.debug(f"[Node_ID={current_node_id}] No valid next node found. Retrying in {delay_ms}ms...")
+            time.sleep(delay_ms / 1000)
+            retry_count += 1
 
     def choose_best_action(self) -> int:
         """
@@ -175,7 +145,7 @@ class QRoutingApplication(Application):
         neighbors_q_values = {
             neighbor: q_value
             for neighbor, q_value in self.q_table[self.node.node_id].items()
-            if self.node.network.nodes[neighbor].status
+            if self.node.network.get_node(neighbor).status
         }
 
         if not neighbors_q_values:
@@ -330,18 +300,27 @@ class SenderQRoutingApplication(QRoutingApplication):
 
         self.episode_start_time = clock.get_current_time()
 
-        episode_thread = threading.Thread(target=self._process_episode, args=(episode_number,0))
+        episode_thread = threading.Thread(target=self._process_episode, args=(episode_number, 0))
         timeout_watcher_thread = threading.Thread(target=self._monitor_timeout, args=(episode_thread, episode_number))
 
         threading.excepthook = custom_thread_excepthook
 
+        log.debug(f"[Episode #{episode_number}] Starting episode thread.")
         episode_thread.start()
+
+        log.debug(f"[Episode #{episode_number}] Starting timeout watcher thread.")
         timeout_watcher_thread.start()
 
-        episode_thread.join()
+        episode_thread.join(timeout=10)
+
+        if episode_thread.is_alive():
+            log.warning(f"[Episode #{episode_number}] Episode thread is still alive after join timeout. Forcing termination.")
+            kill_thread(episode_thread)
 
         if timeout_watcher_thread.is_alive():
             timeout_watcher_thread.join()
+
+        log.debug(f"[Episode #{episode_number}] Episode fully handled (thread joined and timeout watcher done).")
 
     def _process_episode(self, episode_number: int, current_hop_count: int) -> None:
         """Core logic for processing an episode, runs asynchronously."""
@@ -420,9 +399,9 @@ class SenderQRoutingApplication(QRoutingApplication):
                 log.info(f"[Episode #{episode_number}] Episode forcefully terminated due to timeout.")
                 return
 
-            if EPISODE_COMPLETED:
-                log.debug(f"[Episode #{episode_number}] Episode completed. Stopping timeout watcher.")
-                return
+            # if EPISODE_COMPLETED:
+            #     log.debug(f"[Episode #{episode_number}] Episode completed. Stopping timeout watcher.")
+            #     return
 
             import time
             time.sleep(0.001)

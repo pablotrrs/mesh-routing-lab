@@ -4,7 +4,7 @@ from typing import Dict, Optional
 
 from core.base import SimulationConfig
 from core.clock import clock
-from core.reports_manager import ReportsManager
+from core.reports_manager import reports_manager
 from core.network import Network
 
 
@@ -18,7 +18,6 @@ class PacketRegistry:
     def __init__(self) -> None:
         """Initializes the PacketRegistry with an empty packet log."""
         self.packet_log: Dict[int, Dict] = {}
-        self.reports_manager: ReportsManager = ReportsManager()
         self.network: Network = None
         self.config: SimulationConfig = None
         self._current_algorithm: str = None
@@ -218,9 +217,7 @@ class PacketRegistry:
     def log_simulation_end(self) -> None:
         """Marca el final de la simulación y guarda la duración total."""
         self.metrics["total_time"] = clock.get_current_time()
-        self.reports_manager.save_metrics_to_file()
-        self.reports_manager.save_results_to_excel()
-        self.reports_manager.generar_comparative_graphs_from_excel()
+        reports_manager.generate_reports()
 
         # q_tables = []
         # if algorithm == "Q_ROUTING":

@@ -1,6 +1,7 @@
 import logging as log
 import math
 import threading
+from threading import RLock
 import time
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -32,7 +33,7 @@ class Network:
         self.active_nodes: Set[int] = set()
         self.dynamic_change_events: List[int] = []
         self.running: bool = True
-        self.lock: threading.Lock = threading.Lock()
+        self.lock: RLock = RLock()
         self.mean_disconnection_interval_ms: Optional[float] = None
         self.mean_reconnection_interval_ms: Optional[float] = None
         self.disconnection_probability: Optional[float] = None
@@ -81,6 +82,11 @@ class Network:
             disconnection_probability (float): Probability of disconnection (0.0 to 1.0).
         """
         self.disconnection_probability = disconnection_probability
+
+
+    def get_node(self, node_id: int):
+        with self.lock:
+            return self.nodes[node_id]
 
     def generate_next_dynamic_change(self) -> int:
         """Generates the next dynamic change time based on configured intervals.
@@ -131,59 +137,61 @@ class Network:
         """Applies the logic for dynamic changes in the network (e.g., random node disconnections)."""
         current_time = clock.get_current_time()
 
-        for node_id in list(self.active_nodes):
-            node = self.nodes[node_id]
+        with self.lock:
+            for node_id in list(self.active_nodes):
+                node = self.nodes[node_id]
 
-            if np.random.rand() < self.disconnection_probability and node.status:
-                log.debug("⚡ZZZAP⚡")  # Dynamic change event
-                node.status = False
+                if np.random.rand() < self.disconnection_probability and node.status:
+                    log.debug("⚡ZZZAP⚡")  # Dynamic change event
+                    node.status = False
 
-                # fixed reconnection mode
-                if self.reconnection_interval_ms is not None:
-                    node.disconnected_at = current_time
-                # mean reconnection mode
-                elif self.mean_reconnection_interval_ms is not None:
-                    node.reconnect_time = current_time + np.random.exponential(
-                        scale=self.mean_reconnection_interval_ms
-                    )
+                    # fixed reconnection mode
+                    if self.reconnection_interval_ms is not None:
+                        node.disconnected_at = current_time
+                    # mean reconnection mode
+                    elif self.mean_reconnection_interval_ms is not None:
+                        node.reconnect_time = current_time + np.random.exponential(
+                            scale=self.mean_reconnection_interval_ms
+                        )
 
-                log.debug(f"\033[91mNode {node_id} disconnected at {current_time:.2f}.\033[0m")
+                    log.debug(f"\033[91mNode {node_id} disconnected at {current_time:.2f}.\033[0m")
 
     def _handle_reconnections(self) -> None:
         """Handles reconnections of previously disconnected nodes."""
         current_time = clock.get_current_time()
 
-        for node_id, node in self.nodes.items():
-            if not node.status:
-                # Fixed reconnection mode
-                if (
-                    hasattr(self, "reconnection_interval_ms")
-                    and self.reconnection_interval_ms is not None
-                ):
+        with self.lock:
+            for node_id, node in self.nodes.items():
+                if not node.status:
+                    # Fixed reconnection mode
                     if (
-                        not hasattr(node, "disconnected_at")
-                        or node.disconnected_at is None
+                        hasattr(self, "reconnection_interval_ms")
+                        and self.reconnection_interval_ms is not None
                     ):
-                        continue
-                    if (
-                        current_time
-                        >= node.disconnected_at + self.reconnection_interval_ms
-                    ):
-                        node.status = True
-                        delattr(node, "disconnected_at")
-                        log.debug("⚡ZZZAP⚡")
-                        log.debug(f"\033[92mNode {node_id} reconnected at {current_time:.2f}.\033[0m")
-                # Mean reconnection mode
-                elif self.mean_reconnection_interval_ms is not None:
-                    if not hasattr(node, "reconnect_time"):
-                        node.reconnect_time = current_time + np.random.exponential(
-                            self.mean_reconnection_interval_ms
-                        )
-                    if current_time >= node.reconnect_time:
-                        node.status = True
-                        delattr(node, "reconnect_time")
-                        log.debug("⚡ZZZAP⚡")
-                        log.debug(f"\033[92mNode {node_id} reconnected at {current_time:.2f}.\033[0m")
+                        if (
+                            not hasattr(node, "disconnected_at")
+                            or node.disconnected_at is None
+                        ):
+                            continue
+                        if (
+                            current_time
+                            >= node.disconnected_at + self.reconnection_interval_ms
+                        ):
+                            node.status = True
+                            delattr(node, "disconnected_at")
+                            log.debug("⚡ZZZAP⚡")
+                            log.debug(f"\033[92mNode {node_id} reconnected at {current_time:.2f}.\033[0m")
+                    # Mean reconnection mode
+                    elif self.mean_reconnection_interval_ms is not None:
+                        if not hasattr(node, "reconnect_time"):
+                            node.reconnect_time = current_time + np.random.exponential(
+                                self.mean_reconnection_interval_ms
+                            )
+                        if current_time >= node.reconnect_time:
+                            node.status = True
+                            delattr(node, "reconnect_time")
+                            log.debug("⚡ZZZAP⚡")
+                            log.debug(f"\033[92mNode {node_id} reconnected at {current_time:.2f}.\033[0m")
 
 
     def validate_connection(self, from_node_id: int, to_node_id: int) -> bool:
@@ -236,8 +244,9 @@ class Network:
         Returns:
             List[int]: List of neighbor node IDs.
         """
-        neighbors = self.connections.get(node_id, [])
-        return list(set(neighbor for neighbor in neighbors if neighbor != node_id))
+        with self.lock:
+            neighbors = self.connections.get(node_id, [])
+            return list(set(neighbor for neighbor in neighbors if neighbor != node_id))
 
     def get_nodes(self) -> List[int]:
         """Returns a list of all node IDs in the network.
@@ -245,7 +254,8 @@ class Network:
         Returns:
             List[int]: List of node IDs.
         """
-        return list(self.nodes.keys())
+        with self.lock:
+            return list(self.nodes.keys())
 
     def is_node_reachable(self, from_node_id: int, to_node_id: int) -> bool:
         """Checks if a node is reachable from another node.
@@ -257,11 +267,12 @@ class Network:
         Returns:
             bool: True if the destination node is reachable, False otherwise.
         """
-        return (
-            to_node_id in self.connections.get(from_node_id, [])
-            and from_node_id in self.active_nodes
-            and to_node_id in self.active_nodes
-        )
+        with self.lock:
+            return (
+                to_node_id in self.connections.get(from_node_id, [])
+                and from_node_id in self.active_nodes
+                and to_node_id in self.active_nodes
+            )
 
     def send(self, from_node_id: int, to_node_id: int, packet: Dict) -> None:
         """Sends a packet in the network.

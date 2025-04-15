@@ -11,6 +11,8 @@ from tabulate import tabulate
 from utils.thread_killer import kill_thread
 from utils.custom_excep_hook import custom_thread_excepthook
 
+RETRY_BASE_DELAY_MS = 50
+
 EPISODE_COMPLETED = False
 
 broken_path = False
@@ -54,7 +56,6 @@ class PacketType(Enum):
     BROADCAST = "BROADCAST"
     ACK = "ACK"
     PACKET_HOP = "PACKET_HOP"
-    BROKEN_PATH = "BROKEN_PATH"
     SUCCESS = "SUCCESS"
     MAX_HOPS = "MAX_HOPS"
 
@@ -73,7 +74,7 @@ class BellmanFordApplication(Application):
         next_function = packet["functions_sequence"][
             0
         ]
-        neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.nodes[neighbor].status]
+        neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.get_node(neighbor).status]
 
         log.debug(
             f"[Node_ID={self.node.node_id}] Selecting next node to process function: {next_function}"
@@ -136,9 +137,9 @@ class BellmanFordApplication(Application):
             return selected_node
 
         log.debug(
-            f"[Node_ID={self.node.node_id}] No other nodes available. Defaulting to node 0."
+            f"[Node_ID={self.node.node_id}] No other nodes available"
         )
-        return 0
+        return None
 
     def send_packet(self, to_node_id, packet):
 
@@ -208,7 +209,7 @@ class SenderBellmanFordApplication(BellmanFordApplication):
                 )
 
                 if reset_episode:
-                    log.debug(f"Nodes: {self.node.network.nodes.values()}")
+                    log.debug(f"Nodes: {self.node.network.get_nodes().values()}")
                     # node_info = [
                     #     [node.node_id, node.status, node.disconnected_at, node.reconnect_time]
                     #     for node in self.node.network.nodes.values()
@@ -216,11 +217,11 @@ class SenderBellmanFordApplication(BellmanFordApplication):
                     # headers = ["Node ID", "Connected", "Disconnectet at", "Reconnect Time"]
                     # print(tabulate(node_info, headers=headers, tablefmt="grid"))
 
-                    for node_id in self.node.network.nodes:
+                    for node_id in self.node.network.get_nodes():
                         if node_id != 0:
-                            self.node.network.nodes[node_id].application.assigned_function = None
-                            self.node.network.nodes[node_id].application.previous_node_id = None
-                            self.node.network.nodes[node_id].application.broadcast_state = None
+                            self.node.network.get_node(node_id).application.assigned_function = None
+                            self.node.network.get_node(node_id).application.previous_node_id = None
+                            self.node.network.get_node(node_id).application.broadcast_state = None
 
                 message_id = f"broadcast_{self.node.node_id}_{episode_number}"
 
@@ -256,9 +257,27 @@ class SenderBellmanFordApplication(BellmanFordApplication):
             }
             next_node = self.select_next_function_node(packet)
 
-            if next_node is None:
-                log.debug("No suitable next node found.")
-                return
+            retry_count = 0
+            while next_node is None or not self.node.network.get_node(next_node).status:
+                delay_ms = RETRY_BASE_DELAY_MS * (2 ** retry_count)
+                delay_ms = min(delay_ms, 100000)  # clamp para evitar que se dispare
+
+                if next_node is None:
+                    log.debug(
+                        f"[Node_ID={self.node.node_id}] No suitable next node found. Retrying in {delay_ms}ms..."
+                    )
+                else:
+                    log.debug(
+                        f"[Node_ID={self.node.node_id}] Next node {next_node} is down. Retrying in {delay_ms}ms..."
+                    )
+
+                time.sleep(delay_ms / 1000)
+                retry_count += 1
+                next_node = self.select_next_function_node(packet)
+
+            log.debug(
+                f"[Node_ID={self.node.node_id}] Node {next_node} is back online and selected. Resuming."
+            )
 
             self.send_packet(next_node, packet)
             return
@@ -286,9 +305,10 @@ class SenderBellmanFordApplication(BellmanFordApplication):
                 log.info(f"[Episode #{episode_number}] Episode forcefully terminated due to timeout.")
                 return
 
-            if EPISODE_COMPLETED:
-                log.debug(f"[Episode #{episode_number}] Episode completed. Stopping timeout watcher.")
-                return
+            # global EPISODE_COMPLETED
+            # if EPISODE_COMPLETED:
+            #     log.debug(f"[Episode #{episode_number}] Episode completed. Stopping timeout watcher.")
+            #     return
 
             import time
             time.sleep(0.001)
@@ -297,7 +317,7 @@ class SenderBellmanFordApplication(BellmanFordApplication):
         """
         Inicia el proceso de broadcast desde el nodo sender.
         """
-        neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.nodes[neighbor].status]
+        neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.get_node(neighbor).status]
         broadcast_packet = {
             "type": PacketType.BROADCAST,
             "message_id": message_id,
@@ -317,11 +337,35 @@ class SenderBellmanFordApplication(BellmanFordApplication):
         )
 
         for neighbor in neighbors:
-            start_time = clock.get_current_time()
-            self.send_packet(neighbor, broadcast_packet)
-            broadcast_packet["latency_map"][
-                (self.node.node_id, neighbor)
-            ] = start_time
+            if (
+                neighbor is None or self.node.network.get_node(neighbor).status
+            ):
+                retry_count = 0
+                while neighbor is not None and not self.node.network.get_node(neighbor).status:
+                    delay_ms = RETRY_BASE_DELAY_MS * (2 ** retry_count)
+                    delay_ms = min(delay_ms, 100000)  # clamp para no pasarse de rosca
+
+                    log.debug(
+                        f"[BROADCAST] Node {neighbor} is down. Retrying in {delay_ms}ms..."
+                    )
+                    time.sleep(delay_ms / 1000)
+                    retry_count += 1
+
+                log.debug(
+                    f"[BROADCAST] Node {neighbor} is back online. Resuming packet delivery."
+                )
+                start_time = clock.get_current_time()
+                self.send_packet(neighbor, broadcast_packet)
+                broadcast_packet["latency_map"][
+                    (self.node.node_id, neighbor)
+                ] = start_time
+
+            else:
+                start_time = clock.get_current_time()
+                self.send_packet(neighbor, broadcast_packet)
+                broadcast_packet["latency_map"][
+                    (self.node.node_id, neighbor)
+                ] = start_time
 
         # dejar solo las latencias mínimas
         self.broadcast_state.latency_map = {
@@ -396,9 +440,9 @@ class SenderBellmanFordApplication(BellmanFordApplication):
             current = node_id
             while current is not None:
                 path.insert(0, current)
-                assigned_function = self.node.network.nodes[
+                assigned_function = self.node.network.get_node(
                     current
-                ].get_assigned_function()
+                ).get_assigned_function()
                 functions.insert(0, assigned_function if assigned_function else None)
                 current = previous_nodes[current]
             if path[0] == sender_node_id:
@@ -435,23 +479,33 @@ class SenderBellmanFordApplication(BellmanFordApplication):
                     f"[Node_ID={self.node.node_id}] Processing packet at node {self.node}: {packet}"
                 )
 
-                # lógica para reenviar el paquete al siguiente nodo si faltan funciones
                 if packet["functions_sequence"]:
                     log.debug(
                         f"[Node_ID={self.node.node_id}] Remaining functions: {packet['functions_sequence']}"
                     )
                     self.previous_node_id = packet["from_node_id"]
-
                     next_node = self.select_next_function_node(packet)
 
+                    # if next node is not available, exponential backoff retries until it is or timeout or max hops reached
                     if (
-                        next_node is None or self.node.network.nodes[next_node].status
+                        next_node is None or self.node.network.get_node(next_node).status
                     ):
-                        episode_number = packet["episode_number"]
+                        retry_count = 0
+                        while next_node is not None and not self.node.network.get_node(next_node).status:
+                            delay_ms = RETRY_BASE_DELAY_MS * (2 ** retry_count)
+                            delay_ms = min(delay_ms, 100000)  # clamp para no pasarse de rosca
+
+                            log.debug(
+                                f"[Node_ID={self.node.node_id}] Node {next_node} is down. Retrying in {delay_ms}ms..."
+                            )
+                            time.sleep(delay_ms / 1000)
+                            retry_count += 1
+
                         log.debug(
-                            f"[Node_ID={self.node.node_id}] Restarting episode {episode_number} because pre calculated shortest path is broken. Packet={packet}"
+                            f"[Node_ID={self.node.node_id}] Node {next_node} is back online. Resuming packet delivery."
                         )
-                        self._process_episode(episode_number, True)
+                        self.callback_stack.append(packet["from_node_id"])
+                        self.send_packet(next_node, packet)
                     else:
                         self.callback_stack.append(packet["from_node_id"])
                         self.send_packet(next_node, packet)
@@ -483,7 +537,7 @@ class SenderBellmanFordApplication(BellmanFordApplication):
                 self.broadcast_state.received_messages.add(packet.message_id)
                 self.broadcast_state.parent_node = packet.from_node_id
 
-                neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.nodes[neighbor].status]
+                neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.get_node(neighbor).status]
                 for neighbor in neighbors:
                     if (
                         neighbor != packet.from_node_id
@@ -610,6 +664,13 @@ class SenderBellmanFordApplication(BellmanFordApplication):
             packet (Packet): El paquete asociado al episodio.
             success (bool): `True` si el episodio fue exitoso, `False` si falló.
         """
+        global EPISODE_COMPLETED
+        EPISODE_COMPLETED = True
+
+        if not success:
+            global broken_path
+            broken_path = True
+
         status_text = "SUCCESS" if success else "FAILURE"
         episode_number = packet["episode_number"]
         log.debug(
@@ -753,7 +814,7 @@ class IntermediateBellmanFordApplication(BellmanFordApplication):
                         f"[Node_ID={self.node.node_id}] Added function to node function dict: {self.broadcast_state.node_function_map}"
                     )
 
-                neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.nodes[neighbor].status]
+                neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.get_node(neighbor).status]
                 neighbors_to_broadcast = [
                     n for n in neighbors if n not in packet["visited_nodes"]
                 ]
@@ -898,7 +959,6 @@ class IntermediateBellmanFordApplication(BellmanFordApplication):
 
             case PacketType.PACKET_HOP:
 
-                global MAX_HOPS
                 if packet["hops"] > packet["max_hops"]:
                     log.debug(
                         f"[Node_ID={self.node.node_id}] Max hops reached. Initiating callback"
@@ -944,6 +1004,7 @@ class IntermediateBellmanFordApplication(BellmanFordApplication):
                     )
 
                     packet["functions_sequence"].pop(0)
+
                     log.debug(
                         f"[Node_ID={self.node.node_id}] Function {self.assigned_function} removed from sequence. Remaining: {packet['functions_sequence']}"
                     )
@@ -956,25 +1017,33 @@ class IntermediateBellmanFordApplication(BellmanFordApplication):
 
                     log.debug(
                         next_node is None
-                        or not self.node.network.nodes[next_node].status
+                        or not self.node.network.get_node(next_node).status
                     )
 
+                    log.debug(
+                        f"[Node_ID={self.node.node_id}] Next node 2: {next_node is None or not self.node.network.get_node(next_node).status}"
+                    )
+
+                    # if next node is not available, exponential backoff retries until it is or timeout or max hops reached
                     if (
-                        next_node is None
-                        or not self.node.network.nodes[next_node].status
+                        next_node is None or self.node.network.get_node(next_node).status
                     ):
+                        retry_count = 0
+                        while next_node is not None and not self.node.network.get_node(next_node).status:
+                            delay_ms = RETRY_BASE_DELAY_MS * (2 ** retry_count)
+                            delay_ms = min(delay_ms, 100000)  # clamp para no pasarse de rosca
+
+                            log.debug(
+                                f"[Node_ID={self.node.node_id}] Node {next_node} is down. Retrying in {delay_ms}ms..."
+                            )
+                            time.sleep(delay_ms / 1000)
+                            retry_count += 1
+
                         log.debug(
-                            f"[Node_ID={self.node.node_id}] Broken path at node {self.node.node_id}: {packet}"
+                            f"[Node_ID={self.node.node_id}] Node {next_node} is back online. Resuming packet delivery."
                         )
-
-                        broken_path_packet = {
-                            "type": PacketType.BROKEN_PATH,
-                            "episode_number": packet["episode_number"],
-                            "from_node_id": self.node.node_id,
-                            "hops": packet["hops"] + 1,
-                        }
-
-                        self.send_packet(packet["from_node_id"], broken_path_packet)
+                        self.callback_stack.append(packet["from_node_id"])
+                        self.send_packet(next_node, packet)
                     else:
                         self.callback_stack.append(packet["from_node_id"])
                         self.send_packet(next_node, packet)
@@ -993,10 +1062,6 @@ class IntermediateBellmanFordApplication(BellmanFordApplication):
                         f"[Node_ID={self.node.node_id}] Sending SUCCESS packet back to node {from_node_id}."
                     )
                     self.send_packet(from_node_id, success_packet)
-
-            case PacketType.BROKEN_PATH:
-                previous_node = self.callback_stack.pop()
-                self.send_packet(previous_node, packet)
 
             case PacketType.SUCCESS:
                 previous_node = self.callback_stack.pop()
