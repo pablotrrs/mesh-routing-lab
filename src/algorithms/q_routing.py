@@ -108,26 +108,43 @@ class QRoutingApplication(Application):
         while True:
             next_node = None
 
+            all_neighbors = self.node.network.get_neighbors(current_node_id)
+            log.debug(f"[Node_ID={current_node_id}] All neighbors: {all_neighbors}")
+
+            active_neighbors = [
+                neighbor for neighbor in all_neighbors
+                if self.node.network.get_node(neighbor).status and neighbor != current_node_id
+            ]
+            log.debug(f"[Node_ID={current_node_id}] Active neighbors: {active_neighbors}")
+
             if random.random() < EPSILON:
                 log.debug(f"[Node_ID={current_node_id}] Performing exploration with epsilon={EPSILON:.4f}")
-                valid_neighbors = [
-                    neighbor for neighbor in self.node.network.get_neighbors(current_node_id)
-                    if self.node.network.get_node(neighbor).status
-                    and neighbor != current_node_id
-                    and self.node.network.validate_connection(current_node_id, neighbor)
-                ]
-                if valid_neighbors:
-                    next_node = random.choice(valid_neighbors)
+                if active_neighbors:
+                    next_node = random.choice(active_neighbors)
+                    log.debug(f"[Node_ID={current_node_id}] Exploration selected Node {next_node}")
+                else:
+                    log.debug(f"[Node_ID={current_node_id}] No active neighbors available for exploration.")
             else:
-                log.debug(f"[Node_ID={current_node_id}] Exploitation with epsilon={EPSILON:.4f}")
+                log.debug(f"[Node_ID={current_node_id}] Performing exploitation with epsilon={EPSILON:.4f}")
                 next_node = self.choose_best_action()
+                log.debug(f"[Node_ID={current_node_id}] Exploitation chose {next_node}")
 
-                if next_node == current_node_id or not self.node.network.validate_connection(current_node_id, next_node):
-                    log.debug(f"[Node_ID={current_node_id}] Exploitation selected invalid node. Fallback to exploration.")
+                if next_node == current_node_id:
+                    log.debug(f"[Node_ID={current_node_id}] Exploitation selected self node. Invalid.")
                     next_node = None
+                elif not self.node.network.get_node(next_node).status:
+                    log.debug(f"[Node_ID={current_node_id}] Exploitation selected inactive node {next_node}.")
+                    next_node = None
+
+                if next_node is None and active_neighbors:
+                    next_node = random.choice(active_neighbors)
+                    log.debug(f"[Node_ID={current_node_id}] Fallback to exploration selected Node {next_node}")
+                elif next_node is None:
+                    log.debug(f"[Node_ID={current_node_id}] Fallback to exploration found no valid neighbors.")
 
             if next_node is not None:
                 EPSILON = max(EPSILON * EPSILON_DECAY, EPSILON_MIN)
+                log.debug(f"[Node_ID={current_node_id}] Returning next node: {next_node}")
                 return next_node
 
             delay_ms = RETRY_BASE_DELAY_MS * (2 ** retry_count)

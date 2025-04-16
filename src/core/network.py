@@ -193,24 +193,6 @@ class Network:
                             log.debug("⚡ZZZAP⚡")
                             log.debug(f"\033[92mNode {node_id} reconnected at {current_time:.2f}.\033[0m")
 
-
-    def validate_connection(self, from_node_id: int, to_node_id: int) -> bool:
-        """Validates if a connection between two nodes is valid.
-
-        Args:
-            from_node_id (int): ID of the source node.
-            to_node_id (int): ID of the destination node.
-
-        Returns:
-            bool: True if the connection is valid, False otherwise.
-        """
-        with self.lock:
-            return (
-                to_node_id in self.connections.get(from_node_id, [])
-                and from_node_id in self.active_nodes
-                and to_node_id in self.active_nodes
-            )
-
     def add_node(self, node: Node) -> None:
         """Adds a node to the network.
 
