@@ -801,17 +801,19 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                 self.broadcast_state.parent_node = packet["from_node_id"]
 
                 if not self.assigned_function:
-                    min_count = min(packet["function_counters"].values())
+                    function_counters = {func: 0 for func in packet["functions_sequence"]}
+                    for assigned_function in packet["node_function_map"].values():
+                        if assigned_function in function_counters:
+                            function_counters[assigned_function] += 1
+
+                    min_count = min(function_counters.values())
                     least_assigned_functions = [
-                        func
-                        for func, count in packet["function_counters"].items()
-                        if count == min_count
+                        func for func, count in function_counters.items() if count == min_count
                     ]
 
                     function_to_assign = random.choice(least_assigned_functions)
 
                     self.assigned_function = function_to_assign
-
                     packet["function_counters"][function_to_assign] += 1
 
                     log.debug(
