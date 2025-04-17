@@ -203,17 +203,12 @@ class SenderDijkstraApplication(DijkstraApplication):
             global broken_path
             if broken_path or episode_number == 1:
                 broken_path = False
+                log.debug(
+                    f"[Node_ID={self.node.node_id}] Starting broadcast for episode {episode_number}"
+                )
 
                 if broken_path:
-                    # log.debug(f"Nodes: {self.node.network.nodes.values()}")
-                    # node_info = [
-                    #     [node.node_id, node.status, node.disconnected_at, node.reconnect_time]
-                    #     for node in self.node.network.nodes.values()
-                    # ]
-                    # headers = ["Node ID", "Connected", "Disconnectet at", "Reconnect Time"]
-                    # print(tabulate(node_info, headers=headers, tablefmt="grid"))
-
-                    for node_id in self.node.network.get_nodes:
+                    for node_id in self.node.network.get_nodes():
                         if node_id != 0:
                             self.node.network.get_node(node_id).application.assigned_function = None
                             self.node.network.get_node(node_id).application.previous_node_id = None
@@ -314,13 +309,11 @@ class SenderDijkstraApplication(DijkstraApplication):
             if elapsed_time >= self.episode_timeout_ms:
                 log.debug(f"[Sender Node] Timeout reached after {elapsed_time} ms. Terminating episode...")
                 kill_thread(episode_thread)
+
+                global broken_path
+                broken_path = True
                 log.info(f"[Episode #{episode_number}] Episode forcefully terminated due to timeout.")
                 return
-
-            # global EPISODE_COMPLETED
-            # if EPISODE_COMPLETED:
-            #     log.debug(f"[Episode #{episode_number}] Episode completed. Stopping timeout watcher.")
-            #     return
 
             import time
             time.sleep(0.001)
@@ -401,6 +394,18 @@ class SenderDijkstraApplication(DijkstraApplication):
                 tablefmt="grid",
             )
         )
+
+        collected_funcs = set(self.broadcast_state.node_function_map.values())
+        expected_funcs = set(self.functions_sequence)
+
+        if not expected_funcs.issubset(collected_funcs):
+            log.warning(
+                f"[Node_ID={self.node.node_id}] Missing functions in broadcast result. "
+                f"Expected: {expected_funcs}, Got: {collected_funcs}. "
+            )
+
+            log.info(f"[Node_ID={self.node.node_id}] Retrying full broadcast from scratch...")
+            self.start_broadcast(message_id, episode_number)
 
     def compute_shortest_paths(self, episode_number):
         """
