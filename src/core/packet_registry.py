@@ -23,6 +23,8 @@ class PacketRegistry:
         self._current_algorithm: str = None
         self._current_episode_number: int = 0
         self._current_episode_start_time: int = 0
+        self._episode_failure_reason = None
+        self._pending_policy_decision = None
         log.debug("PacketRegistry initialized.")
 
     def log_simulation_start(self, config: SimulationConfig, network: Network) -> None:
@@ -112,18 +114,37 @@ class PacketRegistry:
             latency (float): Latency of the packet hop.
             packet_type (str): Type of the packet.
         """
-        self.packet_log[episode_number]["route"].append(
-            {
-                "from": from_node_id,
-                "to": to_node_id,
-                "function": function,
-                "node_status": node_status,
-                "latency": latency,
-                "packet_type": packet_type,
-            }
-        )
+        hop_data = {
+            "from": from_node_id,
+            "to": to_node_id,
+            "function": function,
+            "node_status": node_status,
+            "latency": latency,
+            "packet_type": packet_type,
+        }
+
+        if self._pending_policy_decision is not None:
+            hop_data.update(self._pending_policy_decision)
+            self._pending_policy_decision = None
+
+        self.packet_log[episode_number]["route"].append(hop_data)
         log.debug(
             f"Logged packet hop from {from_node_id} to {to_node_id} in episode {episode_number}."
+        )
+
+    def log_policy_decision(self, decision: str, epsilon: float) -> None:
+        """Registra si el hop fue por exploración o explotación y el valor de epsilon usado.
+
+        Args:
+            decision (str): 'EXPLORATION' o 'EXPLOITATION'
+            epsilon (float): Valor de epsilon en ese momento
+        """
+        if decision not in {"EXPLORATION", "EXPLOITATION"}:
+            log.warning(f"Invalid policy decision: {decision}")
+            return
+        self._pending_policy_decision = {"policy_decision": decision, "epsilon": epsilon}
+        log.debug(
+            f"[Episode {self._current_episode_number}] Set decision: {decision}, epsilon: {epsilon:.4f}"
         )
 
     def log_lost_packet(
@@ -165,6 +186,18 @@ class PacketRegistry:
         )
         self.packet_log[episode_number]["episode_success"] = episode_success
 
+    def log_episode_failure_reason(self, reason: str) -> None:
+        """Guarda el motivo del fallo del episodio actual (solo si falla).
+
+        Args:
+            reason (str): 'MAX_HOPS' o 'TIMEOUT'.
+        """
+        if reason not in {"MAX_HOPS", "TIMEOUT"}:
+            log.warning(f"Invalid failure reason: {reason}")
+            return
+        self._episode_failure_reason = reason
+        log.debug(f"[Episode {self._current_episode_number}] Registered failure reason: {reason}")
+
     def log_episode_end(self) -> None:
         episode_number = self._current_episode_number
         algorithm = self._current_algorithm
@@ -184,22 +217,26 @@ class PacketRegistry:
             start_time, end_time
         )
 
-        self.metrics[algorithm]["episodes"].append(
-            {
-                "episode_number": episode_number,
-                "start_time": start_time,
-                "end_time": end_time,
-                "episode_duration": end_time - start_time,
-                "episode_success": episode_success,
-                "route": route,
-                "total_hops": total_hops,
-                "dynamic_changes": dynamic_changes,
-                "dynamic_changes_count": len(dynamic_changes),
-            }
-        )
+        episode_entry = {
+            "episode_number": episode_number,
+            "start_time": start_time,
+            "end_time": end_time,
+            "episode_duration": end_time - start_time,
+            "episode_success": episode_success,
+            "route": route,
+            "total_hops": total_hops,
+            "dynamic_changes": dynamic_changes,
+            "dynamic_changes_count": len(dynamic_changes),
+        }
+
+        if not episode_success and self._episode_failure_reason:
+            episode_entry["failure_reason"] = self._episode_failure_reason
+
+        self.metrics[algorithm]["episodes"].append(episode_entry)
 
         self._current_episode_number = None
         self._current_episode_start_time = None
+        self._episode_failure_reason = None
         log.debug(f"Logged episode {episode_number} for algorithm {algorithm}.")
 
     def log_algorithm_end(self) -> None:

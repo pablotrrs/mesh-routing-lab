@@ -119,6 +119,7 @@ class QRoutingApplication(Application):
 
             if random.random() < EPSILON:
                 log.debug(f"[Node_ID={current_node_id}] Performing exploration with epsilon={EPSILON:.4f}")
+                registry.log_policy_decision("EXPLORATION", EPSILON)
                 if active_neighbors:
                     next_node = random.choice(active_neighbors)
                     log.debug(f"[Node_ID={current_node_id}] Exploration selected Node {next_node}")
@@ -126,6 +127,7 @@ class QRoutingApplication(Application):
                     log.debug(f"[Node_ID={current_node_id}] No active neighbors available for exploration.")
             else:
                 log.debug(f"[Node_ID={current_node_id}] Performing exploitation with epsilon={EPSILON:.4f}")
+                registry.log_policy_decision("EXPLOITATION", EPSILON)
                 next_node = self.choose_best_action()
                 log.debug(f"[Node_ID={current_node_id}] Exploitation chose {next_node}")
 
@@ -377,6 +379,7 @@ class SenderQRoutingApplication(QRoutingApplication):
                 log.debug(f'[Node_ID={self.node.node_id}] Packet hop count {packet["hops"]}')
 
                 if packet["hops"] > self.max_hops:
+                    registry.log_episode_failure_reason("MAX_HOPS")
                     self.mark_episode_result(packet, success=False)
 
                 # si no se puede empezar el episodio, se sigue intentando hasta que se pueda
@@ -412,6 +415,7 @@ class SenderQRoutingApplication(QRoutingApplication):
 
             if elapsed_time >= self.episode_timeout_ms:
                 log.debug(f"[Sender Node] Timeout reached after {elapsed_time} ms. Terminating episode...")
+                registry.log_episode_failure_reason("TIMEOUT")
                 kill_thread(episode_thread)
                 log.info(f"[Episode #{episode_number}] Episode forcefully terminated due to timeout.")
                 return
@@ -437,6 +441,7 @@ class SenderQRoutingApplication(QRoutingApplication):
             )
             if packet["hops"] > packet["max_hops"]:
                 # max hops reached
+                registry.log_episode_failure_reason("MAX_HOPS")
                 self.mark_episode_result(packet, success=False)
             else:
                 # retry until there is a valid next node
@@ -500,10 +505,11 @@ class SenderQRoutingApplication(QRoutingApplication):
 
             self.mark_episode_result(packet, success=True)
 
-    def handle_lost_packet(self, packet) -> None:
+    def handle_max_hops_reached(self, packet) -> None:
         episode_number = packet["episode_number"]
         log.debug(f"\n[Node_ID={self.node.node_id}] Episode {episode_number} failed.")
 
+        registry.log_episode_failure_reason("MAX_HOPS")
         self.mark_episode_result(packet, success=False)
 
     def mark_episode_result(self, packet, success=True):
