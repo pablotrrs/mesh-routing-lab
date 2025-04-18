@@ -25,6 +25,7 @@ class PacketRegistry:
         self._current_episode_start_time: int = 0
         self._episode_failure_reason = None
         self._pending_policy_decision = None
+        self._q_value = None
         log.debug("PacketRegistry initialized.")
 
     def log_simulation_start(self, config: SimulationConfig, network: Network) -> None:
@@ -127,6 +128,10 @@ class PacketRegistry:
             hop_data.update(self._pending_policy_decision)
             self._pending_policy_decision = None
 
+        if self._q_value is not None:
+            hop_data.update(self._q_value)
+            self._q_value = None
+
         self.packet_log[episode_number]["route"].append(hop_data)
         log.debug(
             f"Logged packet hop from {from_node_id} to {to_node_id} in episode {episode_number}."
@@ -145,6 +150,32 @@ class PacketRegistry:
         self._pending_policy_decision = {"policy_decision": decision, "epsilon": epsilon}
         log.debug(
             f"[Episode {self._current_episode_number}] Set decision: {decision}, epsilon: {epsilon:.4f}"
+        )
+
+    def log_q_table_value_update(
+        self,
+        node_id: int,
+        next_node: int,
+        old_q: float,
+        new_q: float,
+        estimated_time: float,
+        actual_time: float,
+    ) -> None:
+        """Registra el nuevo q value obtenido para el nodo.
+
+        Args:
+            node_id (int): ID del nodo actual.
+            next_node (int): ID del siguiente nodo.
+            old_q (float): Valor Q anterior.
+            new_q (float): Nuevo valor Q.
+            estimated_time (float): Tiempo estimado.
+            actual_time (float): Tiempo real.
+        """
+        self._q_value = {"q_value": new_q}
+
+        log.debug(
+            f"[Node_ID={node_id}] Updated Q-Value for state {node_id} -> action {next_node} "
+            f"from {old_q:.4f} to {new_q:.4f} (estimated time {estimated_time}, actual time {actual_time})"
         )
 
     def log_lost_packet(
@@ -256,11 +287,5 @@ class PacketRegistry:
         self.metrics["total_time"] = clock.get_current_time()
         reports_manager.config = self.config
         reports_manager.generate_reports()
-
-        # q_tables = []
-        # if algorithm == "Q_ROUTING":
-        #     for node in self.network.nodes.values():
-        #         q_tables.append(node.application.q_table)
-        # self.generate_heat_map(q_tables)
 
 registry: PacketRegistry = PacketRegistry()

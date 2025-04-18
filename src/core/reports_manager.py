@@ -27,6 +27,7 @@ class ReportsManager:
         self._save_metrics_to_file(self.results_dir)
         self._save_results_to_excel(os.path.join(self.results_dir, "resultados_simulacion.xlsx"))
         self._generate_comparative_graphs_from_excel(os.path.join(self.results_dir, "resultados_simulacion.xlsx"))
+        self.generate_q_table_heatmap(self.results_dir)
 
     @staticmethod
     def get_next_results_directory(base_path="../resources/results"):
@@ -299,57 +300,111 @@ class ReportsManager:
         plt.savefig(os.path.join(output_dirs["all"], "Evolucion_Success_Acumulado.png"))
         plt.close()
 
-    def generate_heat_map(self, q_tables):
-        q_table_data = []
-        for q_table in q_tables:
-            for state, actions in q_table.items():
-                for action, q_value in actions.items():
-                    q_table_data.append((state, action, q_value))
+    def generate_q_table_heatmap(
+        self,
+        directory: str = "../resources/results",
+        algorithm="Q_ROUTING"
+    ):
+        """Generates heatmaps for Q-tables across episodes and creates a GIF to visualize the evolution of Q-values.
 
-        if not q_table_data:
-            log.error(f"No Q-table data available.")
-            return
+        Args:
+            directory (str): The directory containing the metrics JSON file. Defaults to "../resources/results".
+            algorithm (str): The algorithm name to extract Q-value data from the metrics file. Defaults to "Q_ROUTING".
+        Raises:
+            ValueError: If the specified algorithm is not found in the metrics file.
+        Outputs:
+            - Heatmap images for each episode saved in the results directory.
+            - A GIF visualizing the evolution of Q-values across episodes.
+        Notes:
+            - The heatmaps display Q-values between nodes, with NaN values represented as black cells.
+            - The function calculates global min, max, and median Q-values for consistent color scaling.
+            - Requires the `imageio` library to generate the GIF. If not installed, the GIF generation will be skipped.
+        """
 
-        states = sorted(set(state for state, _, _ in q_table_data))
-        actions = sorted(set(action for _, action, _ in q_table_data))
+        json_file = f"{directory}/metrics.json"
 
-        q_matrix = np.zeros((len(states), len(actions)))
+        with open(json_file, "r", encoding="utf-8") as file:
+            data = json.load(file)
 
-        for state, action, q_value in q_table_data:
-            state_index = states.index(state)
-            action_index = actions.index(action)
-            q_matrix[state_index, action_index] = q_value
+        if algorithm not in data:
+            raise ValueError(f"Algorithm '{algorithm}' not found in the metrics file.")
 
-        fig, ax = plt.subplots()
-        cax = ax.imshow(q_matrix, cmap="RdYlGn", aspect="auto", vmin=0, vmax=1)
+        episodes = data[algorithm]["episodes"]
 
-        fig.colorbar(cax)
+        max_node = 0
+        q_values = []
+        heatmap_paths = []
+        for episode in episodes:
+            for route in episode["route"]:
+                max_node = max(max_node, route["from"], route["to"])
+                if "q_value" in route:
+                    q_values.append(route["q_value"])
+        num_nodes = max_node + 1 
 
-        ax.set_xticks(np.arange(len(actions)))
-        ax.set_yticks(np.arange(len(states)))
-        ax.set_xticklabels(actions)
-        ax.set_yticklabels(states)
+        # Calculate the global min, max, and median Q-values
+        min_q_value = min(q_values) if q_values else 0
+        max_q_value = max(q_values) if q_values else 1
+        median_q_value = np.median(q_values) if q_values else (min_q_value + max_q_value) / 2
 
-        for i in range(len(states)):
-            for j in range(len(actions)):
-                ax.text(
-                    j,
-                    i,
-                    f"{q_matrix[i, j]:.2f}",
-                    ha="center",
-                    va="center",
-                    color="black",
-                )
+        persistent_q_table = np.full((num_nodes, num_nodes), np.nan)
 
-        plt.xlabel("Actions (Next Node ID)")
-        plt.ylabel("States (Node ID)")
-        plt.title(f"Q-Table Heat Map")
+        # Generate a heatmap for each episode
+        for episode_index, episode in enumerate(episodes):
+            q_table = np.copy(persistent_q_table)
 
-        output_folder = "../resources/results"
-        filename = os.path.join(output_folder, f"q_table_heat_map.png")
-        plt.savefig(filename)
-        plt.close()
+            for route in episode["route"]:
+                if "q_value" in route:
+                    q_table[route["from"], route["to"]] = route["q_value"]
 
-        log.debug(f"Heat map saved to {filename}")
+            persistent_q_table = np.copy(q_table)
+
+            # Generate the heatmap
+            plt.figure(figsize=(10, 8))
+            masked_q_table = np.ma.masked_where(np.isnan(persistent_q_table), persistent_q_table)
+            cmap = plt.cm.RdYlGn
+            cmap.set_bad(color='black')  # Set NaN cells to black
+            plt.imshow(
+                masked_q_table,
+                cmap=cmap,
+                interpolation="nearest",
+                vmin=min_q_value,
+                vmax=max_q_value
+            )
+            plt.colorbar(label="Q-Value")
+            plt.title(f"Q-Table Heatmap for {algorithm} - Episode {episode_index + 1}")
+            plt.xlabel("To Node")
+            plt.ylabel("From Node")
+            plt.xticks(range(num_nodes))
+            plt.yticks(range(num_nodes))
+
+            # Annotate the heatmap with actual Q-values
+            for i in range(num_nodes):
+                for j in range(num_nodes):
+                    value = persistent_q_table[i, j]
+                    if not np.isnan(value):
+                        plt.text(j, i, f"{value:.2f}", ha="center", va="center", color="black")
+
+            from core.enums import Algorithm
+            algorithm_enum = Algorithm[algorithm]
+            output_dir = os.path.join(self.results_dir, str(algorithm_enum))
+            os.makedirs(output_dir, exist_ok=True)
+            heatmap_path = os.path.join(output_dir, f"{algorithm}_q_table_heatmap_episode_{episode_index + 1}.png")
+            plt.tight_layout()
+            plt.savefig(heatmap_path)
+            plt.close()
+            heatmap_paths.append(heatmap_path)
+            log.debug(f"Q-Table heatmap for episode {episode_index + 1} saved to {heatmap_path}")
+
+        # Generate a GIF from the heatmaps
+        import imageio
+        gif_path = os.path.join(output_dir, f"{algorithm}_q_table_heatmaps.gif")
+        try:
+            with imageio.get_writer(gif_path, mode='I', duration=5) as writer:
+                for path in heatmap_paths:
+                    image = imageio.imread(path)
+                    writer.append_data(image)
+            log.debug(f"GIF of Q-Table heatmaps saved to {gif_path}")
+        except ImportError:
+            log.error("imageio library is required to generate GIFs. Please install it using 'pip install imageio'.")
 
 reports_manager = ReportsManager()

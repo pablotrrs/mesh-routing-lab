@@ -92,10 +92,15 @@ class QRoutingApplication(Application):
 
         self.q_table[self.node.node_id][next_node] = new_q
 
-        log.debug(
-            f"[Node_ID={self.node.node_id}] Updated Q-Value for state {self.node.node_id} -> action {next_node} "
-            f"from {old_q:.4f} to {new_q:.4f} (estimated time {t}, actual time {s})"
+        registry.log_q_table_value_update(
+            self.node.node_id,
+            next_node,
+            old_q,
+            new_q,
+            t,
+            s
         )
+
         return
 
     def select_next_node(self) -> int:
