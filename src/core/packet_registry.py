@@ -254,6 +254,7 @@ class PacketRegistry:
     def log_simulation_end(self) -> None:
         """Marca el final de la simulación y guarda la duración total."""
         self.metrics["total_time"] = clock.get_current_time()
+        reports_manager.config = self.config
         reports_manager.generate_reports()
 
         # q_tables = []

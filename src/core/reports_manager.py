@@ -6,6 +6,8 @@ from typing import Dict, List, Union
 import matplotlib.pyplot as plt
 import numpy as np
 
+from core.base import SimulationConfig
+
 
 class ReportsManager:
     """Manages and stores metrics for the simulation.
@@ -17,6 +19,7 @@ class ReportsManager:
     def __init__(self) -> None:
         """Initializes the MetricsManager with an empty metrics dictionary."""
         self.metrics: Dict[str, Union[int, float, str, List, Dict]] = {}
+        self.config: SimulationConfig = None
         self.results_dir = self.get_next_results_directory()
         log.debug("MetricsManager initialized.")
 
@@ -167,16 +170,27 @@ class ReportsManager:
 
         log.debug(f"\nresults saved in {filename}.")
 
-    def _generate_comparative_graphs_from_excel(
-        self, filename: str = "../resources/results/resultados_simulacion.xlsx"
-    ) -> None:
+    def _generate_comparative_graphs_from_excel(self, filename: str = "../resources/results/resultados_simulacion.xlsx") -> None:
         import os
         import matplotlib.pyplot as plt
         import pandas as pd
         import numpy as np
 
-        os.makedirs(self.results_dir, exist_ok=True)
+        def create_config_label(config):
+            return (
+                f"Episodios: {config.episodes}\n"
+                f"Max hops: {config.max_hops}\n"
+                f"Timeout episodio: {config.episode_timeout_ms} ms\n"
+                f"Prob. desconexión: {config.disconnection_probability}\n"
+                f"Int. desconexión fija: {config.disconnection_interval_ms} ms\n"
+                f"Int. reconexión fija: {config.reconnection_interval_ms} ms\n"
+                f"Int. desconexión media: {config.mean_disconnection_interval_ms} ms\n"
+                f"Int. reconexión media: {config.mean_reconnection_interval_ms} ms\n"
+                f"Topología: {os.path.basename(config.topology_file)}\n"
+                f"Secuencia de funciones: {' -> '.join([f.value for f in self.config.functions_sequence])}"
+            )
 
+        os.makedirs(self.results_dir, exist_ok=True)
         xls = pd.ExcelFile(filename)
         all_data = {
             "episode_duration": {},
@@ -196,15 +210,14 @@ class ReportsManager:
             all_data["success_rate"][sheet_name] = df["episode_success"].fillna(False)
             all_data["episode_success"][sheet_name] = df["episode_success"]
 
-        # 1. Crear carpetas para cada algoritmo + carpeta 'all'
         algorithm_names = list(all_data["episode_duration"].keys())
         output_dirs = {name: os.path.join(self.results_dir, name) for name in algorithm_names}
         output_dirs["all"] = os.path.join(self.results_dir, "all")
-
         for path in output_dirs.values():
             os.makedirs(path, exist_ok=True)
 
         def save_line_chart(data_dict, title, ylabel, filename, target_dirs):
+            label = create_config_label(self.config)
             plt.figure(figsize=(16, 8), dpi=150)
             for algorithm, data in data_dict.items():
                 plt.plot(data, label=algorithm, linewidth=2, alpha=0.8)
@@ -213,12 +226,13 @@ class ReportsManager:
             plt.ylabel(ylabel)
             plt.grid(True)
             plt.legend()
+            plt.annotate(label, xy=(1.01, 0), xycoords='axes fraction', fontsize=10,
+                        ha='left', va='bottom', linespacing=1.5,
+                        bbox=dict(facecolor='white', alpha=0.7, edgecolor='gray'))
             plt.tight_layout()
-
-            # Guardar gráfico comparativo en carpeta 'all'
             plt.savefig(os.path.join(target_dirs["all"], filename))
+            plt.close()
 
-            # Guardar gráfico individual en su propia carpeta
             for algorithm, data in data_dict.items():
                 plt.figure(figsize=(16, 8), dpi=150)
                 plt.plot(data, label=algorithm, linewidth=2, alpha=0.8)
@@ -227,55 +241,32 @@ class ReportsManager:
                 plt.ylabel(ylabel)
                 plt.grid(True)
                 plt.legend()
+                plt.annotate(label, xy=(1.01, 0), xycoords='axes fraction', fontsize=10,
+                            ha='left', va='bottom', linespacing=1.5,
+                            bbox=dict(facecolor='white', alpha=0.7, edgecolor='gray'))
                 plt.tight_layout()
                 plt.savefig(os.path.join(target_dirs[algorithm], filename))
                 plt.close()
-            plt.close()
 
-        save_line_chart(
-            all_data["episode_duration"],
-            "Duración del Episodio",
-            "Duración (ms)",
-            "Duracion_Episodio.png",
-            output_dirs
-        )
+        save_line_chart(all_data["episode_duration"], "Duración del Episodio", "Duración (ms)", "Duracion_Episodio.png", output_dirs)
+        save_line_chart(all_data["total_hops"], "Cantidad de Hops por Episodio", "Cantidad de Hops", "Total_Hops_Episodio.png", output_dirs)
 
-        save_line_chart(
-            all_data["total_hops"],
-            "Cantidad de Hops por Episodio",
-            "Cantidad de Hops",
-            "Total_Hops_Episodio.png",
-            output_dirs
-        )
-
-        # 2. Gráfico de columnas de tasa de éxito
+        # Tasa de éxito por algoritmo
         plt.figure(figsize=(12, 8), dpi=150)
-        success_counts = {
-            algorithm: {"TRUE": 0, "FALSE": 0}
-            for algorithm in all_data["episode_success"].keys()
-        }
-
-        for algorithm, data in all_data["episode_success"].items():
-            for value in data:
-                success_counts[algorithm]["TRUE" if value else "FALSE"] += 1
+        success_counts = {alg: {"TRUE": 0, "FALSE": 0} for alg in all_data["episode_success"]}
+        for alg, data in all_data["episode_success"].items():
+            for val in data:
+                success_counts[alg]["TRUE" if val else "FALSE"] += 1
 
         bar_width = 0.25
         index = np.arange(len(success_counts))
         true_values = [success_counts[alg]["TRUE"] for alg in success_counts]
         false_values = [success_counts[alg]["FALSE"] for alg in success_counts]
-
         bars_true = plt.bar(index, true_values, bar_width, label="TRUE")
         bars_false = plt.bar(index + bar_width, false_values, bar_width, label="FALSE")
 
         for bar in bars_true + bars_false:
-            plt.text(
-                bar.get_x() + bar.get_width() / 2,
-                bar.get_height(),
-                f"{int(bar.get_height())}",
-                ha="center",
-                va="bottom",
-                fontsize=8,
-            )
+            plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height(), f"{int(bar.get_height())}", ha="center", va="bottom", fontsize=8)
 
         plt.title("Tasa de Éxito por Algoritmo")
         plt.xlabel("Algoritmo")
@@ -283,26 +274,30 @@ class ReportsManager:
         plt.xticks(index + bar_width / 2, success_counts.keys())
         plt.grid(True)
         plt.legend()
+        plt.annotate(create_config_label(self.config), xy=(1.01, 0), xycoords='axes fraction', fontsize=10,
+                    ha='left', va='bottom', linespacing=1.5,
+                    bbox=dict(facecolor='white', alpha=0.7, edgecolor='gray'))
         plt.tight_layout()
         plt.savefig(os.path.join(output_dirs["all"], "Tasa_Exito_Columnas.png"))
         plt.close()
 
-        # 3. Gráfico de éxito acumulado
+        # Éxitos acumulados
         plt.figure(figsize=(12, 6))
-        for algorithm, successes in all_data["episode_success"].items():
-            cumulative_success = np.cumsum([1 if s else 0 for s in successes])
-            plt.plot(cumulative_success, label=f"{algorithm}", linewidth=1.5)
+        for alg, successes in all_data["episode_success"].items():
+            cumulative = np.cumsum([1 if s else 0 for s in successes])
+            plt.plot(cumulative, label=f"{alg}", linewidth=1.5)
 
         plt.title("Evolución Acumulada de Éxitos")
         plt.xlabel("Episodio")
         plt.ylabel("Éxitos Acumulados")
         plt.grid(True, linestyle='--', alpha=0.5)
         plt.legend()
+        plt.annotate(create_config_label(self.config), xy=(1.01, 0), xycoords='axes fraction', fontsize=10,
+                    ha='left', va='bottom', linespacing=1.5,
+                    bbox=dict(facecolor='white', alpha=0.7, edgecolor='gray'))
         plt.tight_layout()
         plt.savefig(os.path.join(output_dirs["all"], "Evolucion_Success_Acumulado.png"))
         plt.close()
-
-        log.debug(f"Comparative graphs saved in: {self.results_dir}.")
 
     def generate_heat_map(self, q_tables):
         q_table_data = []
