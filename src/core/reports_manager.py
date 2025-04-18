@@ -175,9 +175,9 @@ class ReportsManager:
         import pandas as pd
         import numpy as np
 
-        os.makedirs("../resources/results", exist_ok=True)
-        xls = pd.ExcelFile(filename)
+        os.makedirs(self.results_dir, exist_ok=True)
 
+        xls = pd.ExcelFile(filename)
         all_data = {
             "episode_duration": {},
             "hops_promedio": {},
@@ -192,13 +192,19 @@ class ReportsManager:
             all_data["episode_duration"][sheet_name] = df["episode_duration"]
             all_data["hops_promedio"][sheet_name] = df["total_hops"] / df["episode"]
             all_data["total_hops"][sheet_name] = df["total_hops"]
-            all_data["average_delivery_time"][sheet_name] = (
-                df["episode_duration"] / df["total_hops"]
-            )
+            all_data["average_delivery_time"][sheet_name] = df["episode_duration"] / df["total_hops"]
             all_data["success_rate"][sheet_name] = df["episode_success"].fillna(False)
             all_data["episode_success"][sheet_name] = df["episode_success"]
 
-        def save_line_chart(data_dict, title, ylabel, filename):
+        # 1. Crear carpetas para cada algoritmo + carpeta 'all'
+        algorithm_names = list(all_data["episode_duration"].keys())
+        output_dirs = {name: os.path.join(self.results_dir, name) for name in algorithm_names}
+        output_dirs["all"] = os.path.join(self.results_dir, "all")
+
+        for path in output_dirs.values():
+            os.makedirs(path, exist_ok=True)
+
+        def save_line_chart(data_dict, title, ylabel, filename, target_dirs):
             plt.figure(figsize=(16, 8), dpi=150)
             for algorithm, data in data_dict.items():
                 plt.plot(data, label=algorithm, linewidth=2, alpha=0.8)
@@ -208,23 +214,41 @@ class ReportsManager:
             plt.grid(True)
             plt.legend()
             plt.tight_layout()
-            plt.savefig(os.path.join(self.results_dir, filename))
+
+            # Guardar gráfico comparativo en carpeta 'all'
+            plt.savefig(os.path.join(target_dirs["all"], filename))
+
+            # Guardar gráfico individual en su propia carpeta
+            for algorithm, data in data_dict.items():
+                plt.figure(figsize=(16, 8), dpi=150)
+                plt.plot(data, label=algorithm, linewidth=2, alpha=0.8)
+                plt.title(f"{title} - {algorithm}")
+                plt.xlabel("Episodio")
+                plt.ylabel(ylabel)
+                plt.grid(True)
+                plt.legend()
+                plt.tight_layout()
+                plt.savefig(os.path.join(target_dirs[algorithm], filename))
+                plt.close()
             plt.close()
 
         save_line_chart(
             all_data["episode_duration"],
-            "Comparación de Duración del Episodio entre Algoritmos",
+            "Duración del Episodio",
             "Duración (ms)",
-            "Comparacion_Duracion_Episodio.png"
+            "Duracion_Episodio.png",
+            output_dirs
         )
 
         save_line_chart(
             all_data["total_hops"],
-            "Comparación de Cantidad de Hops por Episodio entre Algoritmos",
+            "Cantidad de Hops por Episodio",
             "Cantidad de Hops",
-            "Comparacion_Total_Hops_Episodio.png"
+            "Total_Hops_Episodio.png",
+            output_dirs
         )
 
+        # 2. Gráfico de columnas de tasa de éxito
         plt.figure(figsize=(12, 8), dpi=150)
         success_counts = {
             algorithm: {"TRUE": 0, "FALSE": 0}
@@ -253,32 +277,32 @@ class ReportsManager:
                 fontsize=8,
             )
 
-        plt.title("Tasa de Éxito por Episodio entre Algoritmos")
+        plt.title("Tasa de Éxito por Algoritmo")
         plt.xlabel("Algoritmo")
         plt.ylabel("Cantidad")
         plt.xticks(index + bar_width / 2, success_counts.keys())
         plt.grid(True)
         plt.legend()
         plt.tight_layout()
-        plt.savefig(os.path.join(self.results_dir, "Tasa_Exito_Columnas.png"))
+        plt.savefig(os.path.join(output_dirs["all"], "Tasa_Exito_Columnas.png"))
         plt.close()
 
+        # 3. Gráfico de éxito acumulado
         plt.figure(figsize=(12, 6))
-
         for algorithm, successes in all_data["episode_success"].items():
             cumulative_success = np.cumsum([1 if s else 0 for s in successes])
             plt.plot(cumulative_success, label=f"{algorithm}", linewidth=1.5)
 
-        plt.title("Evolución Acumulada de Éxitos por Algoritmo")
+        plt.title("Evolución Acumulada de Éxitos")
         plt.xlabel("Episodio")
-        plt.ylabel("Episodios Exitosos Acumulados")
+        plt.ylabel("Éxitos Acumulados")
         plt.grid(True, linestyle='--', alpha=0.5)
         plt.legend()
         plt.tight_layout()
-        plt.savefig(os.path.join(self.results_dir, "Evolucion_Success_Acumulado.png"))
+        plt.savefig(os.path.join(output_dirs["all"], "Evolucion_Success_Acumulado.png"))
         plt.close()
 
-        log.debug(f"Comparative graphs generated in: {self.results_dir}.")
+        log.debug(f"Comparative graphs saved in: {self.results_dir}.")
 
     def generate_heat_map(self, q_tables):
         q_table_data = []
