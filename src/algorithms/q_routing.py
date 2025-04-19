@@ -15,9 +15,6 @@ from utils.custom_excep_hook import custom_thread_excepthook
 
 ALPHA = 0.1
 GAMMA = 0.9
-EPSILON = 1.0
-EPSILON_DECAY = 0.99
-EPSILON_MIN = 0.1
 
 CURRENT_HOP_COUNT = 0
 
@@ -59,6 +56,10 @@ class QRoutingApplication(Application):
         self.q_table = {}
         self.assigned_function = None
         self.callback_stack = deque()
+        self.use_epsilon_decay=True,
+        self.epsilon=1.0
+        self.epsilon_decay=0.99
+        self.epsilon_min=0.1
 
     def receive_packet(self, packet):
         log.debug(f"[Node_ID={self.node.node_id}] Received packet {packet}")
@@ -105,14 +106,17 @@ class QRoutingApplication(Application):
 
     def select_next_node(self) -> int:
         self.initialize_or_update_q_table()
-        global EPSILON
-
         retry_count = 0
         current_node_id = self.node.node_id
 
+        if not hasattr(self, "_epsilon"):
+            if self.config.use_epsilon_decay:
+                self._epsilon = self.config.initial_epsilon
+            else:
+                self._epsilon = self.config.fixed_epsilon
+
         while True:
             next_node = None
-
             all_neighbors = self.node.network.get_neighbors(current_node_id)
             log.debug(f"[Node_ID={current_node_id}] All neighbors: {all_neighbors}")
 
@@ -122,17 +126,17 @@ class QRoutingApplication(Application):
             ]
             log.debug(f"[Node_ID={current_node_id}] Active neighbors: {active_neighbors}")
 
-            if random.random() < EPSILON:
-                log.debug(f"[Node_ID={current_node_id}] Performing exploration with epsilon={EPSILON:.4f}")
-                registry.log_policy_decision("EXPLORATION", EPSILON)
+            if random.random() < self._epsilon:
+                log.debug(f"[Node_ID={current_node_id}] Performing exploration with epsilon={self._epsilon:.4f}")
+                registry.log_policy_decision("EXPLORATION", self._epsilon)
                 if active_neighbors:
                     next_node = random.choice(active_neighbors)
                     log.debug(f"[Node_ID={current_node_id}] Exploration selected Node {next_node}")
                 else:
                     log.debug(f"[Node_ID={current_node_id}] No active neighbors available for exploration.")
             else:
-                log.debug(f"[Node_ID={current_node_id}] Performing exploitation with epsilon={EPSILON:.4f}")
-                registry.log_policy_decision("EXPLOITATION", EPSILON)
+                log.debug(f"[Node_ID={current_node_id}] Performing exploitation with epsilon={self._epsilon:.4f}")
+                registry.log_policy_decision("EXPLOITATION", self._epsilon)
                 next_node = self.choose_best_action()
                 log.debug(f"[Node_ID={current_node_id}] Exploitation chose {next_node}")
 
@@ -150,7 +154,8 @@ class QRoutingApplication(Application):
                     log.debug(f"[Node_ID={current_node_id}] Fallback to exploration found no valid neighbors.")
 
             if next_node is not None:
-                EPSILON = max(EPSILON * EPSILON_DECAY, EPSILON_MIN)
+                if self.config.use_epsilon_decay:
+                    self._epsilon = max(self._epsilon * self.config.epsilon_decay, self.config.epsilon_min)
                 log.debug(f"[Node_ID={current_node_id}] Returning next node: {next_node}")
                 return next_node
 

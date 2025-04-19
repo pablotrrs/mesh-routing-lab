@@ -6,7 +6,7 @@ from typing import Dict, List, Union
 import matplotlib.pyplot as plt
 import numpy as np
 
-from core.base import SimulationConfig
+from core.base import Algorithm, SimulationConfig
 
 
 class ReportsManager:
@@ -24,10 +24,16 @@ class ReportsManager:
         log.debug("MetricsManager initialized.")
 
     def generate_reports(self):
-        self._save_metrics_to_file(self.results_dir)
+        filename = self._save_metrics_to_file(self.results_dir)
         self._save_results_to_excel(os.path.join(self.results_dir, "resultados_simulacion.xlsx"))
         self._generate_comparative_graphs_from_excel(os.path.join(self.results_dir, "resultados_simulacion.xlsx"))
         self.generate_q_table_heatmap(self.results_dir)
+
+        if Algorithm.Q_ROUTING in self.config.algorithms:
+           self.generate_q_routing_policy_graphs_from_metrics(
+               filename,
+               os.path.join(self.results_dir, "Algorithm.Q_ROUTING")
+           )
 
     @staticmethod
     def get_next_results_directory(base_path="../resources/results"):
@@ -42,7 +48,7 @@ class ReportsManager:
 
     def _save_metrics_to_file(
         self, directory: str = "../resources/results/single-run"
-    ) -> None:
+    ) -> str:
         """Saves the simulation metrics to a JSON file.
 
         Args:
@@ -58,6 +64,7 @@ class ReportsManager:
             json.dump(registry.metrics, file, indent=4)
 
         log.debug(f"Simulation metrics saved to {filename}.")
+        return filename
 
     def _save_results_to_excel(
         self, filename: str = "../resources/results/resultados_simulacion.xlsx"
@@ -178,7 +185,10 @@ class ReportsManager:
         import numpy as np
 
         def create_config_label(config):
-            return (
+            import os
+            from core.enums import Algorithm
+
+            label = (
                 f"Episodios: {config.episodes}\n"
                 f"Max hops: {config.max_hops}\n"
                 f"Timeout episodio: {config.episode_timeout_ms} ms\n"
@@ -188,8 +198,22 @@ class ReportsManager:
                 f"Int. desconexión media: {config.mean_disconnection_interval_ms} ms\n"
                 f"Int. reconexión media: {config.mean_reconnection_interval_ms} ms\n"
                 f"Topología: {os.path.basename(config.topology_file)}\n"
-                f"Secuencia de funciones: {' -> '.join([f.value for f in self.config.functions_sequence])}"
+                f"Secuencia de funciones: {' → '.join(f.value for f in config.functions_sequence)}"
             )
+
+            if Algorithm.Q_ROUTING in config.algorithms:
+                label += "\n"
+                label += f"Usa epsilon decay: {'Sí' if config.use_epsilon_decay else 'No'}\n"
+                if config.use_epsilon_decay:
+                    label += (
+                        f"Epsilon inicial: {config.initial_epsilon:.2f}\n"
+                        f"Factor de decay: {config.epsilon_decay:.4f}\n"
+                        f"Epsilon mínimo: {config.epsilon_min:.2f}"
+                    )
+                else:
+                    label += f"Epsilon fijo: {config.fixed_epsilon:.2f}"
+
+            return label
 
         os.makedirs(self.results_dir, exist_ok=True)
         xls = pd.ExcelFile(filename)
@@ -386,9 +410,9 @@ class ReportsManager:
 
             from core.enums import Algorithm
             algorithm_enum = Algorithm[algorithm]
-            output_dir = os.path.join(self.results_dir, str(algorithm_enum))
+            output_dir = os.path.join(self.results_dir, str(algorithm_enum), "q-table")
             os.makedirs(output_dir, exist_ok=True)
-            heatmap_path = os.path.join(output_dir, f"{algorithm}_q_table_heatmap_episode_{episode_index + 1}.png")
+            heatmap_path = os.path.join(output_dir, f"q_table_heatmap_episode_{episode_index + 1}.png")
             plt.tight_layout()
             plt.savefig(heatmap_path)
             plt.close()
@@ -397,7 +421,7 @@ class ReportsManager:
 
         # Generate a GIF from the heatmaps
         import imageio
-        gif_path = os.path.join(output_dir, f"{algorithm}_q_table_heatmaps.gif")
+        gif_path = os.path.join(output_dir, f"q_table_heatmap.gif")
         try:
             with imageio.get_writer(gif_path, mode='I', duration=5) as writer:
                 for path in heatmap_paths:
@@ -406,5 +430,145 @@ class ReportsManager:
             log.debug(f"GIF of Q-Table heatmaps saved to {gif_path}")
         except ImportError:
             log.error("imageio library is required to generate GIFs. Please install it using 'pip install imageio'.")
+
+    def generate_q_routing_policy_graphs_from_metrics(self, metrics_path: str, output_dir: str = "./q_routing_policy_analysis") -> None:
+        import os
+        import json
+        import numpy as np
+        import matplotlib.pyplot as plt
+
+        os.makedirs(output_dir, exist_ok=True)
+
+        with open(metrics_path, "r") as f:
+            metrics = json.load(f)
+
+        q_data = metrics.get("Q_ROUTING", {}).get("episodes", [])
+        if not q_data:
+            print("No Q_ROUTING data found in metrics.")
+            return
+
+        explore_ratios = []
+        avg_epsilons = []
+        heatmap_data = []
+        explore_durations = []
+        exploit_durations = []
+
+        for episode in q_data:
+            route = episode.get("route", [])
+            explore_count = 0
+            total = 0
+            epsilons = []
+
+            row = []
+
+            for hop in route:
+                decision = hop.get("policy_decision")
+                epsilon = hop.get("epsilon")
+                if decision is not None:
+                    row.append(1 if decision == "EXPLORE" else 0)
+                    if decision == "EXPLORE":
+                        explore_count += 1
+                if epsilon is not None:
+                    epsilons.append(epsilon)
+                total += 1
+
+            explore_ratios.append(explore_count / total if total > 0 else 0.0)
+            avg_epsilons.append(np.mean(epsilons) if epsilons else 0.0)
+            heatmap_data.append(row)
+
+            if explore_count >= total / 2:
+                explore_durations.append(episode["episode_duration"])
+            else:
+                exploit_durations.append(episode["episode_duration"])
+
+        # 1. Explore ratio
+        # plt.figure(figsize=(10, 5))
+        # plt.plot(explore_ratios, label="Explore Ratio", color="blue")
+        # plt.title("Explore Ratio Over Episodes")
+        # plt.xlabel("Episode")
+        # plt.ylabel("Explore Ratio")
+        # plt.grid(True)
+        # plt.tight_layout()
+        # plt.savefig(os.path.join(output_dir, "explore_ratio_over_episodes.png"))
+        # plt.close()
+
+        # 2. Avg epsilon
+        def create_config_label(config):
+            import os
+            from core.enums import Algorithm
+
+            label = (
+                f"Episodios: {config.episodes}\n"
+                f"Max hops: {config.max_hops}\n"
+                f"Timeout episodio: {config.episode_timeout_ms} ms\n"
+                f"Prob. desconexión: {config.disconnection_probability}\n"
+                f"Int. desconexión fija: {config.disconnection_interval_ms} ms\n"
+                f"Int. reconexión fija: {config.reconnection_interval_ms} ms\n"
+                f"Int. desconexión media: {config.mean_disconnection_interval_ms} ms\n"
+                f"Int. reconexión media: {config.mean_reconnection_interval_ms} ms\n"
+                f"Topología: {os.path.basename(config.topology_file)}\n"
+                f"Secuencia de funciones: {' → '.join(f.value for f in config.functions_sequence)}"
+            )
+
+            if Algorithm.Q_ROUTING in config.algorithms:
+                label += "\n"
+                label += f"Usa epsilon decay: {'Sí' if config.use_epsilon_decay else 'No'}\n"
+                if config.use_epsilon_decay:
+                    label += (
+                        f"Epsilon inicial: {config.initial_epsilon:.2f}\n"
+                        f"Factor de decay: {config.epsilon_decay:.4f}\n"
+                        f"Epsilon mínimo: {config.epsilon_min:.2f}"
+                    )
+                else:
+                    label += f"Epsilon fijo: {config.fixed_epsilon:.2f}"
+
+            return label
+
+        plt.figure(figsize=(10, 5))
+        plt.plot(avg_epsilons, label="Avg Epsilon", color="orange")
+        plt.title("Epsilon Promedio sobre Episodio")
+        plt.xlabel("Episodio")
+        plt.ylabel("Epsilon")
+        plt.grid(True)
+
+        label = create_config_label(self.config)
+        plt.annotate(label, xy=(1.01, 0), xycoords='axes fraction', fontsize=10,
+                    ha='left', va='bottom', linespacing=1.5,
+                    bbox=dict(facecolor='white', alpha=0.7, edgecolor='gray'))
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, "average_epsilon_over_episodes.png"), bbox_inches='tight')
+        plt.close()
+
+        # 3. Heatmap
+        # max_len = max(len(row) for row in heatmap_data)
+        # for row in heatmap_data:
+        #     row.extend([0] * (max_len - len(row)))
+        # heatmap_array = np.array(heatmap_data)
+        #
+        # plt.figure(figsize=(12, 6))
+        # plt.imshow(heatmap_array.T, aspect="auto", cmap="coolwarm", interpolation="nearest")
+        # plt.title("Explore/Exploit Heatmap (1 = Explore, 0 = Exploit)")
+        # plt.xlabel("Episode")
+        # plt.ylabel("Hop Number")
+        # plt.colorbar(label="Decision")
+        # plt.tight_layout()
+        # plt.savefig(os.path.join(output_dir, "explore_exploit_heatmap.png"))
+        # plt.close()
+
+        # 4. Average delivery time by decision
+        # labels = ['Explore-Dominant', 'Exploit-Dominant']
+        # values = [
+        #     np.mean(explore_durations) if explore_durations else 0,
+        #     np.mean(exploit_durations) if exploit_durations else 0
+        # ]
+        #
+        # plt.figure(figsize=(8, 5))
+        # plt.bar(labels, values, color=["skyblue", "salmon"])
+        # plt.title("Average Delivery Time by Dominant Policy")
+        # plt.ylabel("Avg Episode Duration (ms)")
+        # plt.tight_layout()
+        # plt.savefig(os.path.join(output_dir, "avg_delivery_time_by_decision_type.png"))
+        # plt.close()
 
 reports_manager = ReportsManager()

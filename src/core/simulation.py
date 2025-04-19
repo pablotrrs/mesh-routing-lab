@@ -105,18 +105,14 @@ class Simulation:
 
                 self.sender_node.install_application(SenderQRoutingApplication)
                 self.sender_node.application.set_params(
-                    self.config.max_hops,
-                    self.config.functions_sequence,
-                    self.config.episode_timeout_ms,
+                    self.config,
                 )
 
                 for node_id, node in self.network.nodes.items():
                     if node_id != self.sender_node.node_id:
                         node.install_application(IntermediateQRoutingApplication)
                         node.application.set_params(
-                            self.config.max_hops,
-                            self.config.functions_sequence,
-                            self.config.episode_timeout_ms,
+                            self.config,
                         )
 
             case Algorithm.DIJKSTRA:
@@ -127,18 +123,14 @@ class Simulation:
 
                 self.sender_node.install_application(SenderDijkstraApplication)
                 self.sender_node.application.set_params(
-                    self.config.max_hops,
-                    self.config.functions_sequence,
-                    self.config.episode_timeout_ms,
+                    self.config,
                 )
 
                 for node_id, node in self.network.nodes.items():
                     if node_id != self.sender_node.node_id:
                         node.install_application(IntermediateDijkstraApplication)
                         node.application.set_params(
-                            self.config.max_hops,
-                            self.config.functions_sequence,
-                            self.config.episode_timeout_ms,
+                            self.config,
                         )
 
             case Algorithm.BELLMAN_FORD:
@@ -149,16 +141,12 @@ class Simulation:
 
                 self.sender_node.install_application(SenderBellmanFordApplication)
                 self.sender_node.application.set_params(
-                    self.config.max_hops,
-                    self.config.functions_sequence,
-                    self.config.episode_timeout_ms,
+                    self.config,
                 )
 
                 for node_id, node in self.network.nodes.items():
                     if node_id != self.sender_node.node_id:
                         node.install_application(IntermediateBellmanFordApplication)
                         node.application.set_params(
-                            self.config.max_hops,
-                            self.config.functions_sequence,
-                            self.config.episode_timeout_ms,
+                            self.config,
                         )

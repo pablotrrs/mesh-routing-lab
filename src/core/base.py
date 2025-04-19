@@ -95,6 +95,11 @@ class SimulationConfig:
     episode_timeout_ms: Optional[float] = 0.0
     disconnection_probability: float = 0.0
     penalty: float = 0.0
+    use_epsilon_decay: bool = False
+    initial_epsilon: Optional[float] = None
+    epsilon_decay: Optional[float] = None
+    epsilon_min: Optional[float] = None
+    fixed_epsilon: Optional[float] = None
 
     def __post_init__(self):
         if self.episode_timeout_ms is None:
@@ -118,6 +123,36 @@ class SimulationConfig:
             raise ValueError(
                 "Cannot set both fixed and mean-based disconnection/reconnection intervals. Choose one mode."
             )
+
+        if self.use_epsilon_decay:
+            self.initial_epsilon = self.initial_epsilon if self.initial_epsilon is not None else 1.0
+            self.epsilon_decay = self.epsilon_decay if self.epsilon_decay is not None else 0.99
+            self.epsilon_min = self.epsilon_min if self.epsilon_min is not None else 0.01
+        else:
+            self.fixed_epsilon = self.fixed_epsilon if self.fixed_epsilon is not None else 0.1
+
+        if self.use_epsilon_decay:
+            if (
+                self.initial_epsilon is None
+                or self.epsilon_decay is None
+                or self.epsilon_min is None
+            ):
+                raise ValueError(
+                    "When using epsilon decay, you must specify initial_epsilon, epsilon_decay, and epsilon_min."
+                )
+            if self.fixed_epsilon is not None:
+                raise ValueError(
+                    "Cannot provide fixed_epsilon if epsilon decay is enabled."
+                )
+        else:
+            if (
+                self.initial_epsilon is not None
+                or self.epsilon_decay is not None
+                or self.epsilon_min is not None
+            ):
+                raise ValueError(
+                    "Cannot provide epsilon decay parameters if epsilon decay is disabled."
+                )
 
     def __str__(self):
         from tabulate import tabulate
@@ -144,10 +179,19 @@ class SimulationConfig:
             ["Episode timeout", f"{self.episode_timeout_ms} ms"],
             ["Disconnection probability", self.disconnection_probability],
             ["Penalty (Q-Routing)", self.penalty],
+            ["Epsilon decay enabled", self.use_epsilon_decay],
         ]
-        return "\n" + tabulate(
-            table, headers=["Parameter", "Value"], tablefmt="fancy_grid"
-        )
+
+        if self.use_epsilon_decay:
+            table.extend([
+                ["Initial epsilon", self.initial_epsilon],
+                ["Epsilon decay", self.epsilon_decay],
+                ["Epsilon min", self.epsilon_min],
+            ])
+        else:
+            table.append(["Fixed epsilon", self.fixed_epsilon])
+
+        return "\n" + tabulate(table, headers=["Parameter", "Value"], tablefmt="fancy_grid")
 
 
 class EpisodeEnded(Exception):
@@ -198,12 +242,11 @@ class Application(ABC):
         self.functions_sequence: Optional[List[str]] = None
         self.episode_start_time: Optional[int] = None
         self.episode_timeout_ms: Optional[int] = None
+        self.config: Optional[SimulationConfig] = None
 
     def set_params(
         self,
-        max_hops: int,
-        functions_sequence: List[str],
-        episode_timeout_ms: Optional[int] = None,
+        config: SimulationConfig,
     ) -> None:
         """
         Sets routing parameters for the application.
@@ -213,9 +256,10 @@ class Application(ABC):
             functions_sequence (List[str]): Required function sequence for routing.
             episode_timeout_ms (Optional[int]): Max duration of an episode in milliseconds.
         """
-        self.max_hops = max_hops
-        self.functions_sequence = functions_sequence
-        self.episode_timeout_ms = episode_timeout_ms
+        self.max_hops = config.max_hops
+        self.functions_sequence = config.functions_sequence
+        self.episode_timeout_ms = config.episode_timeout_ms
+        self.config = config
 
     # === Core episode lifecycle methods ===
 
