@@ -131,6 +131,36 @@ def setup_arguments():
         default=0.0,
         help="Penalty for Q-Values of hops that cause a packet to lose (Only for Q_ROUTING)",
     )
+    parser.add_argument(
+        "--use_epsilon_decay",
+        action="store_true",
+        help="Enable epsilon decay in Q-Routing (default: disabled)",
+    )
+    parser.add_argument(
+        "--initial_epsilon",
+        type=float,
+        default=None,
+        help="Initial epsilon value for Q-Routing (only used with epsilon decay)",
+    )
+    parser.add_argument(
+        "--epsilon_decay",
+        type=float,
+        default=None,
+        help="Decay factor for epsilon in Q-Routing (only used with epsilon decay)",
+    )
+    parser.add_argument(
+        "--epsilon_min",
+        type=float,
+        default=None,
+        help="Minimum epsilon value for Q-Routing (only used with epsilon decay)",
+    )
+    parser.add_argument(
+        "--fixed_epsilon",
+        type=float,
+        default=None,
+        help="Fixed epsilon value for Q-Routing (used when epsilon decay is disabled)",
+    )
+
     return parser.parse_args()
 
 
@@ -195,6 +225,11 @@ def main():
         episode_timeout_ms=args.episode_timeout_ms,
         disconnection_probability=args.disconnection_probability,
         penalty=args.penalty,
+        use_epsilon_decay=args.use_epsilon_decay,
+        initial_epsilon=args.initial_epsilon,
+        epsilon_decay=args.epsilon_decay,
+        epsilon_min=args.epsilon_min,
+        fixed_epsilon=args.fixed_epsilon,
     )
 
     log.info(config)
