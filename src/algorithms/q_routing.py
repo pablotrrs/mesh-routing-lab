@@ -13,11 +13,13 @@ from core.packet_registry import registry
 from utils.visualization import print_q_table
 from utils.custom_excep_hook import custom_thread_excepthook
 
+EPISODE_TIMEOUT_TRIGGERED = False
+
 ALPHA = 0.1
 GAMMA = 0.9
 EPSILON = 1.0
 EPSILON_DECAY = 0.99
-EPSILON_MIN = 0.1
+EPSILON_MIN = 0.5
 
 CURRENT_HOP_COUNT = 0
 
@@ -59,6 +61,12 @@ class QRoutingApplication(Application):
         self.q_table = {}
         self.assigned_function = None
         self.callback_stack = deque()
+
+    def ensure_not_timeout(self):
+        global EPISODE_TIMEOUT_TRIGGERED
+        if EPISODE_TIMEOUT_TRIGGERED:
+            log.warning(f"[Node_ID={self.node.node_id}] Episode aborted due to timeout.")
+            raise EpisodeTimeout()
 
     def receive_packet(self, packet):
         log.debug(f"[Node_ID={self.node.node_id}] Received packet {packet}")
@@ -104,6 +112,7 @@ class QRoutingApplication(Application):
         return
 
     def select_next_node(self) -> int:
+        self.ensure_not_timeout()
         self.initialize_or_update_q_table()
         global EPSILON
 
@@ -111,6 +120,7 @@ class QRoutingApplication(Application):
         current_node_id = self.node.node_id
 
         while True:
+            self.ensure_not_timeout()
             next_node = None
 
             all_neighbors = self.node.network.get_neighbors(current_node_id)
@@ -136,10 +146,10 @@ class QRoutingApplication(Application):
                 next_node = self.choose_best_action()
                 log.debug(f"[Node_ID={current_node_id}] Exploitation chose {next_node}")
 
-                if next_node == current_node_id:
+                if next_node is not None and next_node == current_node_id:
                     log.debug(f"[Node_ID={current_node_id}] Exploitation selected self node. Invalid.")
                     next_node = None
-                elif not self.node.network.get_node(next_node).status:
+                elif next_node is not None and not self.node.network.get_node(next_node).status:
                     log.debug(f"[Node_ID={current_node_id}] Exploitation selected inactive node {next_node}.")
                     next_node = None
 
@@ -154,6 +164,7 @@ class QRoutingApplication(Application):
                 log.debug(f"[Node_ID={current_node_id}] Returning next node: {next_node}")
                 return next_node
 
+            self.ensure_not_timeout()
             delay_ms = RETRY_BASE_DELAY_MS * (2 ** retry_count)
             delay_ms = min(delay_ms, 10000)
             log.debug(f"[Node_ID={current_node_id}] No valid next node found. Retrying in {delay_ms}ms...")
@@ -164,42 +175,50 @@ class QRoutingApplication(Application):
         """
         Encuentra la mejor acción según los valores Q actuales en la Q-table del nodo.
         """
+        self.ensure_not_timeout()
         self.initialize_or_update_q_table()
+        current_node_id = self.node.node_id
+
+        raw_q_values = self.q_table[current_node_id]
+        log.debug(f"[Node_ID={current_node_id}] Raw Q-table: {raw_q_values}")
+
+        neighbor_statuses = {
+            neighbor: self.node.network.get_node(neighbor).status
+            for neighbor in self.node.network.get_neighbors(current_node_id)
+        }
+        log.debug(f"[Node_ID={current_node_id}] Neighbor statuses: {neighbor_statuses}")
 
         neighbors_q_values = {
             neighbor: q_value
-            for neighbor, q_value in self.q_table[self.node.node_id].items()
-            if self.node.network.get_node(neighbor).status
+            for neighbor, q_value in raw_q_values.items()
+            if self.node.network.get_node(neighbor).status and neighbor != current_node_id
         }
 
-        if not neighbors_q_values:
-            log.debug(
-                f"[Node_ID={self.node.node_id}] No available neighbors with status True"
-            )
+        log.debug(f"[Node_ID={current_node_id}] Filtered valid neighbors Q-values: {neighbors_q_values}")
 
+        if not neighbors_q_values:
+            log.debug(f"[Node_ID={current_node_id}] No available neighbors with status True and valid ID")
             return None
 
-        return min(neighbors_q_values, key=neighbors_q_values.get)
+        best_neighbor = max(neighbors_q_values, key=neighbors_q_values.get)
+        log.debug(f"[Node_ID={current_node_id}] Best next hop selected: {best_neighbor}")
+        return best_neighbor
 
     def initialize_or_update_q_table(self) -> None:
-        """
-        Asegura que la Q-table del nodo esté inicializada o actualizada como una matriz,
-        donde cada vecino tiene un valor Q asociado. Si un vecino no tiene un valor Q,
-        se inicializa con un valor por defecto.
-        """
+        self.ensure_not_timeout()
         if self.node.node_id not in self.q_table:
             self.q_table[self.node.node_id] = {}
 
         for neighbor in self.node.network.get_neighbors(self.node.node_id):
             if neighbor not in self.q_table[self.node.node_id]:
-                self.q_table[self.node.node_id][neighbor] = 0.0
-        return
+                self.q_table[self.node.node_id][neighbor] = random.uniform(0.5, 1.5)
 
     def estimate_remaining_time(self, next_node) -> float:
         """
         Estima el tiempo restante a partir del valor Q del nodo siguiente.
         Si no hay valores Q asociados, retorna infinito.
         """
+        self.ensure_not_timeout()
         if (
             self.node.node_id not in self.q_table
             or next_node not in self.q_table[self.node.node_id]
@@ -212,6 +231,7 @@ class QRoutingApplication(Application):
         self, next_node, estimated_time_remaining
     ) -> None:
         """Actualiza la Q-table para el estado-acción actual usando información incompleta."""
+        self.ensure_not_timeout()
 
         self.initialize_or_update_q_table()
 
@@ -224,6 +244,7 @@ class QRoutingApplication(Application):
         return
 
     def initiate_max_hops_callback(self, packet):
+        self.ensure_not_timeout()
         global CALLBACK_STACK
 
         # si no tiene callback stack porque puede pasar
@@ -257,6 +278,7 @@ class QRoutingApplication(Application):
         return
 
     def didnt_make_it_further_than_first_hop(self, route):
+        self.ensure_not_timeout()
         from_values = [step["from"] for step in route]
 
         from_counts = {}
@@ -280,6 +302,7 @@ class QRoutingApplication(Application):
         """
         Penaliza el valor Q de la acción (ir al vecino `next_node`) con una reducción fuerte.
         """
+        self.ensure_not_timeout()
         old_q = self.q_table[self.node.node_id].get(next_node, 0.0)
         new_q = old_q - penalty
 
@@ -295,6 +318,7 @@ class QRoutingApplication(Application):
 
     def get_assigned_function(self):
         """Returns the function assigned to this node."""
+        self.ensure_not_timeout()
         assigned_function = self.assigned_function
 
         return assigned_function.value if assigned_function is not None else "N/A"
@@ -337,9 +361,9 @@ class SenderQRoutingApplication(QRoutingApplication):
 
         episode_thread.join(timeout=10)
 
-        if episode_thread.is_alive():
-            log.warning(f"[Episode #{episode_number}] Episode thread is still alive after join timeout. Forcing termination.")
-            kill_thread(episode_thread)
+        # if episode_thread.is_alive():
+        #     log.warning(f"[Episode #{episode_number}] Episode thread is still alive after join timeout. Forcing termination.")
+        #     kill_thread(episode_thread)
 
         if timeout_watcher_thread.is_alive():
             timeout_watcher_thread.join()
@@ -414,6 +438,9 @@ class SenderQRoutingApplication(QRoutingApplication):
         if self.episode_timeout_ms is None or self.episode_start_time is None:
             return
 
+        global EPISODE_TIMEOUT_TRIGGERED
+        EPISODE_TIMEOUT_TRIGGERED = False
+
         while episode_thread.is_alive():
             current_time = clock.get_current_time()
             elapsed_time = current_time - self.episode_start_time
@@ -421,18 +448,17 @@ class SenderQRoutingApplication(QRoutingApplication):
             if elapsed_time >= self.episode_timeout_ms:
                 log.debug(f"[Sender Node] Timeout reached after {elapsed_time} ms. Terminating episode...")
                 registry.log_episode_failure_reason("TIMEOUT")
-                kill_thread(episode_thread)
-                log.info(f"[Episode #{episode_number}] Episode forcefully terminated due to timeout.")
-                return
 
-            # if EPISODE_COMPLETED:
-            #     log.debug(f"[Episode #{episode_number}] Episode completed. Stopping timeout watcher.")
-            #     return
+                EPISODE_TIMEOUT_TRIGGERED = True
+                # kill_thread(episode_thread)
+                # log.info(f"[Episode #{episode_number}] Episode forcefully terminated due to timeout.")
+                return
 
             import time
             time.sleep(0.001)
 
     def handle_packet_hop(self, packet) -> None:
+        self.ensure_not_timeout()
         next_node = self.select_next_node()
 
         if next_node is None:
@@ -486,6 +512,7 @@ class SenderQRoutingApplication(QRoutingApplication):
         return
 
     def handle_echo_callback(self, packet) -> None:
+        self.ensure_not_timeout()
         global CALLBACK_STACK
         if len(CALLBACK_STACK) > 0:
             callback_data = CALLBACK_STACK.pop()
@@ -511,6 +538,7 @@ class SenderQRoutingApplication(QRoutingApplication):
             self.mark_episode_result(packet, success=True)
 
     def handle_max_hops_reached(self, packet) -> None:
+        self.ensure_not_timeout()
         episode_number = packet["episode_number"]
         log.debug(f"\n[Node_ID={self.node.node_id}] Episode {episode_number} failed.")
 
@@ -525,6 +553,7 @@ class SenderQRoutingApplication(QRoutingApplication):
             packet (dict): El paquete asociado al episodio.
             success (bool): `True` si el episodio fue exitoso, `False` si falló.
         """
+        self.ensure_not_timeout()
         global EPISODE_COMPLETED
         EPISODE_COMPLETED = True
 
@@ -554,7 +583,7 @@ class IntermediateQRoutingApplication(QRoutingApplication):
         )
 
     def handle_packet_hop(self, packet):
-
+        self.ensure_not_timeout()
         self.initialize_or_update_q_table()
 
         if packet["hops"] > packet["max_hops"]:
@@ -646,6 +675,7 @@ class IntermediateQRoutingApplication(QRoutingApplication):
 
     def handle_echo_callback(self, packet):
         """Maneja el callback cuando regresa el paquete."""
+        self.ensure_not_timeout()
         global CALLBACK_STACK
         callback_data = CALLBACK_STACK.pop()
         log.debug(
@@ -663,6 +693,7 @@ class IntermediateQRoutingApplication(QRoutingApplication):
         return
 
     def handle_lost_packet(self, packet) -> None:
+        self.ensure_not_timeout()
         global CALLBACK_STACK
         callback_data = CALLBACK_STACK.pop()
         log.debug(
@@ -679,6 +710,7 @@ class IntermediateQRoutingApplication(QRoutingApplication):
 
     def initiate_full_echo_callback(self, packet):
         """Inicia el proceso de full echo callback hacia el nodo anterior."""
+        self.ensure_not_timeout()
 
         callback_packet = {
             "type": PacketType.CALLBACK,
@@ -692,6 +724,7 @@ class IntermediateQRoutingApplication(QRoutingApplication):
 
     def assign_function(self, packet):
         """Asigna la función menos utilizada basada en los contadores del paquete."""
+        self.ensure_not_timeout()
         min_assignments = min(packet["function_counters"].values())
 
         least_assigned_functions = [

@@ -13,6 +13,8 @@ from utils.custom_excep_hook import custom_thread_excepthook
 from utils.thread_killer import kill_thread
 from utils.custom_excep_hook import custom_thread_excepthook
 
+EPISODE_TIMEOUT_TRIGGERED = False
+
 RETRY_BASE_DELAY_MS = 50
 
 EPISODE_COMPLETED = False
@@ -69,11 +71,18 @@ class DijkstraApplication(Application):
         self.callback_stack = []
         self.assigned_function = None
 
+    def ensure_not_timeout(self):
+        global EPISODE_TIMEOUT_TRIGGERED
+        if EPISODE_TIMEOUT_TRIGGERED:
+            log.warning(f"[Node_ID={self.node.node_id}] Episode aborted due to timeout.")
+            raise EpisodeTimeout()
+
     def select_next_function_node(self, packet):
         """
         Selecciona el siguiente nodo que debe procesar la próxima función faltante.
         Si todos los nodos vecinos no tienen la función correspondiente en el mapa, elige el nodo con menor peso en la arista.
         """
+        self.ensure_not_timeout()
         next_function = packet["functions_sequence"][
             0
         ]
@@ -145,7 +154,7 @@ class DijkstraApplication(Application):
         return None
 
     def send_packet(self, to_node_id, packet):
-
+        self.ensure_not_timeout()
         if to_node_id is None:
             raise ValueError("Can't send to node None!")
 
@@ -162,6 +171,7 @@ class DijkstraApplication(Application):
 
     def get_assigned_function(self) -> str:
         """Returns the function assigned to this node or 'N/A' if None."""
+        self.ensure_not_timeout()
         func = None
 
         if self.broadcast_state is not None:
@@ -302,17 +312,22 @@ class SenderDijkstraApplication(DijkstraApplication):
         if self.episode_timeout_ms is None or self.episode_start_time is None:
             return
 
+        global EPISODE_TIMEOUT_TRIGGERED
+        EPISODE_TIMEOUT_TRIGGERED = False
+
         while episode_thread.is_alive():
             current_time = clock.get_current_time()
             elapsed_time = current_time - self.episode_start_time
 
             if elapsed_time >= self.episode_timeout_ms:
                 log.debug(f"[Sender Node] Timeout reached after {elapsed_time} ms. Terminating episode...")
-                kill_thread(episode_thread)
+                # kill_thread(episode_thread)
 
                 global broken_path
                 broken_path = True
-                log.info(f"[Episode #{episode_number}] Episode forcefully terminated due to timeout.")
+                EPISODE_TIMEOUT_TRIGGERED = True
+                # kill_thread(episode_thread)
+                # log.info(f"[Episode #{episode_number}] Episode forcefully terminated due to timeout.")
                 return
 
             import time
@@ -322,6 +337,7 @@ class SenderDijkstraApplication(DijkstraApplication):
         """
         Inicia el proceso de broadcast desde el nodo sender.
         """
+        self.ensure_not_timeout()
         neighbors =  [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.get_node(neighbor).status]
         broadcast_packet = {
             "type": PacketType.BROADCAST,
@@ -347,6 +363,7 @@ class SenderDijkstraApplication(DijkstraApplication):
             ):
                 retry_count = 0
                 while neighbor is not None and not self.node.network.get_node(neighbor).status:
+                    self.ensure_not_timeout()
                     delay_ms = RETRY_BASE_DELAY_MS * (2 ** retry_count)
                     delay_ms = min(delay_ms, 100000)  # clamp para no pasarse de rosca
 
@@ -412,6 +429,7 @@ class SenderDijkstraApplication(DijkstraApplication):
         Calcula las rutas más cortas desde el nodo de origen a todos los demás nodos,
         utilizando una cola de prioridad para manejar eficientemente las latencias definidas en la clase Network.
         """
+        self.ensure_not_timeout()
         self.paths_computed = False
 
         distances = {node_id: float("inf") for node_id in self.node.network.get_nodes()}
@@ -455,6 +473,7 @@ class SenderDijkstraApplication(DijkstraApplication):
         Reconstruye las rutas más cortas desde el diccionario de nodos previos,
         incluyendo las funciones que se procesan en cada nodo.
         """
+        self.ensure_not_timeout()
         routes = {}
         for node_id in self.node.network.get_nodes():
             path = []
@@ -476,6 +495,7 @@ class SenderDijkstraApplication(DijkstraApplication):
         Devuelve la ruta más corta hacia un nodo destino,
         incluyendo las funciones que se procesan en el camino.
         """
+        self.ensure_not_timeout()
         route_info = self.routes.get(destination_node_id, {})
         return route_info.get("path", []), route_info.get("functions", [])
 
@@ -484,6 +504,7 @@ class SenderDijkstraApplication(DijkstraApplication):
         Maneja los paquetes recibidos según su tipo.
         Finaliza el episodio cuando el paquete regresa al nodo sender.
         """
+        self.ensure_not_timeout()
         log.debug(f"[Node_ID={self.node.node_id}] Received packet {packet}")
 
         match packet["type"]:
@@ -514,6 +535,7 @@ class SenderDijkstraApplication(DijkstraApplication):
                     ):
                         retry_count = 0
                         while next_node is not None and not self.node.network.get_node(next_node).status:
+                            self.ensure_not_timeout()
                             delay_ms = RETRY_BASE_DELAY_MS * (2 ** retry_count)
                             delay_ms = min(delay_ms, 100000)  # clamp para no pasarse de rosca
 
@@ -763,6 +785,7 @@ class IntermediateDijkstraApplication(DijkstraApplication):
         pass
 
     def receive_packet(self, packet):
+        self.ensure_not_timeout()
         packet_type = packet["type"]
         log.debug(f"[Node_ID={self.node.node_id}] Received {packet_type} packet.")
         match packet_type:
@@ -1051,6 +1074,7 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                     retry_count = 0
 
                     while True:
+                        self.ensure_not_timeout()
                         next_node = self.select_next_function_node(packet)
 
                         if next_node is not None and self.node.network.get_node(next_node).status:
