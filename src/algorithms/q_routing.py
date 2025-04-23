@@ -200,7 +200,7 @@ class QRoutingApplication(Application):
             log.debug(f"[Node_ID={current_node_id}] No available neighbors with status True and valid ID")
             return None
 
-        best_neighbor = max(neighbors_q_values, key=neighbors_q_values.get)
+        best_neighbor = min(neighbors_q_values, key=neighbors_q_values.get)
         log.debug(f"[Node_ID={current_node_id}] Best next hop selected: {best_neighbor}")
         return best_neighbor
 

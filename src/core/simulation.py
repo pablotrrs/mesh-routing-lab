@@ -40,15 +40,15 @@ class Simulation:
         log.info("Simulation started")
         registry.log_simulation_start(self.config, self.network)
         clock.start()
-        self.network.start_dynamic_changes()
-
+        
         for algorithm in self.config.algorithms:
+            self.network.start_dynamic_changes()
             registry.log_algorithm_start(algorithm)
             self._run_algorithm(algorithm)
             registry.log_algorithm_end()
+            self.network.stop_dynamic_changes()
 
         clock.stop()
-        self.network.stop_dynamic_changes()
         registry.log_simulation_end()
         log.info("Simulation finished")
 

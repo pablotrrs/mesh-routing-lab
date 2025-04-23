@@ -111,6 +111,7 @@ class Network:
 
     def start_dynamic_changes(self) -> None:
         """Starts a thread to apply dynamic changes based on the central clock."""
+        self.running = True
         current_time = clock.get_current_time()
         log.debug(f"Network clock starts: {current_time}")
         threading.Thread(target=self._monitor_dynamic_changes, daemon=True).start()
@@ -142,7 +143,7 @@ class Network:
                 node = self.nodes[node_id]
 
                 if np.random.rand() < self.disconnection_probability and node.status:
-                    log.debug("⚡ZZZAP⚡")  # Dynamic change event
+                    log.debug("ZZZAP")  # Dynamic change event
                     node.status = False
 
                     # fixed reconnection mode
@@ -179,7 +180,7 @@ class Network:
                         ):
                             node.status = True
                             delattr(node, "disconnected_at")
-                            log.debug("⚡ZZZAP⚡")
+                            log.debug("ZZZAP")
                             log.debug(f"\033[92mNode {node_id} reconnected at {current_time:.2f}.\033[0m")
                     # Mean reconnection mode
                     elif self.mean_reconnection_interval_ms is not None:
@@ -190,7 +191,7 @@ class Network:
                         if current_time >= node.reconnect_time:
                             node.status = True
                             delattr(node, "reconnect_time")
-                            log.debug("⚡ZZZAP⚡")
+                            log.debug("ZZZAP")
                             log.debug(f"\033[92mNode {node_id} reconnected at {current_time:.2f}.\033[0m")
 
     def add_node(self, node: Node) -> None:

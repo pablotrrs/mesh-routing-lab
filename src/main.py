@@ -158,7 +158,7 @@ def initialize_network(config):
 
     network.set_disconnection_probability(config.disconnection_probability)
     log.info(network)
-    network.start_dynamic_changes()
+    # network.start_dynamic_changes()
     return network, sender_node
 
 
