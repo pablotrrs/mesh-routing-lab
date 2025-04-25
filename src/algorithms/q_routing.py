@@ -358,6 +358,9 @@ class SenderQRoutingApplication(QRoutingApplication):
         global EPISODE_COMPLETED
         EPISODE_COMPLETED = False
 
+        global EPISODE_TIMEOUT_TRIGGERED
+        EPISODE_TIMEOUT_TRIGGERED = False
+
         self.episode_start_time = clock.get_current_time()
 
         episode_thread = threading.Thread(target=self._process_episode, args=(episode_number, 0))
