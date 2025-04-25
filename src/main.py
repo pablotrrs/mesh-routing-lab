@@ -179,7 +179,8 @@ def main():
     selected_algorithms = (
         [Algorithm(args.algorithm)]
         if args.algorithm
-        else [Algorithm.Q_ROUTING, Algorithm.DIJKSTRA, Algorithm.BELLMAN_FORD]
+        # else [Algorithm.Q_ROUTING, Algorithm.DIJKSTRA, Algorithm.BELLMAN_FORD]
+        else [Algorithm.Q_ROUTING, Algorithm.DIJKSTRA]
     )
 
     config = SimulationConfig(

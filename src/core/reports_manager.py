@@ -21,6 +21,8 @@ class ReportsManager:
         self.metrics: Dict[str, Union[int, float, str, List, Dict]] = {}
         self.config: SimulationConfig = None
         self.results_dir = self.get_next_results_directory()
+        fm_logger = log.getLogger('matplotlib.font_manager')
+        fm_logger.setLevel(log.ERROR)
         log.debug("MetricsManager initialized.")
 
     def generate_reports(self):
@@ -187,6 +189,8 @@ class ReportsManager:
                 f"Int. reconexión fija: {config.reconnection_interval_ms} ms\n"
                 f"Int. desconexión media: {config.mean_disconnection_interval_ms} ms\n"
                 f"Int. reconexión media: {config.mean_reconnection_interval_ms} ms\n"
+                f"Epsilon: 0.1\n"
+                f"Bonus for hop processing correct function: -0.1 \n"
                 f"Topología: {os.path.basename(config.topology_file)}\n"
                 f"Secuencia de funciones: {' -> '.join([f.value for f in self.config.functions_sequence])}"
             )

@@ -19,7 +19,7 @@ ALPHA = 0.1
 GAMMA = 0.9
 EPSILON = 1.0
 EPSILON_DECAY = 0.99
-EPSILON_MIN = 0.5
+EPSILON_MIN = 0.1
 
 CURRENT_HOP_COUNT = 0
 
@@ -228,20 +228,32 @@ class QRoutingApplication(Application):
         return self.q_table[self.node.node_id][next_node]
 
     def update_q_table_with_incomplete_info(
-        self, next_node, estimated_time_remaining
+        self, next_node, estimated_time_remaining, hop_processes_correct_function=False
     ) -> None:
         """Actualiza la Q-table para el estado-acción actual usando información incompleta."""
         self.ensure_not_timeout()
-
         self.initialize_or_update_q_table()
 
-        current_q = self.q_table[self.node.node_id].get(
-            next_node, 0.0
-        )
+        current_q = self.q_table[self.node.node_id].get(next_node, 0.0)
         updated_q = current_q + ALPHA * (estimated_time_remaining - current_q)
 
+        if hop_processes_correct_function:
+            bonus = -BONUS_VALUE  # porque queremos que el Q sea menor
+            log.debug(
+                f"[Node_ID={self.node.node_id}] Applying bonus {bonus} for hop to Node {next_node} (processed correct function)"
+            )
+            updated_q += bonus
+
         self.q_table[self.node.node_id][next_node] = updated_q
-        return
+
+        registry.log_q_table_value_update(
+            self.node.node_id,
+            next_node,
+            current_q,
+            updated_q,
+            estimated_time_remaining,
+            None  # no hay 's' aún
+        )
 
     def initiate_max_hops_callback(self, packet):
         self.ensure_not_timeout()
@@ -269,9 +281,9 @@ class QRoutingApplication(Application):
             f"\033[91m[CALLBACK_STACK] Desencolando {callback_data}, callback_stack: {CALLBACK_STACK}\033[0m"
         )
 
-        self.penalize_q_value(
-            next_node=callback_data.next_hop_node, penalty=packet["penalty"]
-        )
+        # self.penalize_q_value(
+        #     next_node=callback_data.next_hop_node, penalty=packet["penalty"]
+        # )
 
         # movement: backward
         self.send_packet(callback_data.previous_hop_node, callback_packet)
@@ -300,11 +312,11 @@ class QRoutingApplication(Application):
 
     def penalize_q_value(self, next_node, penalty):
         """
-        Penaliza el valor Q de la acción (ir al vecino `next_node`) con una reducción fuerte.
+        Penaliza el valor Q de la acción (ir al vecino `next_node`) con un aumento fuerte.
         """
         self.ensure_not_timeout()
         old_q = self.q_table[self.node.node_id].get(next_node, 0.0)
-        new_q = old_q - penalty
+        new_q = old_q + penalty
 
         self.q_table[self.node.node_id][next_node] = max(
             new_q, 0
@@ -605,6 +617,8 @@ class IntermediateQRoutingApplication(QRoutingApplication):
         if self.assigned_function is None:
             self.assign_function(packet)
 
+        hop_processes_correct_function = False
+
         # if function to process is function assigned to this node
         if (
             self.assigned_function == packet["functions_sequence"][0]
@@ -614,6 +628,7 @@ class IntermediateQRoutingApplication(QRoutingApplication):
             log.debug(
                 f"[Node_ID={self.node.node_id}] Removing function {self.assigned_function} from functions to process"
             )
+            hop_processes_correct_function = True
             if packet["functions_sequence"]:
                 packet["functions_sequence"].pop(0)
 
@@ -650,7 +665,9 @@ class IntermediateQRoutingApplication(QRoutingApplication):
             )
 
             self.update_q_table_with_incomplete_info(
-                next_node=next_node, estimated_time_remaining=estimated_time_remaining
+                next_node=next_node,
+                estimated_time_remaining=estimated_time_remaining,
+                hop_processes_correct_function=hop_processes_correct_function
             )
 
             # movement: forward
@@ -700,9 +717,9 @@ class IntermediateQRoutingApplication(QRoutingApplication):
             f"\033[91m[CALLBACK_STACK] Desencolando {callback_data}, callback_stack: {CALLBACK_STACK}\033[0m"
         )
 
-        self.penalize_q_value(
-            next_node=callback_data.next_hop_node, penalty=packet["penalty"]
-        )
+        # self.penalize_q_value(
+        #     next_node=callback_data.next_hop_node, penalty=packet["penalty"]
+        # )
 
         # movement: backward
         self.send_packet(callback_data.previous_hop_node, packet)

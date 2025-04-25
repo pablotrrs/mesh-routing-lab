@@ -97,9 +97,9 @@ def visualize_simulation(simulation_file):
                 node_functions[to_node] = function
     
     algorithm_text += (f"Max Hops: {data['parameters']['max_hops']}\n"
-                        f"Mean Interval: {data['parameters']['mean_interval_ms']} ms\n"
-                        f"Reconnect Interval: {data['parameters']['reconnect_interval_ms']} ms\n"
-                        f"Topology File: {data['parameters']['topology_file']}\n"
+                        # f"Mean Interval: {data['parameters']['mean_interval_ms']} ms\n"
+                        # f"Reconnect Interval: {data['parameters']['reconnect_interval_ms']} ms\n"
+                        # f"Topology File: {data['parameters']['topology_file']}\n"
                         f"Functions Sequence: {', '.join(data['parameters']['functions_sequence'])}\n"
                         f"Disconnect Probability: {data['parameters']['disconnection_probability']}\n\n")
 

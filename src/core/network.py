@@ -128,7 +128,6 @@ class Network:
             with self.lock:
                 if current_time >= next_event_time:
                     self.trigger_dynamic_change()
-                    self.dynamic_change_events.append(current_time)
                     next_event_time = current_time + self.generate_next_dynamic_change()
 
                 self._handle_reconnections()
@@ -142,6 +141,7 @@ class Network:
                 node = self.nodes[node_id]
 
                 if np.random.rand() < self.disconnection_probability and node.status:
+                    self.dynamic_change_events.append(current_time)
                     log.debug("⚡ZZZAP⚡")  # Dynamic change event
                     node.status = False
 

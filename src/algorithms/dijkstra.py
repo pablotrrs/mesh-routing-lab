@@ -192,6 +192,9 @@ class SenderDijkstraApplication(DijkstraApplication):
         global EPISODE_COMPLETED
         EPISODE_COMPLETED = False
 
+        global EPISODE_TIMEOUT_TRIGGERED
+        EPISODE_TIMEOUT_TRIGGERED = False
+
         self.episode_start_time = clock.get_current_time()
 
         episode_thread = threading.Thread(target=self._process_episode, args=(episode_number,))
@@ -321,6 +324,7 @@ class SenderDijkstraApplication(DijkstraApplication):
 
             if elapsed_time >= self.episode_timeout_ms:
                 log.debug(f"[Sender Node] Timeout reached after {elapsed_time} ms. Terminating episode...")
+                registry.log_episode_failure_reason("TIMEOUT")
                 # kill_thread(episode_thread)
 
                 global broken_path
@@ -515,6 +519,7 @@ class SenderDijkstraApplication(DijkstraApplication):
                     f"\n[Node_ID={self.node.node_id}] Episode {episode_number} failed."
                 )
 
+                registry.log_episode_failure_reason("MAX_HOPS")
                 self.mark_episode_result(packet, success=False)
 
             case PacketType.PACKET_HOP:
