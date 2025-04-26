@@ -202,13 +202,22 @@ class SenderDijkstraApplication(DijkstraApplication):
 
         threading.excepthook = custom_thread_excepthook
 
+        log.debug(f"[Episode #{episode_number}] Starting episode thread.")
         episode_thread.start()
+
+        log.debug(f"[Episode #{episode_number}] Starting timeout watcher thread.")
         timeout_watcher_thread.start()
 
-        episode_thread.join()
+        # episode_thread.join(timeout=10)
+
+        # if episode_thread.is_alive():
+        #     log.warning(f"[Episode #{episode_number}] Episode thread is still alive after join timeout. Forcing termination.")
+        #     kill_thread(episode_thread)
 
         if timeout_watcher_thread.is_alive():
             timeout_watcher_thread.join()
+
+        log.debug(f"[Episode #{episode_number}] Episode fully handled (thread joined and timeout watcher done).")
 
     def _process_episode(self, episode_number: int) -> None:
         """Core logic for processing an episode, runs asynchronously."""

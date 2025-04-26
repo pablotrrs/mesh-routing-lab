@@ -238,7 +238,7 @@ class QRoutingApplication(Application):
         updated_q = current_q + ALPHA * (estimated_time_remaining - current_q)
 
         if hop_processes_correct_function:
-            bonus = -BONUS_VALUE  # porque queremos que el Q sea menor
+            bonus = -0.2  # porque queremos que el Q sea menor
             log.debug(
                 f"[Node_ID={self.node.node_id}] Applying bonus {bonus} for hop to Node {next_node} (processed correct function)"
             )
@@ -374,7 +374,7 @@ class SenderQRoutingApplication(QRoutingApplication):
         log.debug(f"[Episode #{episode_number}] Starting timeout watcher thread.")
         timeout_watcher_thread.start()
 
-        episode_thread.join(timeout=10)
+        # episode_thread.join(timeout=10)
 
         # if episode_thread.is_alive():
         #     log.warning(f"[Episode #{episode_number}] Episode thread is still alive after join timeout. Forcing termination.")
@@ -675,7 +675,6 @@ class IntermediateQRoutingApplication(QRoutingApplication):
 
             # movement: forward
             self.send_packet(next_node, packet)
-            return
         else:
             # movement: none
             packet["hops"] += 1
