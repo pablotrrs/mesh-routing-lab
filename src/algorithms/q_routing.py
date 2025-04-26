@@ -172,9 +172,7 @@ class QRoutingApplication(Application):
             retry_count += 1
 
     def choose_best_action(self) -> int:
-        """
-        Encuentra la mejor acción según los valores Q actuales en la Q-table del nodo.
-        """
+        """Encuentra la mejor acción según los valores Q actuales en la Q-table del nodo."""
         self.ensure_not_timeout()
         self.initialize_or_update_q_table()
         current_node_id = self.node.node_id
@@ -191,16 +189,15 @@ class QRoutingApplication(Application):
         neighbors_q_values = {
             neighbor: q_value
             for neighbor, q_value in raw_q_values.items()
-            if self.node.network.get_node(neighbor).status and neighbor != current_node_id
+            if neighbor_statuses.get(neighbor) and neighbor != current_node_id
         }
-
         log.debug(f"[Node_ID={current_node_id}] Filtered valid neighbors Q-values: {neighbors_q_values}")
 
         if not neighbors_q_values:
-            log.debug(f"[Node_ID={current_node_id}] No available neighbors with status True and valid ID")
+            log.warning(f"[Node_ID={current_node_id}] No available active neighbors for exploitation.")
             return None
 
-        best_neighbor = max(neighbors_q_values, key=neighbors_q_values.get)
+        best_neighbor = min(neighbors_q_values, key=neighbors_q_values.get)  # ← Ojo, min si Q es delay!
         log.debug(f"[Node_ID={current_node_id}] Best next hop selected: {best_neighbor}")
         return best_neighbor
 
@@ -673,6 +670,7 @@ class IntermediateQRoutingApplication(QRoutingApplication):
                 hop_processes_correct_function=hop_processes_correct_function
             )
 
+            # FIXME: está habiendo algo acá que está haciendo que corte el episodio sin que tenga que cortar
             # movement: forward
             self.send_packet(next_node, packet)
         else:
@@ -696,20 +694,31 @@ class IntermediateQRoutingApplication(QRoutingApplication):
         """Maneja el callback cuando regresa el paquete."""
         self.ensure_not_timeout()
         global CALLBACK_STACK
-        callback_data = CALLBACK_STACK.pop()
-        log.debug(
-            f"\033[91m[CALLBACK_STACK] Desencolando {callback_data}, callback_stack: {CALLBACK_STACK}\033[0m"
-        )
 
-        self.update_q_value(
-            next_node=callback_data.next_hop_node,
-            s=clock.get_current_time() - callback_data.send_timestamp,
-            t=callback_data.estimated_time,
-        )
+        while CALLBACK_STACK:
+            callback_data = CALLBACK_STACK.pop()
+            log.debug(
+                f"\033[91m[CALLBACK_STACK] Desencolando {callback_data}, callback_stack: {CALLBACK_STACK}\033[0m"
+            )
 
-        # movement: backward
-        self.send_packet(callback_data.previous_hop_node, packet)
-        return
+            if self.node.node_id == callback_data.next_hop_node:
+                log.warning(f"[Node_ID={self.node.node_id}] Ignoring invalid callback step with same current and next hop: {callback_data}")
+                continue  # Seguimos buscando en el stack
+
+            # Si encontramos uno válido:
+            self.update_q_value(
+                next_node=callback_data.next_hop_node,
+                s=clock.get_current_time() - callback_data.send_timestamp,
+                t=callback_data.estimated_time,
+            )
+
+            # movement: backward
+            self.send_packet(callback_data.previous_hop_node, packet)
+            return
+
+        # Si no quedó nada válido en el stack:
+        log.error(f"[Node_ID={self.node.node_id}] Callback stack exhausted without valid steps. Episode will be aborted.")
+        self.mark_episode_result(packet, success=False)
 
     def handle_lost_packet(self, packet) -> None:
         self.ensure_not_timeout()
