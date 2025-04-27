@@ -208,7 +208,7 @@ class QRoutingApplication(Application):
 
         for neighbor in self.node.network.get_neighbors(self.node.node_id):
             if neighbor not in self.q_table[self.node.node_id]:
-                self.q_table[self.node.node_id][neighbor] = random.uniform(0.5, 1.5)
+                self.q_table[self.node.node_id][neighbor] = 100
 
     def estimate_remaining_time(self, next_node) -> float:
         """
@@ -235,7 +235,7 @@ class QRoutingApplication(Application):
         updated_q = current_q + ALPHA * (estimated_time_remaining - current_q)
 
         if hop_processes_correct_function:
-            bonus = -0.2  # porque queremos que el Q sea menor
+            bonus = -10  # porque queremos que el Q sea menor
             log.debug(
                 f"[Node_ID={self.node.node_id}] Applying bonus {bonus} for hop to Node {next_node} (processed correct function)"
             )
@@ -371,11 +371,8 @@ class SenderQRoutingApplication(QRoutingApplication):
         log.debug(f"[Episode #{episode_number}] Starting timeout watcher thread.")
         timeout_watcher_thread.start()
 
-        # episode_thread.join(timeout=10)
-
-        # if episode_thread.is_alive():
-        #     log.warning(f"[Episode #{episode_number}] Episode thread is still alive after join timeout. Forcing termination.")
-        #     kill_thread(episode_thread)
+        # ✅ Esperar que termine el episodio
+        episode_thread.join()
 
         if timeout_watcher_thread.is_alive():
             timeout_watcher_thread.join()
