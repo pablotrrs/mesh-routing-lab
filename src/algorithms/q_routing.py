@@ -15,6 +15,9 @@ from utils.custom_excep_hook import custom_thread_excepthook
 
 EPISODE_TIMEOUT_TRIGGERED = False
 
+SMALL_BONUS = -10
+BIG_BONUS = -50
+
 ALPHA = 0.1
 GAMMA = 0.9
 EPSILON = 1.0
@@ -235,11 +238,12 @@ class QRoutingApplication(Application):
         updated_q = current_q + ALPHA * (estimated_time_remaining - current_q)
 
         if hop_processes_correct_function:
-            bonus = -10  # porque queremos que el Q sea menor
+
+            global SMALL_BONUS
             log.debug(
-                f"[Node_ID={self.node.node_id}] Applying bonus {bonus} for hop to Node {next_node} (processed correct function)"
+                f"[Node_ID={self.node.node_id}] Applying bonus {SMALL_BONUS} for hop to Node {next_node} (processed correct function)"
             )
-            updated_q += bonus
+            updated_q += SMALL_BONUS
 
         self.q_table[self.node.node_id][next_node] = updated_q
 
@@ -634,6 +638,19 @@ class IntermediateQRoutingApplication(QRoutingApplication):
             log.debug(
                 f"[Node_ID={self.node.node_id}] Function sequence is complete! Initiating full echo callback"
             )
+
+            # esta línea de acá abajo si la descomento rompe...
+            from_node = packet["from_node_id"]
+            to_node = self.node.node_id
+
+            if from_node not in self.q_table:
+                self.q_table[from_node] = {}
+
+            if to_node not in self.q_table[from_node]:
+                self.q_table[from_node][to_node] = 0.0
+
+            self.q_table[from_node][to_node] = self.q_table[from_node][to_node] - 50
+
             self.initiate_full_echo_callback(packet)
             return
 
@@ -769,6 +786,26 @@ class IntermediateQRoutingApplication(QRoutingApplication):
         self.assigned_function = function_to_assign
         packet["function_counters"][function_to_assign] += 1
         return
+
+    def update_q_value_with_reward(self, from_node, to_node, reward):
+        """Actualiza el valor Q entre dos nodos usando una recompensa directa."""
+        self.ensure_not_timeout()
+        self.initialize_or_update_q_table()
+
+        old_q = self.q_table[from_node].get(to_node, 0.0)
+        new_q = old_q + ALPHA * (reward - old_q)
+
+        self.q_table[from_node][to_node] = new_q
+        return
+        #
+        # registry.log_q_table_value_update(
+        #     from_node,
+        #     to_node,
+        #     old_q,
+        #     new_q,
+        #     reward,
+        #     None  # no hay "estimated time" acá, es reward puro
+        # )
 
     def __str__(self):
         return f"IntermediateNode(id={self.node.node_id}, neighbors={self.node.network.get_neighbors(self.node.node_id)})"

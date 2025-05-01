@@ -185,12 +185,13 @@ class ReportsManager:
                 f"Max hops: {config.max_hops}\n"
                 f"Timeout episodio: {config.episode_timeout_ms} ms\n"
                 f"Prob. desconexión: {config.disconnection_probability}\n"
-                f"Int. desconexión fija: {config.disconnection_interval_ms} ms\n"
-                f"Int. reconexión fija: {config.reconnection_interval_ms} ms\n"
+                # f"Int. desconexión fija: {config.disconnection_interval_ms} ms\n"
+                # f"Int. reconexión fija: {config.reconnection_interval_ms} ms\n"
                 f"Int. desconexión media: {config.mean_disconnection_interval_ms} ms\n"
                 f"Int. reconexión media: {config.mean_reconnection_interval_ms} ms\n"
                 f"Epsilon: 0.1\n"
                 f"Bonus for hop processing correct function: -10 \n"
+                f"Bonus for hop finishing processing functions: -50 \n"
                 f"Initial Q-Values: 100 \n"
                 f"Topología: {os.path.basename(config.topology_file)}\n"
                 f"Secuencia de funciones: {' -> '.join([f.value for f in self.config.functions_sequence])}"
@@ -332,7 +333,7 @@ class ReportsManager:
             data = json.load(file)
 
         if algorithm not in data:
-            raise ValueError(f"Algorithm '{algorithm}' not found in the metrics file.")
+            return
 
         episodes = data[algorithm]["episodes"]
 

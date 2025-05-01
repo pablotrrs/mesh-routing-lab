@@ -83,6 +83,10 @@ class DijkstraApplication(Application):
         Si todos los nodos vecinos no tienen la función correspondiente en el mapa, elige el nodo con menor peso en la arista.
         """
         self.ensure_not_timeout()
+
+        # active_nodes = self.node.network.get_active_nodes()
+        # log.error(f"Nodos activos: {active_nodes}")
+
         next_function = packet["functions_sequence"][
             0
         ]
@@ -754,7 +758,7 @@ class SenderDijkstraApplication(DijkstraApplication):
             functions = []
             for node in path:
                 assigned_function = node_function_map.get(node, "None")
-                print(f"Node {node} assigned function: {assigned_function}")
+                log.debug(f"Node {node} assigned function: {assigned_function}")
                 if node != 0 and assigned_function == "None":
                     # Si un nodo distinto de 0 no tiene función asignada, retornar False
                     print(f"Node {node} has no assigned function. Returning False.")
