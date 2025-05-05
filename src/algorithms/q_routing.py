@@ -240,15 +240,15 @@ class QRoutingApplication(Application):
         current_q = self.q_table[self.node.node_id].get(next_node, 0.0)
         updated_q = current_q + ALPHA * (estimated_time_remaining - current_q)
 
-        # if hop_processes_correct_function:
-        #
-        #     global SMALL_BONUS
-        #     log.debug(
-        #         f"[Node_ID={self.node.node_id}] Applying bonus {SMALL_BONUS} for hop to Node {next_node} (processed correct function)"
-        #     )
-        #     updated_q += SMALL_BONUS
-        #
-        # self.q_table[self.node.node_id][next_node] = updated_q
+        if hop_processes_correct_function:
+
+            global SMALL_BONUS
+            log.debug(
+                f"[Node_ID={self.node.node_id}] Applying bonus {SMALL_BONUS} for hop to Node {next_node} (processed correct function)"
+            )
+            updated_q += SMALL_BONUS
+
+        self.q_table[self.node.node_id][next_node] = updated_q
 
         registry.log_q_table_value_update(
             self.node.node_id,

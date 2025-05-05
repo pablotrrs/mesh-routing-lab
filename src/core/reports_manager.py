@@ -190,7 +190,7 @@ class ReportsManager:
                 f"Int. desconexión media: {config.mean_disconnection_interval_ms} ms\n"
                 f"Int. reconexión media: {config.mean_reconnection_interval_ms} ms\n"
                 f"Epsilon: 0.1\n"
-                # f"Bonus for hop processing correct function: -0.1 \n"
+                f"Bonus for hop processing correct function: -0.1 \n"
                 # f"Bonus for hop finishing processing functions: -50 \n"
                 # f"Initial Q-Values: 100 \n"
                 f"Topología: {os.path.basename(config.topology_file)}\n"
