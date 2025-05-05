@@ -15,7 +15,7 @@ from utils.custom_excep_hook import custom_thread_excepthook
 
 EPISODE_TIMEOUT_TRIGGERED = False
 
-SMALL_BONUS = -0.1
+SMALL_BONUS = -10
 BIG_BONUS = -50
 
 ALPHA = 0.1
@@ -214,7 +214,7 @@ class QRoutingApplication(Application):
         for neighbor in self.node.network.get_neighbors(self.node.node_id):
             if neighbor not in self.q_table[self.node.node_id]:
                 # TODO:
-                self.q_table[self.node.node_id][neighbor] = 10
+                self.q_table[self.node.node_id][neighbor] = 100
                 # self.q_table[self.node.node_id][neighbor] = 0
 
     def estimate_remaining_time(self, next_node) -> float:
@@ -643,16 +643,16 @@ class IntermediateQRoutingApplication(QRoutingApplication):
                 f"[Node_ID={self.node.node_id}] Function sequence is complete! Initiating full echo callback"
             )
 
-            # from_node = packet["from_node_id"]
-            # to_node = self.node.node_id
-            #
-            # if from_node not in self.q_table:
-            #     self.q_table[from_node] = {}
-            #
-            # if to_node not in self.q_table[from_node]:
-            #     self.q_table[from_node][to_node] = 0.0
-            #
-            # self.q_table[from_node][to_node] = self.q_table[from_node][to_node] - 50
+            from_node = packet["from_node_id"]
+            to_node = self.node.node_id
+
+            if from_node not in self.q_table:
+                self.q_table[from_node] = {}
+
+            if to_node not in self.q_table[from_node]:
+                self.q_table[from_node][to_node] = 0.0
+
+            self.q_table[from_node][to_node] = self.q_table[from_node][to_node] - 50
 
             self.initiate_full_echo_callback(packet)
             return
