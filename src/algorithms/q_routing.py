@@ -15,7 +15,7 @@ from utils.custom_excep_hook import custom_thread_excepthook
 
 EPISODE_TIMEOUT_TRIGGERED = False
 
-SMALL_BONUS = -10
+SMALL_BONUS = -0.1
 BIG_BONUS = -50
 
 ALPHA = 0.1
@@ -72,6 +72,7 @@ class QRoutingApplication(Application):
             raise EpisodeTimeout()
 
     def receive_packet(self, packet):
+        self.ensure_not_timeout()
         log.debug(f"[Node_ID={self.node.node_id}] Received packet {packet}")
 
         if packet["type"] == PacketType.PACKET_HOP:
@@ -98,6 +99,7 @@ class QRoutingApplication(Application):
         Actualiza el valor Q para el nodo actual y la acción (saltar al vecino `next_node`)
         usando la ecuación de Bellman.
         """
+        self.ensure_not_timeout()
         old_q = self.q_table[self.node.node_id].get(next_node, 0.0)
         new_q = BELLMAN_EQ(s, t, old_q)
 
@@ -211,7 +213,8 @@ class QRoutingApplication(Application):
 
         for neighbor in self.node.network.get_neighbors(self.node.node_id):
             if neighbor not in self.q_table[self.node.node_id]:
-                self.q_table[self.node.node_id][neighbor] = 100
+                # self.q_table[self.node.node_id][neighbor] = 100
+                self.q_table[self.node.node_id][neighbor] = 0
 
     def estimate_remaining_time(self, next_node) -> float:
         """
@@ -237,15 +240,15 @@ class QRoutingApplication(Application):
         current_q = self.q_table[self.node.node_id].get(next_node, 0.0)
         updated_q = current_q + ALPHA * (estimated_time_remaining - current_q)
 
-        if hop_processes_correct_function:
-
-            global SMALL_BONUS
-            log.debug(
-                f"[Node_ID={self.node.node_id}] Applying bonus {SMALL_BONUS} for hop to Node {next_node} (processed correct function)"
-            )
-            updated_q += SMALL_BONUS
-
-        self.q_table[self.node.node_id][next_node] = updated_q
+        # if hop_processes_correct_function:
+        #
+        #     global SMALL_BONUS
+        #     log.debug(
+        #         f"[Node_ID={self.node.node_id}] Applying bonus {SMALL_BONUS} for hop to Node {next_node} (processed correct function)"
+        #     )
+        #     updated_q += SMALL_BONUS
+        #
+        # self.q_table[self.node.node_id][next_node] = updated_q
 
         registry.log_q_table_value_update(
             self.node.node_id,
@@ -639,17 +642,16 @@ class IntermediateQRoutingApplication(QRoutingApplication):
                 f"[Node_ID={self.node.node_id}] Function sequence is complete! Initiating full echo callback"
             )
 
-            # esta línea de acá abajo si la descomento rompe...
-            from_node = packet["from_node_id"]
-            to_node = self.node.node_id
-
-            if from_node not in self.q_table:
-                self.q_table[from_node] = {}
-
-            if to_node not in self.q_table[from_node]:
-                self.q_table[from_node][to_node] = 0.0
-
-            self.q_table[from_node][to_node] = self.q_table[from_node][to_node] - 50
+            # from_node = packet["from_node_id"]
+            # to_node = self.node.node_id
+            #
+            # if from_node not in self.q_table:
+            #     self.q_table[from_node] = {}
+            #
+            # if to_node not in self.q_table[from_node]:
+            #     self.q_table[from_node][to_node] = 0.0
+            #
+            # self.q_table[from_node][to_node] = self.q_table[from_node][to_node] - 50
 
             self.initiate_full_echo_callback(packet)
             return
