@@ -213,8 +213,9 @@ class QRoutingApplication(Application):
 
         for neighbor in self.node.network.get_neighbors(self.node.node_id):
             if neighbor not in self.q_table[self.node.node_id]:
-                # self.q_table[self.node.node_id][neighbor] = 100
-                self.q_table[self.node.node_id][neighbor] = 0
+                # TODO:
+                self.q_table[self.node.node_id][neighbor] = 10
+                # self.q_table[self.node.node_id][neighbor] = 0
 
     def estimate_remaining_time(self, next_node) -> float:
         """
