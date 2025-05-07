@@ -15,7 +15,7 @@ from utils.custom_excep_hook import custom_thread_excepthook
 
 EPISODE_TIMEOUT_TRIGGERED = False
 
-SMALL_BONUS = -0.1
+SMALL_BONUS = -1
 BIG_BONUS = -50
 
 ALPHA = 0.1
