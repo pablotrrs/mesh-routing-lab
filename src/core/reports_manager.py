@@ -388,7 +388,7 @@ class ReportsManager:
                 for j in range(num_nodes):
                     value = persistent_q_table[i, j]
                     if not np.isnan(value):
-                        plt.text(j, i, f"{value:.2f}", ha="center", va="center", color="black")
+                        plt.text(j, i, f"{value:.2f}", ha="center", va="center", color="white")
 
             from core.enums import Algorithm
             algorithm_enum = Algorithm[algorithm]

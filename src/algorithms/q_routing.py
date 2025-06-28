@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from collections import deque
 from enum import Enum
 import threading
+from tabulate import tabulate
 from utils.thread_killer import kill_thread
 
 from core.clock import clock
@@ -214,7 +215,8 @@ class QRoutingApplication(Application):
         for neighbor in self.node.network.get_neighbors(self.node.node_id):
             if neighbor not in self.q_table[self.node.node_id]:
                 # self.q_table[self.node.node_id][neighbor] = 100
-                self.q_table[self.node.node_id][neighbor] = 0
+                # self.q_table[self.node.node_id][neighbor] = 0
+                self.q_table[self.node.node_id][neighbor] = 20000
 
     def estimate_remaining_time(self, next_node) -> float:
         """
@@ -345,6 +347,23 @@ class QRoutingApplication(Application):
     def __repr__(self) -> str:
         return self.__str__()
 
+def log_nodos_y_vecinos(network, function_sequence=["A", "B", "C", "D", "E"]):
+    rows = []
+
+    for node_id, node in network.nodes.items():
+        function = node.get_assigned_function() or "N/A"
+        vecinos = [
+            str(other_id)
+            for other_id in network.nodes
+            if other_id != node_id and network.is_node_reachable(node_id, other_id)
+        ]
+        vecinos_str = ", ".join(vecinos)
+        rows.append([node_id, function, vecinos_str])
+
+    table = tabulate(rows, headers=["Nodo", "Función", "Vecinos alcanzables"], tablefmt="fancy_grid")
+    log.info("\n===== Estado de la Red al inicio del episodio =====")
+    log.info(table)
+    log.info(f"\nSecuencia objetivo de funciones: {' -> '.join(function_sequence)}\n")
 
 class SenderQRoutingApplication(QRoutingApplication):
     def __init__(self, node):
@@ -358,6 +377,8 @@ class SenderQRoutingApplication(QRoutingApplication):
 
     def start_episode(self, episode_number: int) -> None:
         """Initiates an episode by creating a packet and sending it asynchronously."""
+
+        log_nodos_y_vecinos(self.node.network)
 
         global EPISODE_COMPLETED
         EPISODE_COMPLETED = False
