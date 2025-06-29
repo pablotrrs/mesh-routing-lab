@@ -22,7 +22,7 @@ BIG_BONUS = -50
 ALPHA = 0.1
 GAMMA = 0.9
 EPSILON = 1.0
-EPSILON_DECAY = 0.99
+EPSILON_DECAY = 0.998847
 EPSILON_MIN = 0.1
 
 CURRENT_HOP_COUNT = 0
@@ -347,7 +347,7 @@ class QRoutingApplication(Application):
     def __repr__(self) -> str:
         return self.__str__()
 
-def log_nodos_y_vecinos(network, function_sequence=["A", "B", "C", "D", "E"]):
+def log_nodos_y_vecinos(network, function_sequence=["A", "B", "C", "D", "E", "F", "G"]):
     rows = []
 
     for node_id, node in network.nodes.items():

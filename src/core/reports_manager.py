@@ -364,11 +364,15 @@ class ReportsManager:
 
             persistent_q_table = np.copy(q_table)
 
+            # Log the Q-table as a tabulated matrix
+            tabulated_q = q_table_to_tabulate(persistent_q_table)
+            log.info(f"📘 Q-Table - Episode {episode_index + 1}\n{tabulated_q}")
+
             # Generate the heatmap
             plt.figure(figsize=(10, 8))
             masked_q_table = np.ma.masked_where(np.isnan(persistent_q_table), persistent_q_table)
             cmap = plt.cm.RdYlGn
-            cmap.set_bad(color='black')  # Set NaN cells to black
+            cmap.set_bad(color='black')
             plt.imshow(
                 masked_q_table,
                 cmap=cmap,
@@ -412,5 +416,18 @@ class ReportsManager:
             log.debug(f"GIF of Q-Table heatmaps saved to {gif_path}")
         except ImportError:
             log.error("imageio library is required to generate GIFs. Please install it using 'pip install imageio'.")
+
+
+from tabulate import tabulate
+
+def q_table_to_tabulate(q_table: np.ndarray) -> str:
+    """Convierte una Q-table en formato tabular legible con `tabulate`."""
+    headers = ["From \\ To"] + [str(i) for i in range(q_table.shape[1])]
+    table = []
+    for i, row in enumerate(q_table):
+        formatted_row = [f"{val:.2f}" if not np.isnan(val) else "-" for val in row]
+        table.append([str(i)] + formatted_row)
+    return tabulate(table, headers=headers, tablefmt="grid")
+
 
 reports_manager = ReportsManager()
