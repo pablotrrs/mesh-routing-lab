@@ -22,7 +22,7 @@ BIG_BONUS = -50
 ALPHA = 0.1
 GAMMA = 0.9
 EPSILON = 1.0
-EPSILON_DECAY = 0.998847
+EPSILON_DECAY = 0.999976975
 EPSILON_MIN = 0.1
 
 CURRENT_HOP_COUNT = 0
@@ -347,7 +347,7 @@ class QRoutingApplication(Application):
     def __repr__(self) -> str:
         return self.__str__()
 
-def log_nodos_y_vecinos(network, function_sequence=["A", "B", "C", "D", "E", "F", "G"]):
+def log_nodos_y_vecinos(network, function_sequence=["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]):
     rows = []
 
     for node_id, node in network.nodes.items():
@@ -378,13 +378,13 @@ class SenderQRoutingApplication(QRoutingApplication):
     def start_episode(self, episode_number: int) -> None:
         """Initiates an episode by creating a packet and sending it asynchronously."""
 
-        log_nodos_y_vecinos(self.node.network)
-
         global EPISODE_COMPLETED
         EPISODE_COMPLETED = False
 
         global EPISODE_TIMEOUT_TRIGGERED
         EPISODE_TIMEOUT_TRIGGERED = False
+
+        log_nodos_y_vecinos(self.node.network)
 
         self.episode_start_time = clock.get_current_time()
 
@@ -406,6 +406,8 @@ class SenderQRoutingApplication(QRoutingApplication):
             timeout_watcher_thread.join()
 
         log.debug(f"[Episode #{episode_number}] Episode fully handled (thread joined and timeout watcher done).")
+
+        EPISODE_TIMEOUT_TRIGGERED = False
 
     def _process_episode(self, episode_number: int, current_hop_count: int) -> None:
         """Core logic for processing an episode, runs asynchronously."""

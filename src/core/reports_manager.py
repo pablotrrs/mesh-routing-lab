@@ -190,6 +190,7 @@ class ReportsManager:
                 f"Int. desconexión media: {config.mean_disconnection_interval_ms} ms\n"
                 f"Int. reconexión media: {config.mean_reconnection_interval_ms} ms\n"
                 f"Epsilon: 0.1\n"
+                f"Epsilon decay: 0.999976975\n"
                 # f"Bonus for hop processing correct function: -0.1 \n"
                 # f"Bonus for hop finishing processing functions: -50 \n"
                 # f"Initial Q-Values: 100 \n"
@@ -311,21 +312,7 @@ class ReportsManager:
         directory: str = "../resources/results",
         algorithm="Q_ROUTING"
     ):
-        """Generates heatmaps for Q-tables across episodes and creates a GIF to visualize the evolution of Q-values.
-
-        Args:
-            directory (str): The directory containing the metrics JSON file. Defaults to "../resources/results".
-            algorithm (str): The algorithm name to extract Q-value data from the metrics file. Defaults to "Q_ROUTING".
-        Raises:
-            ValueError: If the specified algorithm is not found in the metrics file.
-        Outputs:
-            - Heatmap images for each episode saved in the results directory.
-            - A GIF visualizing the evolution of Q-values across episodes.
-        Notes:
-            - The heatmaps display Q-values between nodes, with NaN values represented as black cells.
-            - The function calculates global min, max, and median Q-values for consistent color scaling.
-            - Requires the `imageio` library to generate the GIF. If not installed, the GIF generation will be skipped.
-        """
+        """Generates heatmaps for Q-tables across episodes and creates a GIF to visualize the evolution of Q-values."""
 
         json_file = f"{directory}/metrics.json"
 
@@ -347,14 +334,12 @@ class ReportsManager:
                     q_values.append(route["q_value"])
         num_nodes = max_node + 1 
 
-        # Calculate the global min, max, and median Q-values
         min_q_value = min(q_values) if q_values else 0
         max_q_value = max(q_values) if q_values else 1
         median_q_value = np.median(q_values) if q_values else (min_q_value + max_q_value) / 2
 
         persistent_q_table = np.full((num_nodes, num_nodes), np.nan)
 
-        # Generate a heatmap for each episode
         for episode_index, episode in enumerate(episodes):
             q_table = np.copy(persistent_q_table)
 
@@ -387,7 +372,6 @@ class ReportsManager:
             plt.xticks(range(num_nodes))
             plt.yticks(range(num_nodes))
 
-            # Annotate the heatmap with actual Q-values
             for i in range(num_nodes):
                 for j in range(num_nodes):
                     value = persistent_q_table[i, j]
