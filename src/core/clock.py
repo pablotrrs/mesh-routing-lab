@@ -1,5 +1,6 @@
 import threading
 import time
+import logging as log
 
 
 class Clock:
@@ -37,7 +38,7 @@ class Clock:
         """
         while self.running:
             with self.lock:
-                self.time += 1
+                self.tick()
             time.sleep(0.001)  # Simulate 1 ms in real time
 
     def get_current_time(self) -> int:
@@ -58,9 +59,8 @@ class Clock:
         Returns:
             int: Updated simulation time after the increment.
         """
-        with self.lock:
-            self.time += increment
-            return self.time
+        self.time += increment
+        return self.time
 
 
 # Global instance of the clock

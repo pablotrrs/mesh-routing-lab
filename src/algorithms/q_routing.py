@@ -19,6 +19,8 @@ EPISODE_TIMEOUT_TRIGGERED = False
 SMALL_BONUS = -0.1
 BIG_BONUS = -50
 
+DEFAULT_ESTIMATE = 20000.0
+
 ALPHA = 0.1
 GAMMA = 0.9
 EPSILON = 1.0
@@ -209,7 +211,7 @@ class QRoutingApplication(Application):
         current_node_id = self.node.node_id
 
         best_neighbor = None
-        best_total_estimate = float("inf")
+        best_total_estimate = DEFAULT_ESTIMATE
 
         for neighbor_id in self.node.network.get_neighbors(current_node_id):
             neighbor_node = self.node.network.get_node(neighbor_id)
@@ -220,11 +222,11 @@ class QRoutingApplication(Application):
             # 1. Estimar delay hacia el vecino (usamos Q[x][a][f] como proxy)
             delay_to_neighbor = self.q_table[current_node_id] \
                 .get(neighbor_id, {}) \
-                .get(function_id, float("inf"))
+                .get(function_id, DEFAULT_ESTIMATE)
 
             # 2. Buscar el mejor Q(a, b, function_id) entre los vecinos de 'a'
             neighbor_q_table = self.q_table.get(neighbor_id, {})
-            min_estimate_from_neighbor = float("inf")
+            min_estimate_from_neighbor = DEFAULT_ESTIMATE
 
             for b_id, function_map in neighbor_q_table.items():
                 estimate = function_map.get(function_id)
@@ -295,7 +297,7 @@ class QRoutingApplication(Application):
             or next_node not in self.q_table[self.node.node_id]
             or function_id not in self.q_table[self.node.node_id][next_node]
         ):
-            return float("inf")
+            return DEFAULT_ESTIMATE
 
         return self.q_table[self.node.node_id][next_node][function_id]
 
