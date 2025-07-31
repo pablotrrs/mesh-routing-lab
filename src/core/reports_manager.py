@@ -30,6 +30,11 @@ class ReportsManager:
         self._save_results_to_excel(os.path.join(self.results_dir, "resultados_simulacion.xlsx"))
         self._generate_comparative_graphs_from_excel(os.path.join(self.results_dir, "resultados_simulacion.xlsx"))
         self.generate_q_table_heatmap(self.results_dir)
+        
+        # Add convergence graph generation
+        if hasattr(self, 'convergence_data') and self.convergence_data:
+            self.generate_convergence_graphs()
+            self.generate_node_convergence_timeline()
 
     @staticmethod
     def get_next_results_directory(base_path="../resources/results"):
@@ -401,6 +406,275 @@ class ReportsManager:
         except ImportError:
             log.error("imageio library is required to generate GIFs. Please install it using 'pip install imageio'.")
 
+    def track_convergence_metrics(self, episode_number, node_id, epsilon, converged, success_rate):
+        """Track convergence metrics for analysis"""
+        
+        if not hasattr(self, 'convergence_data'):
+            self.convergence_data = {}
+        
+        if node_id not in self.convergence_data:
+            self.convergence_data[node_id] = {
+                'episodes': [],
+                'epsilon_values': [],
+                'success_rates': [],
+                'convergence_episode': None
+            }
+        
+        # Validate inputs
+        if episode_number is None or epsilon is None or success_rate is None:
+            log.warning(f"Invalid convergence data for node {node_id}: episode={episode_number}, epsilon={epsilon}, success_rate={success_rate}")
+            return
+        
+        self.convergence_data[node_id]['episodes'].append(episode_number)
+        self.convergence_data[node_id]['epsilon_values'].append(float(epsilon))
+        self.convergence_data[node_id]['success_rates'].append(float(success_rate))
+        
+        if converged and self.convergence_data[node_id]['convergence_episode'] is None:
+            self.convergence_data[node_id]['convergence_episode'] = episode_number
+            log.info(f"Node {node_id} convergence recorded at episode {episode_number}")
+
+    def generate_convergence_graphs(self):
+        """Generate convergence analysis graphs"""
+        
+        if not hasattr(self, 'convergence_data') or not self.convergence_data:
+            log.warning("No convergence data available for graph generation")
+            return
+        
+        plt.figure(figsize=(15, 10))
+        
+        # Epsilon decay over time
+        plt.subplot(2, 2, 1)
+        for node_id, data in self.convergence_data.items():
+            if data['episodes'] and data['epsilon_values']:
+                plt.plot(data['episodes'], data['epsilon_values'], 
+                        label=f'Node {node_id}', alpha=0.7)
+        plt.title('Epsilon Decay Over Episodes')
+        plt.xlabel('Episode')
+        plt.ylabel('Epsilon Value')
+        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.grid(True)
+        
+        # Success rate over time
+        plt.subplot(2, 2, 2)
+        for node_id, data in self.convergence_data.items():
+            if data['episodes'] and data['success_rates']:
+                plt.plot(data['episodes'], data['success_rates'], 
+                        label=f'Node {node_id}', alpha=0.7)
+        plt.title('Success Rate Over Episodes')
+        plt.xlabel('Episode')
+        plt.ylabel('Success Rate')
+        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.grid(True)
+        
+        # Convergence timeline
+        plt.subplot(2, 2, 3)
+        convergence_episodes = [data['convergence_episode'] for data in self.convergence_data.values() 
+                            if data['convergence_episode'] is not None]
+        if convergence_episodes:
+            plt.hist(convergence_episodes, bins=min(20, len(convergence_episodes)), alpha=0.7)
+            plt.title('Convergence Episode Distribution')
+            plt.xlabel('Episode')
+            plt.ylabel('Number of Nodes')
+        else:
+            plt.text(0.5, 0.5, 'No nodes converged yet', ha='center', va='center', transform=plt.gca().transAxes)
+            plt.title('Convergence Episode Distribution - No Convergence Yet')
+        plt.grid(True)
+        
+        # Combined view - Fixed to handle different array lengths
+        plt.subplot(2, 2, 4)
+        
+        # Find the common episode range across all nodes
+        all_episodes = set()
+        for data in self.convergence_data.values():
+            if data['episodes']:
+                all_episodes.update(data['episodes'])
+        
+        if all_episodes:
+            common_episodes = sorted(list(all_episodes))
+            
+            # Calculate averages for each episode
+            avg_epsilon_values = []
+            avg_success_values = []
+            
+            for episode in common_episodes:
+                episode_epsilons = []
+                episode_successes = []
+                
+                for data in self.convergence_data.values():
+                    if episode in data['episodes']:
+                        idx = data['episodes'].index(episode)
+                        if idx < len(data['epsilon_values']):
+                            episode_epsilons.append(data['epsilon_values'][idx])
+                        if idx < len(data['success_rates']):
+                            episode_successes.append(data['success_rates'][idx])
+                
+                if episode_epsilons:
+                    avg_epsilon_values.append(np.mean(episode_epsilons))
+                else:
+                    avg_epsilon_values.append(np.nan)
+                    
+                if episode_successes:
+                    avg_success_values.append(np.mean(episode_successes))
+                else:
+                    avg_success_values.append(np.nan)
+            
+            # Plot averages
+            plt.plot(common_episodes, avg_epsilon_values, label='Average Epsilon', 
+                    color='blue', linewidth=2, marker='o', markersize=3)
+            plt.plot(common_episodes, avg_success_values, label='Average Success Rate', 
+                    color='green', linewidth=2, marker='s', markersize=3)
+            plt.title('Network-Wide Convergence')
+            plt.xlabel('Episode')
+            plt.ylabel('Value')
+            plt.legend()
+        else:
+            plt.text(0.5, 0.5, 'No convergence data available', ha='center', va='center', 
+                    transform=plt.gca().transAxes)
+            plt.title('Network-Wide Convergence - No Data')
+        
+        plt.grid(True)
+        
+        plt.tight_layout()
+        
+        # Save the convergence graph
+        convergence_graph_path = os.path.join(self.results_dir, 'convergence_analysis.png')
+        plt.savefig(convergence_graph_path, dpi=150, bbox_inches='tight')
+        plt.close()
+        
+        log.info(f"Convergence analysis graph saved to {convergence_graph_path}")
+        
+        # Generate the new node convergence timeline
+        self.generate_node_convergence_timeline()
+
+    def generate_node_convergence_timeline(self):
+        """Generate a timeline showing when each specific node converged"""
+        
+        if not hasattr(self, 'convergence_data') or not self.convergence_data:
+            log.warning("No convergence data available for node convergence timeline")
+            return
+        
+        import matplotlib.pyplot as plt
+        import numpy as np
+        
+        # Extract convergence data
+        convergence_info = []
+        for node_id, data in self.convergence_data.items():
+            if data.get('convergence_episode') is not None:
+                convergence_info.append({
+                    'node_id': node_id,
+                    'episode': data['convergence_episode']
+                })
+        
+        if not convergence_info:
+            log.warning("No nodes have converged yet")
+            return
+        
+        # Sort by convergence episode
+        convergence_info.sort(key=lambda x: x['episode'])
+        
+        # Create the timeline plot
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 10))
+        
+        # Plot 1: Scatter plot showing convergence timeline
+        episodes = [info['episode'] for info in convergence_info]
+        node_ids = [info['node_id'] for info in convergence_info]
+        
+        ax1.scatter(episodes, node_ids, c='red', s=100, alpha=0.7, edgecolors='black')
+        
+        # Add node labels next to points
+        for info in convergence_info:
+            ax1.annotate(f'Node {info["node_id"]}', 
+                        (info['episode'], info['node_id']),
+                        xytext=(5, 5), textcoords='offset points',
+                        fontsize=8, alpha=0.8)
+        
+        ax1.set_xlabel('Episode Number')
+        ax1.set_ylabel('Node ID')
+        ax1.set_title('Node Convergence Timeline - Individual Nodes')
+        ax1.grid(True, alpha=0.3)
+        
+        # Set y-axis to show all node IDs
+        all_node_ids = list(self.convergence_data.keys())
+        ax1.set_yticks(sorted(all_node_ids))
+        
+        # Plot 2: Horizontal bar chart showing convergence order
+        convergence_info_with_order = []
+        for i, info in enumerate(convergence_info):
+            convergence_info_with_order.append({
+                'node_id': info['node_id'],
+                'episode': info['episode'],
+                'order': i + 1
+            })
+        
+        # Create horizontal bars
+        y_positions = range(len(convergence_info))
+        episodes_for_bars = [info['episode'] for info in convergence_info]
+        node_labels = [f"Node {info['node_id']}" for info in convergence_info]
+        
+        bars = ax2.barh(y_positions, episodes_for_bars, alpha=0.7, color='skyblue', edgecolor='navy')
+        
+        # Add episode numbers on the bars
+        for i, (bar, info) in enumerate(zip(bars, convergence_info)):
+            width = bar.get_width()
+            ax2.text(width + 1, bar.get_y() + bar.get_height()/2, 
+                    f'Ep. {info["episode"]}', 
+                    ha='left', va='center', fontweight='bold')
+        
+        ax2.set_yticks(y_positions)
+        ax2.set_yticklabels(node_labels)
+        ax2.set_xlabel('Convergence Episode')
+        ax2.set_title('Node Convergence Order (First to Last)')
+        ax2.grid(True, alpha=0.3, axis='x')
+        
+        # Invert y-axis so first converged node appears at top
+        ax2.invert_yaxis()
+        
+        plt.tight_layout()
+        
+        # Save the convergence timeline graph
+        timeline_graph_path = os.path.join(self.results_dir, 'node_convergence_timeline.png')
+        plt.savefig(timeline_graph_path, dpi=150, bbox_inches='tight')
+        plt.close()
+        
+        log.info(f"Node convergence timeline graph saved to {timeline_graph_path}")
+        
+        # Also create a summary table
+        self._create_convergence_summary_table(convergence_info)
+
+    def _create_convergence_summary_table(self, convergence_info):
+        """Create a text summary of convergence data"""
+        
+        summary_path = os.path.join(self.results_dir, 'convergence_summary.txt')
+        
+        with open(summary_path, 'w') as f:
+            f.write("=== NODE CONVERGENCE SUMMARY ===\n\n")
+            f.write(f"Total nodes that converged: {len(convergence_info)}\n")
+            f.write(f"Total nodes in network: {len(self.convergence_data)}\n")
+            f.write(f"Convergence rate: {len(convergence_info)/len(self.convergence_data)*100:.1f}%\n\n")
+            
+            if convergence_info:
+                first_converged = min(convergence_info, key=lambda x: x['episode'])
+                last_converged = max(convergence_info, key=lambda x: x['episode'])
+                
+                f.write(f"First to converge: Node {first_converged['node_id']} at episode {first_converged['episode']}\n")
+                f.write(f"Last to converge: Node {last_converged['node_id']} at episode {last_converged['episode']}\n")
+                f.write(f"Convergence span: {last_converged['episode'] - first_converged['episode']} episodes\n\n")
+            
+            f.write("=== CONVERGENCE ORDER ===\n")
+            for i, info in enumerate(convergence_info, 1):
+                f.write(f"{i:2d}. Node {info['node_id']:2d} - Episode {info['episode']:3d}\n")
+            
+            f.write("\n=== NON-CONVERGED NODES ===\n")
+            non_converged = [node_id for node_id, data in self.convergence_data.items() 
+                            if data.get('convergence_episode') is None]
+            
+            if non_converged:
+                for node_id in sorted(non_converged):
+                    f.write(f"Node {node_id}\n")
+            else:
+                f.write("All nodes converged!\n")
+        
+        log.info(f"Convergence summary saved to {summary_path}")
 
 from tabulate import tabulate
 

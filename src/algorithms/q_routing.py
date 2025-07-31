@@ -7,6 +7,7 @@ from enum import Enum
 import threading
 from tabulate import tabulate
 from utils.thread_killer import kill_thread
+from typing import Optional
 
 from core.clock import clock
 from core.base import Application, EpisodeEnded, EpisodeTimeout
