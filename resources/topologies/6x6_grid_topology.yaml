@@ -1,4 +1,4 @@
-# 6x6 irregular grid
+# 6x6 irregular grid with 10x increased latency (distances scaled by ~3.162)
 nodes:
   0:
     neighbors:
@@ -6,7 +6,7 @@ nodes:
     - 6
     position:
     - 0
-    - 500
+    - 1581
     - 0
     type: sender
   1:
@@ -15,16 +15,16 @@ nodes:
     - 2
     - 7
     position:
-    - 100
-    - 500
+    - 316
+    - 1581
     - 0
   2:
     neighbors:
     - 1
     - 3
     position:
-    - 200
-    - 500
+    - 632
+    - 1581
     - 0
   3:
     neighbors:
@@ -32,8 +32,8 @@ nodes:
     - 4
     - 9
     position:
-    - 300
-    - 500
+    - 948
+    - 1581
     - 0
   4:
     neighbors:
@@ -41,16 +41,16 @@ nodes:
     - 5
     - 10
     position:
-    - 400
-    - 500
+    - 1265
+    - 1581
     - 0
   5:
     neighbors:
     - 4
     - 11
     position:
-    - 500
-    - 500
+    - 1581
+    - 1581
     - 0
   6:
     neighbors:
@@ -59,7 +59,7 @@ nodes:
     - 12
     position:
     - 0
-    - 400
+    - 1265
     - 0
   7:
     neighbors:
@@ -68,16 +68,16 @@ nodes:
     - 8
     - 13
     position:
-    - 100
-    - 400
+    - 316
+    - 1265
     - 0
   8:
     neighbors:
     - 7
     - 14
     position:
-    - 200
-    - 400
+    - 632
+    - 1265
     - 0
   9:
     neighbors:
@@ -85,8 +85,8 @@ nodes:
     - 10
     - 15
     position:
-    - 300
-    - 400
+    - 948
+    - 1265
     - 0
   10:
     neighbors:
@@ -95,8 +95,8 @@ nodes:
     - 11
     - 16
     position:
-    - 400
-    - 400
+    - 1265
+    - 1265
     - 0
   11:
     neighbors:
@@ -104,8 +104,8 @@ nodes:
     - 10
     - 17
     position:
-    - 500
-    - 400
+    - 1581
+    - 1265
     - 0
   12:
     neighbors:
@@ -114,7 +114,7 @@ nodes:
     - 18
     position:
     - 0
-    - 300
+    - 948
     - 0
   13:
     neighbors:
@@ -123,16 +123,16 @@ nodes:
     - 14
     - 19
     position:
-    - 100
-    - 300
+    - 316
+    - 948
     - 0
   14:
     neighbors:
     - 8
     - 13
     position:
-    - 200
-    - 300
+    - 632
+    - 948
     - 0
   15:
     neighbors:
@@ -140,8 +140,8 @@ nodes:
     - 16
     - 20
     position:
-    - 300
-    - 300
+    - 948
+    - 948
     - 0
   16:
     neighbors:
@@ -150,8 +150,8 @@ nodes:
     - 17
     - 21
     position:
-    - 400
-    - 300
+    - 1265
+    - 948
     - 0
   17:
     neighbors:
@@ -159,8 +159,8 @@ nodes:
     - 16
     - 22
     position:
-    - 500
-    - 300
+    - 1581
+    - 948
     - 0
   18:
     neighbors:
@@ -169,7 +169,7 @@ nodes:
     - 24
     position:
     - 0
-    - 200
+    - 632
     - 0
   19:
     neighbors:
@@ -177,8 +177,8 @@ nodes:
     - 18
     - 25
     position:
-    - 100
-    - 200
+    - 316
+    - 632
     - 0
   20:
     neighbors:
@@ -186,8 +186,8 @@ nodes:
     - 21
     - 26
     position:
-    - 300
-    - 200
+    - 948
+    - 632
     - 0
   21:
     neighbors:
@@ -196,8 +196,8 @@ nodes:
     - 22
     - 27
     position:
-    - 400
-    - 200
+    - 1265
+    - 632
     - 0
   22:
     neighbors:
@@ -205,8 +205,8 @@ nodes:
     - 21
     - 28
     position:
-    - 500
-    - 200
+    - 1581
+    - 632
     - 0
   24:
     neighbors:
@@ -215,15 +215,15 @@ nodes:
     - 30
     position:
     - 0
-    - 100
+    - 316
     - 0
   25:
     neighbors:
     - 19
     - 24
     position:
-    - 100
-    - 100
+    - 316
+    - 316
     - 0
   26:
     neighbors:
@@ -231,8 +231,8 @@ nodes:
     - 27
     - 32
     position:
-    - 300
-    - 100
+    - 948
+    - 316
     - 0
   27:
     neighbors:
@@ -241,8 +241,8 @@ nodes:
     - 28
     - 33
     position:
-    - 400
-    - 100
+    - 1265
+    - 316
     - 0
   28:
     neighbors:
@@ -250,8 +250,8 @@ nodes:
     - 27
     - 34
     position:
-    - 500
-    - 100
+    - 1581
+    - 316
     - 0
   30:
     neighbors:
@@ -265,7 +265,7 @@ nodes:
     neighbors:
     - 30
     position:
-    - 100
+    - 316
     - 0
     - 0
   32:
@@ -273,7 +273,7 @@ nodes:
     - 26
     - 33
     position:
-    - 300
+    - 948
     - 0
     - 0
   33:
@@ -282,7 +282,7 @@ nodes:
     - 32
     - 34
     position:
-    - 400
+    - 1265
     - 0
     - 0
   34:
@@ -290,6 +290,6 @@ nodes:
     - 28
     - 33
     position:
-    - 500
+    - 1581
     - 0
     - 0
