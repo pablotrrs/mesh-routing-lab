@@ -196,7 +196,8 @@ class ReportsManager:
                 # f"Initial Q-Values: 100 \n"
                 f"Topología: {os.path.basename(config.topology_file)}\n"
                 f"Secuencia de funciones: {' -> '.join([f.value for f in self.config.functions_sequence])}\n"
-                f"Inicialización de Q-Values en un rango aleatorio entre 0 y 100"
+                f"Inicialización de Q-Values en un rango aleatorio entre 0 y 100\n"
+                f"Latencia incrementada 10 veces"
             )
 
         os.makedirs(self.results_dir, exist_ok=True)
