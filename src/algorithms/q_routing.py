@@ -8,6 +8,8 @@ import threading
 from tabulate import tabulate
 from utils.thread_killer import kill_thread
 from typing import Optional
+import math
+import numpy as np
 
 from core.clock import clock
 from core.base import Application, EpisodeEnded, EpisodeTimeout
@@ -22,11 +24,20 @@ BIG_BONUS = -50
 
 DEFAULT_ESTIMATE = 20000.0
 
-ALPHA = 0.1
+# More aggressive learning
+ALPHA = 0.15  # Increase learning rate
+EPSILON_DECAY_RATE = 0.995  # Faster epsilon decay
+MIN_EPISODES_FOR_CONVERGENCE = 80  # Earlier convergence check
+
 GAMMA = 0.9
 EPSILON = 1.0
 EPSILON_DECAY = 0.999976975
 EPSILON_MIN = 0.1
+
+# Enhanced convergence parameters
+EPSILON_START = 0.9
+EPSILON_END = 0.01
+CONVERGENCE_THRESHOLD = 0.02
 
 CURRENT_HOP_COUNT = 0
 
@@ -68,6 +79,12 @@ class QRoutingApplication(Application):
         self.q_table = {}
         self.assigned_function = None
         self.callback_stack = deque()
+        
+        self.epsilon = EPSILON_START
+        self.performance_history = []
+        self.converged = False
+        self.convergence_episode = None
+        self._last_selections = []  # deteccion de loops
 
     def ensure_not_timeout(self):
         global EPISODE_TIMEOUT_TRIGGERED
@@ -97,6 +114,96 @@ class QRoutingApplication(Application):
 
     def handle_lost_packet(self, packet):
         raise NotImplementedError("This method should be implemented by subclasses.")
+
+    def update_epsilon(self, episode_number, episode_success):
+        """Enhanced epsilon update with convergence tracking"""
+        
+        log.info(f"[Node_ID={self.node.node_id}] DEBUG: update_epsilon called with episode={episode_number}, success={episode_success}")
+        
+        # Try to get episode success if not provided
+        if episode_success is None and episode_number is not None and episode_number > 1:
+            from core.packet_registry import registry
+            log.info(f"[Node_ID={self.node.node_id}] DEBUG: Looking for episode {episode_number-1} success")
+            
+            # Try to find previous episode data
+            algorithm_data = registry.results.get("Q_ROUTING", {})
+            episodes_data = algorithm_data.get("episodes", [])
+            log.info(f"[Node_ID={self.node.node_id}] DEBUG: Found {len(episodes_data)} episodes in registry")
+            
+            previous_episode = episode_number - 1
+            for episode_data in episodes_data:
+                if episode_data.get("episode_number") == previous_episode:
+                    episode_success = episode_data.get("episode_success", None)
+                    log.info(f"[Node_ID={self.node.node_id}] DEBUG: Found episode {previous_episode} success: {episode_success}")
+                    break
+        
+        # Track performance
+        if episode_success is not None:
+            self.performance_history.append(1 if episode_success else 0)
+            log.info(f"[Node_ID={self.node.node_id}] DEBUG: Added to history. Total entries: {len(self.performance_history)}")
+        
+        # Keep only recent history
+        if len(self.performance_history) > 50:
+            self.performance_history.pop(0)
+        
+        # Check convergence
+        if (episode_number is not None and 
+            episode_number > MIN_EPISODES_FOR_CONVERGENCE and 
+            len(self.performance_history) >= 10):
+            
+            recent_performance = self.performance_history[-10:]
+            success_rate = sum(recent_performance) / len(recent_performance)
+            performance_variance = np.var(recent_performance)
+            
+            log.info(f"[Node_ID={self.node.node_id}] CONVERGENCE CHECK:")
+            log.info(f"  - Episode: {episode_number}")
+            log.info(f"  - Performance history: {len(self.performance_history)} entries")
+            log.info(f"  - Recent performance: {recent_performance}")
+            log.info(f"  - Success rate: {success_rate:.3f}")
+            log.info(f"  - Variance: {performance_variance:.3f}")
+            log.info(f"  - Epsilon: {self.epsilon:.3f}")
+            
+            # In update_epsilon method, around line 160
+            if (success_rate > 0.7 and self.epsilon < 0.5 and episode_number > 80):  # Less strict
+                if not self.converged:
+                    self.converged = True
+                    self.convergence_episode = episode_number
+                    log.info(f"[Node_ID={self.node.node_id}] ✅ CONVERGED at episode {episode_number}")
+                    
+                    # Track convergence in reports manager
+                    from core.reports_manager import reports_manager
+                    reports_manager.track_convergence_metrics(
+                        episode_number, 
+                        self.node.node_id, 
+                        self.epsilon, 
+                        self.converged, 
+                        success_rate
+                    )
+                return
+        
+        # Normal decay if not converged
+        if not self.converged:
+            self.epsilon = max(EPSILON_END, self.epsilon * EPSILON_DECAY_RATE)
+            log.debug(f"[Node_ID={self.node.node_id}] Epsilon updated to {self.epsilon:.4f}")
+
+    def check_network_convergence(self, episode_number):
+        """Check if entire network has converged"""
+        if episode_number % 50 == 0:  # Check every 50 episodes
+            from core.reports_manager import reports_manager
+            
+            if hasattr(reports_manager, 'convergence_data'):
+                converged_nodes = sum(1 for data in reports_manager.convergence_data.values() 
+                                    if data.get('convergence_episode') is not None)
+                total_nodes = len(reports_manager.convergence_data)
+                
+                if converged_nodes >= total_nodes * 0.8:  # 80% of nodes converged
+                    log.info(f"[Episode {episode_number}] Network-wide convergence achieved!")
+                    log.info(f"Converged nodes: {converged_nodes}/{total_nodes}")
+                    
+                    # Optional: Further reduce exploration across network
+                    if not self.converged:
+                        self.epsilon = EPSILON_END
+                        log.info(f"[Node_ID={self.node.node_id}] Network convergence triggered final epsilon reduction")
 
     def update_q_value(self, next_node, s, t, function_id: str):
         """
@@ -142,10 +249,41 @@ class QRoutingApplication(Application):
 
         return
 
-    def select_next_node(self, function_id: str) -> int:
+    def select_next_node(self, function_id: str, episode_number=None, episode_success=None) -> int:
+        """Enhanced node selection with convergence tracking and loop detection"""
         self.ensure_not_timeout()
         self.initialize_or_update_q_table()
-        global EPSILON
+        
+        from core.packet_registry import registry
+        from core.reports_manager import reports_manager
+        
+        # Update epsilon based on performance if data is available
+        if episode_number is not None:
+            self.update_epsilon(episode_number, episode_success)
+        
+        # Track convergence metrics every 20 episodes
+        if episode_number is not None and episode_number % 20 == 0:
+            # Calculate success rate from recent episodes
+            success_count = 0
+            total_episodes = min(20, episode_number)
+            
+            for ep in range(max(1, episode_number - 19), episode_number + 1):
+                episode_data = registry.packet_log.get(ep, {})
+                if episode_data.get("episode_success", False):
+                    success_count += 1
+            
+            success_rate = success_count / total_episodes if total_episodes > 0 else 0.0
+            
+            # Track convergence metrics
+            reports_manager.track_convergence_metrics(
+                episode_number, 
+                self.node.node_id, 
+                self.epsilon, 
+                self.converged, 
+                success_rate
+            )
+
+            self.check_network_convergence(episode_number)
 
         retry_count = 0
         current_node_id = self.node.node_id
@@ -163,17 +301,58 @@ class QRoutingApplication(Application):
             ]
             log.debug(f"[Node_ID={current_node_id}] Active neighbors: {active_neighbors}")
 
-            if random.random() < EPSILON:
-                log.debug(f"[Node_ID={current_node_id}] Performing exploration with epsilon={EPSILON:.4f}")
-                registry.log_policy_decision("EXPLORATION", EPSILON)
+
+            self._last_selections.append(current_node_id)
+            if len(self._last_selections) > 8:
+                self._last_selections.pop(0)
+
+            if len(self._last_selections) >= 8:
+                recent_selections = self._last_selections[-6:]
+                unique_recent = set(recent_selections)
+                
+                if len(unique_recent) <= 2:
+                    pattern_detected = False
+                    
+                    if len(unique_recent) == 2:
+                        nodes = list(unique_recent)
+                        if (recent_selections[0] == recent_selections[2] == recent_selections[4] and
+                            recent_selections[1] == recent_selections[3] == recent_selections[5]):
+                            pattern_detected = True
+                    
+                    elif len(unique_recent) == 1:
+                        if all(node == recent_selections[0] for node in recent_selections):
+                            pattern_detected = True
+                    
+                    if pattern_detected:
+                        log.warning(f"[Node_ID={current_node_id}] Loop pattern detected: {recent_selections}")
+                        log.warning(f"[Node_ID={current_node_id}] Forcing exploration to break loop")
+                        
+                        if active_neighbors:
+                            available_neighbors = [n for n in active_neighbors if n not in unique_recent]
+                            if available_neighbors:
+                                next_node = random.choice(available_neighbors)
+                            else:
+                                next_node = random.choice(active_neighbors)
+                            
+                            log.info(f"[Node_ID={current_node_id}] Loop-breaking exploration selected Node {next_node}")
+                            self._last_selections = []
+                            
+                            # Update epsilon only if not converged
+                            if not self.converged:
+                                self.epsilon = max(self.epsilon * EPSILON_DECAY_RATE, EPSILON_END)
+                            return next_node
+
+            if random.random() < self.epsilon:
+                log.debug(f"[Node_ID={current_node_id}] Performing exploration with epsilon={self.epsilon:.4f}")
+                registry.log_policy_decision("EXPLORATION", self.epsilon)
                 if active_neighbors:
                     next_node = random.choice(active_neighbors)
                     log.debug(f"[Node_ID={current_node_id}] Exploration selected Node {next_node}")
                 else:
                     log.debug(f"[Node_ID={current_node_id}] No active neighbors available for exploration.")
             else:
-                log.debug(f"[Node_ID={current_node_id}] Performing exploitation with epsilon={EPSILON:.4f}")
-                registry.log_policy_decision("EXPLOITATION", EPSILON)
+                log.debug(f"[Node_ID={current_node_id}] Performing exploitation with epsilon={self.epsilon:.4f}")
+                registry.log_policy_decision("EXPLOITATION", self.epsilon)
                 next_node = self.choose_best_action(function_id)
                 log.debug(f"[Node_ID={current_node_id}] Exploitation chose {next_node}")
 
@@ -191,7 +370,9 @@ class QRoutingApplication(Application):
                     log.debug(f"[Node_ID={current_node_id}] Fallback to exploration found no valid neighbors.")
 
             if next_node is not None:
-                EPSILON = max(EPSILON * EPSILON_DECAY, EPSILON_MIN)
+                # Update epsilon only if not converged
+                if not self.converged:
+                    self.epsilon = max(self.epsilon * EPSILON_DECAY_RATE, EPSILON_END)
                 log.debug(f"[Node_ID={current_node_id}] Returning next node: {next_node}")
                 return next_node
 
@@ -508,7 +689,7 @@ def log_nodos_y_vecinos(network, function_sequence=["A", "B", "C", "D", "E", "F"
                     q_table_global[src][neighbor][function] = q_value
 
     # Mostrar Q-table global
-    log.info("===== Q-Table Global (Origen → Vecino → Función) =====")
+    log.info("===== Q-Table Global (Origen -> Vecino → Función) =====")
     for src, neighbors in q_table_global.items():
         log.info(f"\n[Desde Nodo {src}]")
         for neighbor, functions in neighbors.items():
@@ -524,6 +705,16 @@ class SenderQRoutingApplication(QRoutingApplication):
 
     def set_penalty(self, penalty):
         self.penalty = penalty
+
+    def _get_previous_episode_success(self, current_episode):
+        """Get success status of previous episode for convergence tracking"""
+        if current_episode <= 1:
+            return None
+        
+        from core.packet_registry import registry
+        previous_episode = current_episode - 1
+        episode_data = registry.packet_log.get(previous_episode, {})
+        return episode_data.get("episode_success", None)
 
     def start_episode(self, episode_number: int) -> None:
         """Initiates an episode by creating a packet and sending it asynchronously."""
@@ -583,7 +774,12 @@ class SenderQRoutingApplication(QRoutingApplication):
 
             self.initialize_or_update_q_table()
 
-            next_node = self.select_next_node(packet["functions_sequence"][0].value)
+            episode_success = self._get_previous_episode_success(episode_number)
+            next_node = self.select_next_node(
+                function_id=packet["functions_sequence"][0].value,
+                episode_number=episode_number, 
+                episode_success=episode_success
+            )
 
             if next_node is None:
                 log.debug(
@@ -650,7 +846,13 @@ class SenderQRoutingApplication(QRoutingApplication):
 
     def handle_packet_hop(self, packet) -> None:
         self.ensure_not_timeout()
-        next_node = self.select_next_node(packet["functions_sequence"][0])
+        episode_number = packet["episode_number"]
+        episode_success = self._get_previous_episode_success(episode_number)
+        next_node = self.select_next_node(
+            function_id=packet["functions_sequence"][0],
+            episode_number=episode_number, 
+            episode_success=episode_success
+        )
 
         if next_node is None:
             log.debug(
@@ -785,6 +987,16 @@ class IntermediateQRoutingApplication(QRoutingApplication):
             "Intermediate node is not supposed to start an episode"
         )
 
+    def _get_previous_episode_success(self, current_episode):
+        """Get success status of previous episode for convergence tracking"""
+        if current_episode <= 1:
+            return None
+        
+        from core.packet_registry import registry
+        previous_episode = current_episode - 1
+        episode_data = registry.packet_log.get(previous_episode, {})
+        return episode_data.get("episode_success", None)
+
     def handle_packet_hop(self, packet):
         self.ensure_not_timeout()
         self.initialize_or_update_q_table()
@@ -843,7 +1055,13 @@ class IntermediateQRoutingApplication(QRoutingApplication):
             self.initiate_full_echo_callback(packet)
             return
 
-        next_node = self.select_next_node(packet["functions_sequence"][0])
+        episode_number = packet["episode_number"]
+        episode_success = self._get_previous_episode_success(episode_number)
+        next_node = self.select_next_node(
+            function_id=packet["functions_sequence"][0],
+            episode_number=episode_number, 
+            episode_success=episode_success
+        )
 
         log.debug(f"[Node_ID={self.node.node_id}] Next node is {next_node}")
         if next_node is not None:

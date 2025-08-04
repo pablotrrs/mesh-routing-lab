@@ -41,7 +41,7 @@ def setup_logging(log_level_str="INFO"):
     handlers = [log.StreamHandler()]
 
     log_file_path = os.path.join(reports_manager.results_dir, "logs.txt")
-    file_handler = log.FileHandler(log_file_path, mode="w")
+    file_handler = log.FileHandler(log_file_path, mode="w", encoding="utf-8")
     handlers.append(file_handler)
 
     log.root.handlers = []
