@@ -189,15 +189,16 @@ class ReportsManager:
                 # f"Int. reconexión fija: {config.reconnection_interval_ms} ms\n"
                 f"Int. desconexión media: {config.mean_disconnection_interval_ms} ms\n"
                 f"Int. reconexión media: {config.mean_reconnection_interval_ms} ms\n"
-                f"Epsilon: 0.1\n"
-                f"Epsilon decay: 0.999976975\n"
+                # f"Epsilon: 0.1\n"
+                # f"Epsilon decay: 0.999976975\n"
                 # f"Bonus for hop processing correct function: -0.1 \n"
                 # f"Bonus for hop finishing processing functions: -50 \n"
                 # f"Initial Q-Values: 100 \n"
                 f"Topología: {os.path.basename(config.topology_file)}\n"
                 f"Secuencia de funciones: {' -> '.join([f.value for f in self.config.functions_sequence])}\n"
                 f"Inicialización de Q-Values en un rango aleatorio entre 0 y 100\n"
-                f"Latencia incrementada 10 veces"
+                f"Latencia incrementada 10 veces\n"
+                f"Sin exploración"
             )
 
         os.makedirs(self.results_dir, exist_ok=True)

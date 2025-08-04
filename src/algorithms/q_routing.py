@@ -139,7 +139,8 @@ class QRoutingApplication(Application):
             ]
             log.debug(f"[Node_ID={current_node_id}] Active neighbors: {active_neighbors}")
 
-            if random.random() < EPSILON:
+            # if random.random() < EPSILON:
+            if 1 < 0:
                 log.debug(f"[Node_ID={current_node_id}] Performing exploration with epsilon={EPSILON:.4f}")
                 registry.log_policy_decision("EXPLORATION", EPSILON)
                 if active_neighbors:
@@ -161,15 +162,15 @@ class QRoutingApplication(Application):
                     log.debug(f"[Node_ID={current_node_id}] Exploitation selected inactive node {next_node}.")
                     next_node = None
 
-                if next_node is None and active_neighbors:
-                    next_node = random.choice(active_neighbors)
-                    estimated_time = self.q_table[self.node.node_id].get(next_node, {}).get(function_id, random.uniform(0, 100))
-                    log.debug(f"[Node_ID={current_node_id}] Fallback to exploration selected Node {next_node}")
-                elif next_node is None:
-                    log.debug(f"[Node_ID={current_node_id}] Fallback to exploration found no valid neighbors.")
+                # if next_node is None and active_neighbors:
+                #     next_node = random.choice(active_neighbors)
+                #     estimated_time = self.q_table[self.node.node_id].get(next_node, {}).get(function_id, random.uniform(0, 100))
+                #     log.debug(f"[Node_ID={current_node_id}] Fallback to exploration selected Node {next_node}")
+                # elif next_node is None:
+                #     log.debug(f"[Node_ID={current_node_id}] Fallback to exploration found no valid neighbors.")
 
             if next_node is not None:
-                EPSILON = max(EPSILON * EPSILON_DECAY, EPSILON_MIN)
+                # EPSILON = max(EPSILON * EPSILON_DECAY, EPSILON_MIN)
                 log.debug(f"[Node_ID={current_node_id}] Returning next node: {next_node}")
                 return next_node, estimated_time
 
