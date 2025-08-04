@@ -1,12 +1,13 @@
+import math
 import random
 import time
 import logging as log
+from typing import Optional, Tuple
 from dataclasses import dataclass
 from collections import deque
 from enum import Enum
 import threading
 from tabulate import tabulate
-from utils.thread_killer import kill_thread
 
 from core.clock import clock
 from core.base import Application, EpisodeEnded, EpisodeTimeout
@@ -19,7 +20,8 @@ EPISODE_TIMEOUT_TRIGGERED = False
 SMALL_BONUS = -0.1
 BIG_BONUS = -50
 
-DEFAULT_ESTIMATE = 20000.0
+random.seed(42)
+# DEFAULT_ESTIMATE = 20000.0
 
 ALPHA = 0.1
 GAMMA = 0.9
@@ -35,15 +37,6 @@ EPISODE_COMPLETED = False
 
 CALLBACK_STACK = deque()
 
-# Ecuación de Bellman:
-# ΔQ_x(d, y) = α * (s + t - Q_x(d, y))
-# Donde:
-# - s: Tiempo de transmisión, calculado como la diferencia entre el timestamp guardado y el tiempo actual.
-# - t: Tiempo estimado restante que el nodo calculó cuando eligió el vecino al que enviaría el paquete.
-# - Q_x(d, y): Valor Q actual para el nodo actual (x) hacia el vecino (y).
-# - α (alpha): Tasa de aprendizaje.
-BELLMAN_EQ = lambda s, t, q_current: q_current + ALPHA * (s + t - q_current)
-
 
 class PacketType(str, Enum):
     PACKET_HOP = "PACKET_HOP"
@@ -56,9 +49,10 @@ class CallbackChainStep:
     previous_hop_node: int
     current_node: int
     next_hop_node: int
-    send_timestamp: float
-    estimated_time: float
     episode_number: int
+    function_to_process: str
+    send_timestamp: int
+    estimated_time: int
 
 
 class QRoutingApplication(Application):
@@ -97,36 +91,20 @@ class QRoutingApplication(Application):
     def handle_lost_packet(self, packet):
         raise NotImplementedError("This method should be implemented by subclasses.")
 
-    def update_q_value(self, next_node, s, t, function_id: str):
+    def update_q_value(self, next_node, actual_time, function_id: str) -> float:
         """
         Actualiza el valor Q para el nodo actual y la acción (saltar al vecino `next_node`)
-        usando la ecuación de Bellman.
+        usando la versión clásica de la ecuación de Bellman.
+
+        Parámetros:
+        - next_node: vecino elegido
+        - actual_time: tiempo real observado desde este nodo hasta que se cumplió la función
+        - function_id: función objetivo
         """
         self.ensure_not_timeout()
 
-        try:
-            log.info("la concha tu madre 1")
-            old_q = self.q_table[self.node.node_id].get(next_node, 0.0)
-            log.info(f"\nold_q = self.q_table[self.node.node_id].get(next_node, 0.0) = {self.q_table[self.node.node_id].get(next_node, 0.0)}")
-        except Exception as e:
-            log.error(e)
-            return
-
-        try:
-            log.info("la concha tu madre 2")
-            old_q = self.q_table[self.node.node_id].get(next_node, {}).get(function_id, 0.0)
-            log.info(f"\nnew old_q = self.q_table[self.node.node_id].get(next_node, 0.0) = {self.q_table[self.node.node_id].get(next_node, {}).get(function_id, 0.0)}")
-        except Exception as e:
-            log.error(e)
-            return
-
-        # log.info(f"\nold_q = self.q_table[self.node.node_id].get(next_node, 0.0) = {self.q_table[self.node.node_id].get(next_node, 0.0)}")
-        log.info(f"\nnew old_q = self.q_table[self.node.node_id].get(next_node, 0.0) = {self.q_table[self.node.node_id].get(next_node, {}).get(function_id, 0.0)}")
-        log.info(f"self.q_table[self.node.node_id] = {self.q_table[self.node.node_id]}")
-
-        # old_q = self.q_table[self.node.node_id].get(next_node, 0.0)
         old_q = self.q_table[self.node.node_id].get(next_node, {}).get(function_id, 0.0)
-        new_q = BELLMAN_EQ(s, t, old_q)
+        new_q = old_q + ALPHA * (actual_time - old_q)
 
         self.q_table[self.node.node_id][next_node][function_id] = new_q
 
@@ -135,13 +113,12 @@ class QRoutingApplication(Application):
             next_node,
             old_q,
             new_q,
-            t,
-            s
+            actual_time
         )
 
-        return
+        return new_q
 
-    def select_next_node(self, function_id: str) -> int:
+    def select_next_node(self, function_id: str) -> Tuple[int, int]:
         self.ensure_not_timeout()
         self.initialize_or_update_q_table()
         global EPSILON
@@ -167,13 +144,14 @@ class QRoutingApplication(Application):
                 registry.log_policy_decision("EXPLORATION", EPSILON)
                 if active_neighbors:
                     next_node = random.choice(active_neighbors)
+                    estimated_time = self.q_table[self.node.node_id].get(next_node, {}).get(function_id, random.uniform(0, 100))
                     log.debug(f"[Node_ID={current_node_id}] Exploration selected Node {next_node}")
                 else:
                     log.debug(f"[Node_ID={current_node_id}] No active neighbors available for exploration.")
             else:
                 log.debug(f"[Node_ID={current_node_id}] Performing exploitation with epsilon={EPSILON:.4f}")
                 registry.log_policy_decision("EXPLOITATION", EPSILON)
-                next_node = self.choose_best_action(function_id)
+                next_node, estimated_time = self.choose_best_action(function_id)
                 log.debug(f"[Node_ID={current_node_id}] Exploitation chose {next_node}")
 
                 if next_node is not None and next_node == current_node_id:
@@ -185,6 +163,7 @@ class QRoutingApplication(Application):
 
                 if next_node is None and active_neighbors:
                     next_node = random.choice(active_neighbors)
+                    estimated_time = self.q_table[self.node.node_id].get(next_node, {}).get(function_id, random.uniform(0, 100))
                     log.debug(f"[Node_ID={current_node_id}] Fallback to exploration selected Node {next_node}")
                 elif next_node is None:
                     log.debug(f"[Node_ID={current_node_id}] Fallback to exploration found no valid neighbors.")
@@ -192,7 +171,7 @@ class QRoutingApplication(Application):
             if next_node is not None:
                 EPSILON = max(EPSILON * EPSILON_DECAY, EPSILON_MIN)
                 log.debug(f"[Node_ID={current_node_id}] Returning next node: {next_node}")
-                return next_node
+                return next_node, estimated_time
 
             self.ensure_not_timeout()
             delay_ms = RETRY_BASE_DELAY_MS * (2 ** retry_count)
@@ -201,7 +180,7 @@ class QRoutingApplication(Application):
             time.sleep(delay_ms / 1000)
             retry_count += 1
 
-    def choose_best_action(self, function_id: str) -> Optional[int]:
+    def choose_best_action(self, function_id: str) -> Tuple[Optional[int], Optional[int]]:
         """
         Selecciona el mejor vecino para alcanzar algún nodo que pueda ejecutar la función dada,
         utilizando Q-routing adaptado a entornos orientados a funciones.
@@ -211,7 +190,7 @@ class QRoutingApplication(Application):
         current_node_id = self.node.node_id
 
         best_neighbor = None
-        best_total_estimate = DEFAULT_ESTIMATE
+        best_total_estimate = random.uniform(0, 100)
 
         for neighbor_id in self.node.network.get_neighbors(current_node_id):
             neighbor_node = self.node.network.get_node(neighbor_id)
@@ -222,11 +201,11 @@ class QRoutingApplication(Application):
             # 1. Estimar delay hacia el vecino (usamos Q[x][a][f] como proxy)
             delay_to_neighbor = self.q_table[current_node_id] \
                 .get(neighbor_id, {}) \
-                .get(function_id, DEFAULT_ESTIMATE)
+                .get(function_id, random.uniform(0, 100))
 
             # 2. Buscar el mejor Q(a, b, function_id) entre los vecinos de 'a'
             neighbor_q_table = self.q_table.get(neighbor_id, {})
-            min_estimate_from_neighbor = DEFAULT_ESTIMATE
+            min_estimate_from_neighbor = random.uniform(0, 100)
 
             for b_id, function_map in neighbor_q_table.items():
                 estimate = function_map.get(function_id)
@@ -251,7 +230,7 @@ class QRoutingApplication(Application):
             log.debug(f"[Node_ID={current_node_id}] Best next hop for function '{function_id}': {best_neighbor} "
                     f"(est. total time: {best_total_estimate})")
 
-        return best_neighbor
+        return best_neighbor, best_total_estimate
 
     def initialize_or_update_q_table(self) -> None:
         self.ensure_not_timeout()
@@ -282,112 +261,6 @@ class QRoutingApplication(Application):
 
         log.info("self.q_table")
         log.info(self.q_table)
-
-    def estimate_remaining_time(self, next_node, function_id) -> float:
-        """
-        Estima el tiempo restante para alcanzar un nodo que procese la función `function_id`
-        a través del vecino `next_node`. Si no hay valores Q asociados, retorna infinito.
-        """
-        self.ensure_not_timeout()
-
-        log.info(f'self.q_table {self.q_table}')
-
-        if (
-            self.node.node_id not in self.q_table
-            or next_node not in self.q_table[self.node.node_id]
-            or function_id not in self.q_table[self.node.node_id][next_node]
-        ):
-            return DEFAULT_ESTIMATE
-
-        return self.q_table[self.node.node_id][next_node][function_id]
-
-    def update_q_table_with_incomplete_info(
-        self, next_node: int, function_id: str, estimated_time_remaining: float
-    ) -> None:
-        """
-        Actualiza la Q-table para el salto (self.node -> next_node) y la función objetivo `function_id`,
-        usando información incompleta sobre el tiempo restante estimado.
-        """
-        self.ensure_not_timeout()
-        self.initialize_or_update_q_table()
-
-        current_node_id = self.node.node_id
-
-        # Obtener valor actual o default (0.0)
-        current_q = (
-            self.q_table.get(current_node_id, {})
-            .get(next_node, {})
-            .get(function_id, 0.0)
-        )
-
-        # Validaciones
-        def is_invalid(value):
-            return (
-                value is None
-                or isinstance(value, dict)
-                or isinstance(value, str)
-                or (isinstance(value, float) and math.isnan(value))
-            )
-
-        if is_invalid(estimated_time_remaining):
-            log.warning(f"[WARNING] estimated_time_remaining tiene valor inválido: {estimated_time_remaining} (tipo: {type(estimated_time_remaining)})")
-            raise ValueError("estimated_time_remaining no es un float válido")
-
-        if is_invalid(current_q):
-            log.warning(f"[WARNING] current_q tiene valor inválido: {current_q} (tipo: {type(current_q)})")
-            raise ValueError("current_q no es un float válido")
-
-        log.info("\n" + tabulate([
-            ["Current node", current_node_id],
-            ["Next node", next_node],
-            ["Function ID", function_id],
-            ["Estimated time remaining", estimated_time_remaining],
-            ["Current Q-value", current_q],
-        ], headers=["Q-routing update (incomplete info)", "Valor"], tablefmt="fancy_grid"))
-
-        # Ecuación de actualización
-        updated_q = current_q + ALPHA * (estimated_time_remaining - current_q)
-
-        # Inicializar subtablas si hiciera falta
-        if current_node_id not in self.q_table:
-            self.q_table[current_node_id] = {}
-        if next_node not in self.q_table[current_node_id]:
-            self.q_table[current_node_id][next_node] = {}
-
-        # para ser compliants con si es el NodeFunction o un str crudo
-        raw_function = function_id.value if hasattr(function_id, "value") else function_id
-
-        # Guardar nuevo valor
-        self.q_table[current_node_id][next_node][raw_function] = updated_q
-
-        log.info(f"✅ Updated Q-value: {updated_q}")
-
-        # if hop_processes_correct_function:
-        #
-        #     global SMALL_BONUS
-        #     log.debug(
-        #         f"[Node_ID={self.node.node_id}] Applying bonus {SMALL_BONUS} for hop to Node {next_node} (processed correct function)"
-        #     )
-        #     updated_q += SMALL_BONUS
-        #
-        # self.q_table[self.node.node_id][next_node] = updated_q
-
-        registry.log_q_table_value_update(
-            self.node.node_id,
-            next_node,
-            current_q,
-            updated_q,
-            estimated_time_remaining,
-            None  # no hay 's' aún
-        )
-
-    def is_invalid(value):
-        return (
-            value is None
-            or isinstance(value, dict)
-            or isinstance(value, str)
-            or (isinstance(value, float) and (math.isnan(value) or math.isinf(value)))
-        )
 
     def initiate_max_hops_callback(self, packet):
         self.ensure_not_timeout()
@@ -568,6 +441,11 @@ class SenderQRoutingApplication(QRoutingApplication):
             global CALLBACK_STACK
             CALLBACK_STACK.clear()
 
+            self.initialize_or_update_q_table()
+
+            first_function = self.functions_sequence[0].value
+            next_node, estimated_time = self.select_next_node(first_function)
+
             packet = {
                 "type": PacketType.PACKET_HOP,
                 "episode_number": episode_number,
@@ -578,11 +456,17 @@ class SenderQRoutingApplication(QRoutingApplication):
                 "max_hops": self.max_hops,
                 "is_delivered": False,
                 "penalty": self.penalty,
+                "function_timings": [],
             }
 
-            self.initialize_or_update_q_table()
-
-            next_node = self.select_next_node(packet["functions_sequence"][0].value)
+            if first_function:
+                packet["function_timings"].append({
+                    "node_id": self.node.node_id,
+                    "function": first_function,
+                    "start_timestamp": clock.get_current_time(),
+                    "end_timestamp": None,
+                    "estimated_time": estimated_time
+                })
 
             if next_node is None:
                 log.debug(
@@ -603,12 +487,20 @@ class SenderQRoutingApplication(QRoutingApplication):
                 self._process_episode(episode_number, packet["hops"])
                 return
             else:
-                # estimated_time_remaining = self.estimate_remaining_time(next_node)
-                # estimated_time_remaining = list(self.estimate_remaining_time(next_node, packet["functions_sequence"][0]).values())[0]
-                estimated_time_remaining = self.estimate_remaining_time(next_node, packet["functions_sequence"][0])
 
-                self.update_q_table_with_incomplete_info(
-                    next_node=next_node, function_id=packet["functions_sequence"][0].value ,estimated_time_remaining=estimated_time_remaining
+                callback_chain_step = CallbackChainStep(
+                    previous_hop_node=None,
+                    current_node=self.node.node_id,
+                    next_hop_node=next_node,
+                    episode_number=packet["episode_number"],
+                    function_to_process=first_function,
+                    send_timestamp=clock.get_current_time(),
+                    estimated_time=estimated_time
+                )
+
+                CALLBACK_STACK.append(callback_chain_step)
+                log.debug(
+                    f"\033[92m[CALLBACK_STACK] Encolando {callback_chain_step}, callback_stack: {CALLBACK_STACK}\033[0m"
                 )
 
                 # movement: forward
@@ -649,7 +541,8 @@ class SenderQRoutingApplication(QRoutingApplication):
 
     def handle_packet_hop(self, packet) -> None:
         self.ensure_not_timeout()
-        next_node = self.select_next_node(packet["functions_sequence"][0])
+        function_to_process = packet["functions_sequence"][0]
+        next_node, estimated_time = self.select_next_node(function_to_process)
 
         if next_node is None:
             log.debug(
@@ -669,21 +562,14 @@ class SenderQRoutingApplication(QRoutingApplication):
                 self.handle_packet_hop(packet)
                 return
 
-        # estimated_time_remaining = self.estimate_remaining_time(next_node)
-        # estimated_time_remaining = list(self.estimate_remaining_time(next_node).values())[0]
-        estimated_time_remaining = self.estimate_remaining_time(next_node, packet["functions_sequence"][0])
-
-        self.update_q_table_with_incomplete_info(
-            next_node=next_node, function_id=packet["functions_sequence"][0] ,estimated_time_remaining=estimated_time_remaining
-        )
-
         callback_chain_step = CallbackChainStep(
             previous_hop_node=packet["from_node_id"],
             current_node=self.node.node_id,
             next_hop_node=next_node,
-            send_timestamp=clock.get_current_time(),
-            estimated_time=estimated_time_remaining,
             episode_number=packet["episode_number"],
+            function_to_process=function_to_process,
+            send_timestamp=clock.get_current_time(),
+            estimated_time=estimated_time
         )
 
         global CALLBACK_STACK
@@ -706,37 +592,73 @@ class SenderQRoutingApplication(QRoutingApplication):
     def handle_echo_callback(self, packet) -> None:
         self.ensure_not_timeout()
         global CALLBACK_STACK
+
         if len(CALLBACK_STACK) > 0:
             callback_data = CALLBACK_STACK.pop()
             log.debug(
                 f"\033[91m[CALLBACK_STACK] Desencolando {callback_data}, callback_stack: {CALLBACK_STACK}\033[0m"
             )
 
-            log.info(f"clock.get_current_time() = {clock.get_current_time()}")
-            log.info(f"callback_data.send_timestamp = {callback_data.send_timestamp}")
-            log.info(f"clock.get_current_time() - callback_data.send_timestamp = {clock.get_current_time() - callback_data.send_timestamp}")
-            log.info(f"callback_data.estimated_time = {callback_data.estimated_time}")
+            best_timing = None
+            best_duration = float("inf")
 
-            # TODO: podríamos guardar esto en el callback_data directamente
-            function_id = self.node.network.get_node(callback_data.next_hop_node).get_assigned_function()
-            log.info(f"function_id = {function_id}")
+            for timing in packet.get("function_timings", []):
+                if (
+                    timing["node_id"] == self.node.node_id
+                    and timing["function"] == callback_data.function_to_process
+                    and timing["start_timestamp"] is not None
+                    and timing["end_timestamp"] is not None
+                ):
+                    duration = timing["end_timestamp"] - timing["start_timestamp"]
+                    if duration < best_duration:
+                        best_duration = duration
+                        best_timing = timing
 
-            self.update_q_value(
-                next_node=callback_data.next_hop_node,
-                s=clock.get_current_time() - callback_data.send_timestamp,
-                t=callback_data.estimated_time,
-                function_id=function_id
-            )
+            if best_timing is None:
+                log.error(f"[Node_ID={self.node.node_id}] No valid timing found for function {callback_data.function_to_process}")
+            else:
+                new_q_value = self.update_q_value(
+                    next_node=callback_data.next_hop_node,
+                    actual_time=best_duration,
+                    function_id=callback_data.function_to_process
+                )
 
-            # movement: backward
+                # Propagar el valor aprendido a los vecinos activos (excepto el que envió el paquete)
+                current_node_id = self.node.node_id
+                for neighbor_id in self.node.network.get_neighbors(current_node_id):
+                    if neighbor_id == callback_data.previous_hop_node:
+                        continue  # evitar propagar de nuevo hacia atrás
+
+                    neighbor_node = self.node.network.get_node(neighbor_id)
+                    if not neighbor_node.status:
+                        continue  # evitar nodos caídos
+
+                    # Actualizar el Q-value como si el vecino hubiese aprendido lo mismo que este nodo
+                    neighbor_q_table = neighbor_node.application.q_table
+
+                    if current_node_id not in neighbor_q_table:
+                        neighbor_q_table[current_node_id] = {}
+
+                    if callback_data.next_hop_node not in neighbor_q_table[current_node_id]:
+                        neighbor_q_table[current_node_id][callback_data.next_hop_node] = {}
+
+                    neighbor_q_table[current_node_id][callback_data.next_hop_node][callback_data.function_to_process] = new_q_value
+
+            if callback_data.previous_hop_node is None:
+                print_q_table(self)
+                log.debug(
+                    f'\n[Node_ID={self.node.node_id}] Episode {packet["episode_number"]} finished.'
+                )
+                self.mark_episode_result(packet, success=True)
+
             self.send_packet(callback_data.previous_hop_node, packet)
             return
+
         else:
             print_q_table(self)
             log.debug(
                 f'\n[Node_ID={self.node.node_id}] Episode {packet["episode_number"]} finished.'
             )
-
             self.mark_episode_result(packet, success=True)
 
     def handle_max_hops_reached(self, packet) -> None:
@@ -790,72 +712,70 @@ class IntermediateQRoutingApplication(QRoutingApplication):
 
         if packet["hops"] > packet["max_hops"]:
             global EPISODE_COMPLETED
-
-            log.debug(f"episode completion {EPISODE_COMPLETED}")
             if EPISODE_COMPLETED:
                 episode_number = packet["episode_number"]
                 log.debug(
                     f"\033[91m[Node_ID={self.node.node_id}] Episode {episode_number} already ended or not found. Ignoring packet.\033[0m"
                 )
                 return
-            log.debug(
-                f"[Node_ID={self.node.node_id}] Max hops reached. Initiating full echo callback"
-            )
+            log.debug(f"[Node_ID={self.node.node_id}] Max hops reached. Initiating full echo callback")
             self.initiate_max_hops_callback(packet)
             return
 
         if self.assigned_function is None:
             self.assign_function(packet)
 
-        hop_processes_correct_function = False
-
-        # if function to process is function assigned to this node
-        if (
+        # 1. Verificar si este nodo cumple la función actual
+        hop_processes_correct_function = (
             self.assigned_function == packet["functions_sequence"][0]
             if packet["functions_sequence"]
             else None
-        ):
-            log.debug(
-                f"[Node_ID={self.node.node_id}] Removing function {self.assigned_function} from functions to process"
-            )
-            hop_processes_correct_function = True
+        )
+
+        if "function_timings" not in packet:
+            packet["function_timings"] = []
+
+        if hop_processes_correct_function:
+            # Cumple la función → registrar fin de búsqueda
+            log.debug(f"[Node_ID={self.node.node_id}] Removing function {self.assigned_function} from functions to process")
+
+            for entry in reversed(packet["function_timings"]):
+                if (
+                    entry["function"] == packet["functions_sequence"][0]
+                    and entry["end_timestamp"] is None
+                ):
+                    entry["end_timestamp"] = clock.get_current_time()
+
+            # Eliminar la función cumplida
             if packet["functions_sequence"]:
                 packet["functions_sequence"].pop(0)
 
-        # if all functions have been processed
+        # 2. Si se terminaron todas las funciones
         if len(packet["functions_sequence"]) == 0:
             log.debug(
                 f"[Node_ID={self.node.node_id}] Function sequence is complete! Initiating full echo callback"
             )
-
-            # from_node = packet["from_node_id"]
-            # to_node = self.node.node_id
-            #
-            # if from_node not in self.q_table:
-            #     self.q_table[from_node] = {}
-            #
-            # if to_node not in self.q_table[from_node]:
-            #     self.q_table[from_node][to_node] = 0.0
-            #
-            # self.q_table[from_node][to_node] = self.q_table[from_node][to_node] - 50
-
             self.initiate_full_echo_callback(packet)
             return
 
-        next_node = self.select_next_node(packet["functions_sequence"][0])
+        # 3. Obtener la siguiente función a buscar
+        next_function = packet["functions_sequence"][0]
 
-        log.debug(f"[Node_ID={self.node.node_id}] Next node is {next_node}")
+        # 4. Seleccionar siguiente nodo y obtener estimación
+        next_node, estimated_time = self.select_next_node(next_function)
+
         if next_node is not None:
-            # estimated_time_remaining = self.estimate_remaining_time(next_node)
-            estimated_time_remaining = self.estimate_remaining_time(next_node, packet["functions_sequence"][0])
+            send_timestamp = clock.get_current_time()
 
+            # Encolar paso en el callback stack
             callback_chain_step = CallbackChainStep(
                 previous_hop_node=packet["from_node_id"],
                 current_node=self.node.node_id,
                 next_hop_node=next_node,
-                send_timestamp=clock.get_current_time(),
-                estimated_time=estimated_time_remaining,
+                estimated_time=estimated_time,
                 episode_number=packet["episode_number"],
+                function_to_process=next_function.value,
+                send_timestamp=send_timestamp,
             )
             global CALLBACK_STACK
             CALLBACK_STACK.append(callback_chain_step)
@@ -863,37 +783,28 @@ class IntermediateQRoutingApplication(QRoutingApplication):
                 f"\033[92m[CALLBACK_STACK] Encolando {callback_chain_step}, callback_stack: {CALLBACK_STACK}\033[0m"
             )
 
-            log.debug(
-                f"[Node_ID={self.node.node_id}] Adding step to callback chain stack: {callback_chain_step}"
-            )
+            # Registrar nuevo intento de alcanzar la función desde este nodo
+            packet["function_timings"].append({
+                "node_id": self.node.node_id,
+                "function": next_function.value,
+                "start_timestamp": send_timestamp,
+                "end_timestamp": None,
+                "estimated_time": estimated_time,
+            })
 
-            # estimated_time_remaining = list(self.estimate_remaining_time(next_node).values())[0]
-            estimated_time_remaining = self.estimate_remaining_time(next_node, packet["functions_sequence"][0])
-
-            self.update_q_table_with_incomplete_info(
-                next_node=next_node,
-                function_id=packet["functions_sequence"][0],
-                estimated_time_remaining=estimated_time_remaining,
-                # hop_processes_correct_function=hop_processes_correct_function
-            )
-
-            # FIXME: está habiendo algo acá que está haciendo que corte el episodio sin que tenga que cortar
-            # movement: forward
             self.send_packet(next_node, packet)
+
         else:
-            # movement: none
+            # No hay siguiente nodo válido → intentar de nuevo si quedan hops
             packet["hops"] += 1
             registry.log_lost_packet(
                 packet["episode_number"], packet["from_node_id"], None, packet["type"]
             )
-            still_hops_remaining = packet["hops"] < packet["max_hops"]
 
-            if not still_hops_remaining:
-                # max hops reached
+            if packet["hops"] >= packet["max_hops"]:
                 self.initiate_max_hops_callback(packet)
                 return
             else:
-                # retry until there is a valid next node
                 self.handle_packet_hop(packet)
                 return
 
@@ -910,30 +821,57 @@ class IntermediateQRoutingApplication(QRoutingApplication):
 
             if self.node.node_id == callback_data.next_hop_node:
                 log.warning(f"[Node_ID={self.node.node_id}] Ignoring invalid callback step with same current and next hop: {callback_data}")
-                continue  # Seguimos buscando en el stack
+                continue
 
-            log.info(f"callback_data = {callback_data}")
-            log.info(f"clock.get_current_time() = {clock.get_current_time()}")
-            log.info(f"callback_data.send_timestamp = {callback_data.send_timestamp}")
-            log.info(f"clock.get_current_time() - callback_data.send_timestamp = {clock.get_current_time() - callback_data.send_timestamp}")
-            log.info(f"callback_data.estimated_time = {callback_data.estimated_time}")
+            best_timing = None
+            best_duration = float("inf")
 
-            function_id = self.node.network.get_node(callback_data.next_hop_node).get_assigned_function()
-            log.info(f"function_id = {function_id}")
+            for timing in packet.get("function_timings", []):
+                if (
+                    timing["node_id"] == self.node.node_id
+                    and timing["function"] == callback_data.function_to_process
+                    and timing["start_timestamp"] is not None
+                    and timing["end_timestamp"] is not None
+                ):
+                    duration = timing["end_timestamp"] - timing["start_timestamp"]
+                    if duration < best_duration:
+                        best_duration = duration
+                        best_timing = timing
 
-            # Si encontramos uno válido:
-            self.update_q_value(
-                next_node=callback_data.next_hop_node,
-                s=clock.get_current_time() - callback_data.send_timestamp,
-                t=callback_data.estimated_time,
-                function_id=function_id
-            )
+            if best_timing is None:
+                log.error(f"[Node_ID={self.node.node_id}] No valid timing found for function {callback_data.function_to_process}")
+            else:
+                new_q_value = self.update_q_value(
+                    next_node=callback_data.next_hop_node,
+                    actual_time=best_duration,
+                    function_id=callback_data.function_to_process
+                )
+
+                # Propagar el valor aprendido a los vecinos activos (excepto el que envió el paquete)
+                current_node_id = self.node.node_id
+                for neighbor_id in self.node.network.get_neighbors(current_node_id):
+                    if neighbor_id == callback_data.previous_hop_node:
+                        continue  # evitar propagar de nuevo hacia atrás
+
+                    neighbor_node = self.node.network.get_node(neighbor_id)
+                    if not neighbor_node.status:
+                        continue  # evitar nodos caídos
+
+                    # Actualizar el Q-value como si el vecino hubiese aprendido lo mismo que este nodo
+                    neighbor_q_table = neighbor_node.application.q_table
+
+                    if current_node_id not in neighbor_q_table:
+                        neighbor_q_table[current_node_id] = {}
+
+                    if callback_data.next_hop_node not in neighbor_q_table[current_node_id]:
+                        neighbor_q_table[current_node_id][callback_data.next_hop_node] = {}
+
+                    neighbor_q_table[current_node_id][callback_data.next_hop_node][callback_data.function_to_process] = new_q_value
 
             # movement: backward
             self.send_packet(callback_data.previous_hop_node, packet)
             return
 
-        # Si no quedó nada válido en el stack:
         log.error(f"[Node_ID={self.node.node_id}] Callback stack exhausted without valid steps. Episode will be aborted.")
         self.mark_episode_result(packet, success=False)
 
@@ -961,6 +899,7 @@ class IntermediateQRoutingApplication(QRoutingApplication):
             "type": PacketType.CALLBACK,
             "episode_number": packet["episode_number"],
             "from_node_id": self.node.node_id,
+            "function_timings":packet["function_timings"]
         }
 
         # movement: backward

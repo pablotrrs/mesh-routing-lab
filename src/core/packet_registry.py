@@ -158,7 +158,6 @@ class PacketRegistry:
         next_node: int,
         old_q: float,
         new_q: float,
-        estimated_time: float,
         actual_time: float,
     ) -> None:
         """Registra el nuevo q value obtenido para el nodo.
@@ -175,7 +174,7 @@ class PacketRegistry:
 
         log.debug(
             f"[Node_ID={node_id}] Updated Q-Value for state {node_id} -> action {next_node} "
-            f"from {old_q:.4f} to {new_q:.4f} (estimated time {estimated_time}, actual time {actual_time})"
+            f"from {old_q:.4f} to {new_q:.4f} (actual time {actual_time})"
         )
 
     def log_lost_packet(
