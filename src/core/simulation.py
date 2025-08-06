@@ -110,6 +110,9 @@ class Simulation:
                     self.config.episode_timeout_ms,
                 )
 
+                # Set convergence parameters
+                self.sender_node.application.set_convergence_params(self.config)
+
                 for node_id, node in self.network.nodes.items():
                     if node_id != self.sender_node.node_id:
                         node.install_application(IntermediateQRoutingApplication)
@@ -118,6 +121,8 @@ class Simulation:
                             self.config.functions_sequence,
                             self.config.episode_timeout_ms,
                         )
+                        # Set convergence parameters
+                        node.application.set_convergence_params(self.config)
 
             case Algorithm.DIJKSTRA:
                 from algorithms.dijkstra import (

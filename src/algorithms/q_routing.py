@@ -79,12 +79,47 @@ class QRoutingApplication(Application):
         self.q_table = {}
         self.assigned_function = None
         self.callback_stack = deque()
-        
-        self.epsilon = EPSILON_START
         self.performance_history = []
         self.converged = False
         self.convergence_episode = None
-        self._last_selections = []  # deteccion de loops
+        self._last_selections = [] 
+
+        # Default convergence parameters (will be overridden by config)
+        self.convergence_success_rate = 0.7
+        self.convergence_epsilon_threshold = 0.5
+        self.convergence_min_episodes = 80
+        self.convergence_min_history = 10
+        self.epsilon_start = 0.9
+        self.epsilon_end = 0.01
+        self.epsilon_decay_rate = 0.995
+        
+        # Initialize epsilon with default (will be updated by config)
+        self.epsilon = self.epsilon_start
+        self.performance_history = []
+        self.converged = False
+        self.convergence_episode = None
+        self._last_selections = []
+
+    def set_convergence_params(self, config):
+        """Set convergence parameters from simulation config"""
+        self.convergence_success_rate = config.convergence_success_rate
+        self.convergence_epsilon_threshold = config.convergence_epsilon_threshold
+        self.convergence_min_episodes = config.convergence_min_episodes
+        self.convergence_min_history = config.convergence_min_history
+        self.epsilon_start = config.epsilon_start
+        self.epsilon_end = config.epsilon_end
+        self.epsilon_decay_rate = config.epsilon_decay_rate
+        
+        # Reset epsilon with new start value
+        self.epsilon = self.epsilon_start
+        
+        log.info(f"[Node_ID={self.node.node_id}] Convergence parameters set:")
+        log.info(f"  - Success rate threshold: {self.convergence_success_rate}")
+        log.info(f"  - Epsilon threshold: {self.convergence_epsilon_threshold}")
+        log.info(f"  - Min episodes: {self.convergence_min_episodes}")
+        log.info(f"  - Min history: {self.convergence_min_history}")
+        log.info(f"  - Epsilon range: {self.epsilon_start} → {self.epsilon_end}")
+        log.info(f"  - Decay rate: {self.epsilon_decay_rate}")
 
     def ensure_not_timeout(self):
         global EPISODE_TIMEOUT_TRIGGERED
@@ -146,25 +181,24 @@ class QRoutingApplication(Application):
         if len(self.performance_history) > 50:
             self.performance_history.pop(0)
         
-        # Check convergence
         if (episode_number is not None and 
-            episode_number > MIN_EPISODES_FOR_CONVERGENCE and 
-            len(self.performance_history) >= 10):
+            episode_number > self.convergence_min_episodes and 
+            len(self.performance_history) >= self.convergence_min_history):
             
-            recent_performance = self.performance_history[-10:]
+            recent_performance = self.performance_history[-self.convergence_min_history:]
             success_rate = sum(recent_performance) / len(recent_performance)
             performance_variance = np.var(recent_performance)
             
             log.info(f"[Node_ID={self.node.node_id}] CONVERGENCE CHECK:")
             log.info(f"  - Episode: {episode_number}")
-            log.info(f"  - Performance history: {len(self.performance_history)} entries")
-            log.info(f"  - Recent performance: {recent_performance}")
-            log.info(f"  - Success rate: {success_rate:.3f}")
-            log.info(f"  - Variance: {performance_variance:.3f}")
-            log.info(f"  - Epsilon: {self.epsilon:.3f}")
+            log.info(f"  - Success rate: {success_rate:.3f} (threshold: {self.convergence_success_rate})")
+            log.info(f"  - Epsilon: {self.epsilon:.3f} (threshold: {self.convergence_epsilon_threshold})")
             
-            # In update_epsilon method, around line 160
-            if (success_rate > 0.7 and self.epsilon < 0.5 and episode_number > 80):  # Less strict
+            # Use configurable thresholds
+            if (success_rate > self.convergence_success_rate and 
+                self.epsilon < self.convergence_epsilon_threshold and 
+                episode_number > self.convergence_min_episodes):
+                
                 if not self.converged:
                     self.converged = True
                     self.convergence_episode = episode_number
@@ -181,9 +215,9 @@ class QRoutingApplication(Application):
                     )
                 return
         
-        # Normal decay if not converged
+        # Normal decay if not converged using configurable rate
         if not self.converged:
-            self.epsilon = max(EPSILON_END, self.epsilon * EPSILON_DECAY_RATE)
+            self.epsilon = max(self.epsilon_end, self.epsilon * self.epsilon_decay_rate)
             log.debug(f"[Node_ID={self.node.node_id}] Epsilon updated to {self.epsilon:.4f}")
 
     def check_network_convergence(self, episode_number):
@@ -212,40 +246,25 @@ class QRoutingApplication(Application):
         """
         self.ensure_not_timeout()
 
-        try:
-            log.info("la concha tu madre 1")
-            old_q = self.q_table[self.node.node_id].get(next_node, 0.0)
-            log.info(f"\nold_q = self.q_table[self.node.node_id].get(next_node, 0.0) = {self.q_table[self.node.node_id].get(next_node, 0.0)}")
-        except Exception as e:
-            log.error(e)
-            return
-
-        try:
-            log.info("la concha tu madre 2")
-            old_q = self.q_table[self.node.node_id].get(next_node, {}).get(function_id, 0.0)
-            log.info(f"\nnew old_q = self.q_table[self.node.node_id].get(next_node, 0.0) = {self.q_table[self.node.node_id].get(next_node, {}).get(function_id, 0.0)}")
-        except Exception as e:
-            log.error(e)
-            return
-
-        # log.info(f"\nold_q = self.q_table[self.node.node_id].get(next_node, 0.0) = {self.q_table[self.node.node_id].get(next_node, 0.0)}")
-        log.info(f"\nnew old_q = self.q_table[self.node.node_id].get(next_node, 0.0) = {self.q_table[self.node.node_id].get(next_node, {}).get(function_id, 0.0)}")
-        log.info(f"self.q_table[self.node.node_id] = {self.q_table[self.node.node_id]}")
-
-        # old_q = self.q_table[self.node.node_id].get(next_node, 0.0)
-        old_q = self.q_table[self.node.node_id].get(next_node, {}).get(function_id, 0.0)
-        new_q = BELLMAN_EQ(s, t, old_q)
-
-        self.q_table[self.node.node_id][next_node][function_id] = new_q
-
-        registry.log_q_table_value_update(
-            self.node.node_id,
-            next_node,
-            old_q,
-            new_q,
-            t,
-            s
-        )
+        current_node_id = self.node.node_id
+        
+        # Initialize if needed
+        if current_node_id not in self.q_table:
+            self.q_table[current_node_id] = {}
+        if function_id not in self.q_table[current_node_id]:
+            self.q_table[current_node_id][function_id] = {}
+        
+        # Get current Q-value
+        old_q = self.q_table[current_node_id][function_id].get(next_node, DEFAULT_ESTIMATE)
+        
+        # Bellman update: Q ← Q + α[s + t - Q]
+        new_q = old_q + ALPHA * (s + t - old_q)
+        
+        # Store updated value
+        self.q_table[current_node_id][function_id][next_node] = new_q
+        
+        # Log the update
+        registry.log_q_table_value_update(current_node_id, next_node, old_q, new_q, t, s)
 
         return
 
@@ -339,7 +358,7 @@ class QRoutingApplication(Application):
                             
                             # Update epsilon only if not converged
                             if not self.converged:
-                                self.epsilon = max(self.epsilon * EPSILON_DECAY_RATE, EPSILON_END)
+                                self.epsilon = max(self.epsilon * self.epsilon_decay_rate, self.epsilon_end)
                             return next_node
 
             if random.random() < self.epsilon:
@@ -372,7 +391,7 @@ class QRoutingApplication(Application):
             if next_node is not None:
                 # Update epsilon only if not converged
                 if not self.converged:
-                    self.epsilon = max(self.epsilon * EPSILON_DECAY_RATE, EPSILON_END)
+                    self.epsilon = max(self.epsilon * self.epsilon_decay_rate, self.epsilon_end)
                 log.debug(f"[Node_ID={current_node_id}] Returning next node: {next_node}")
                 return next_node
 
@@ -392,46 +411,16 @@ class QRoutingApplication(Application):
         self.initialize_or_update_q_table()
         current_node_id = self.node.node_id
 
-        best_neighbor = None
-        best_total_estimate = DEFAULT_ESTIMATE
-
-        for neighbor_id in self.node.network.get_neighbors(current_node_id):
-            neighbor_node = self.node.network.get_node(neighbor_id)
-
-            if not neighbor_node.status:
-                continue  # Saltamos vecinos caídos
-
-            # 1. Estimar delay hacia el vecino (usamos Q[x][a][f] como proxy)
-            delay_to_neighbor = self.q_table[current_node_id] \
-                .get(neighbor_id, {}) \
-                .get(function_id, DEFAULT_ESTIMATE)
-
-            # 2. Buscar el mejor Q(a, b, function_id) entre los vecinos de 'a'
-            neighbor_q_table = self.q_table.get(neighbor_id, {})
-            min_estimate_from_neighbor = DEFAULT_ESTIMATE
-
-            for b_id, function_map in neighbor_q_table.items():
-                estimate = function_map.get(function_id)
-                if estimate is not None:
-                    min_estimate_from_neighbor = min(min_estimate_from_neighbor, estimate)
-
-            # 3. Calcular tiempo total estimado
-            total_estimate = delay_to_neighbor + min_estimate_from_neighbor
-
-            log.debug(
-                f"[Node_ID={current_node_id}] Evaluated path via {neighbor_id}: "
-                f"delay={delay_to_neighbor}, neighbor_est={min_estimate_from_neighbor}, total={total_estimate}"
-            )
-
-            if total_estimate < best_total_estimate:
-                best_total_estimate = total_estimate
-                best_neighbor = neighbor_id
-
-        if best_neighbor is None:
-            log.debug(f"[Node_ID={current_node_id}] No valid next hop found for function '{function_id}'.")
-        else:
-            log.debug(f"[Node_ID={current_node_id}] Best next hop for function '{function_id}': {best_neighbor} "
-                    f"(est. total time: {best_total_estimate})")
+        if current_node_id not in self.q_table:
+            return None
+        if function_id not in self.q_table[current_node_id]:
+            return None
+        
+        # Find neighbor with minimum Q-value for this function
+        best_neighbor = min(
+            self.q_table[current_node_id][function_id].items(),
+            key=lambda x: x[1]
+        )[0]
 
         return best_neighbor
 
@@ -443,9 +432,6 @@ class QRoutingApplication(Application):
             self.q_table[current_node_id] = {}
 
         for neighbor_id in self.node.network.get_neighbors(current_node_id):
-            if neighbor_id not in self.q_table[current_node_id]:
-                self.q_table[current_node_id][neighbor_id] = {}
-
             neighbor_node = self.node.network.get_node(neighbor_id)
             raw_function = neighbor_node.get_assigned_function()
 
@@ -456,11 +442,12 @@ class QRoutingApplication(Application):
             # Si es un enum NodeFunction, convertimos a string
             function_id = raw_function.value if hasattr(raw_function, "value") else raw_function
 
-            q_subtable = self.q_table[current_node_id][neighbor_id]
-
-            if function_id not in q_subtable:
-                q_subtable[function_id] = 20000.0
-                log.debug(f"[Q-Table Init] ({current_node_id} → {neighbor_id} | {function_id}) = 20000.0")
+            if function_id not in self.q_table[current_node_id]:
+                self.q_table[current_node_id][function_id] = {}
+                
+            if neighbor_id not in self.q_table[current_node_id][function_id]:
+                self.q_table[current_node_id][function_id][neighbor_id] = DEFAULT_ESTIMATE
+                log.debug(f"[Q-Table Init] ({current_node_id} | {function_id} → {neighbor_id}) = {DEFAULT_ESTIMATE}")
 
         log.info("self.q_table")
         log.info(self.q_table)
@@ -474,14 +461,15 @@ class QRoutingApplication(Application):
 
         log.info(f'self.q_table {self.q_table}')
 
-        if (
-            self.node.node_id not in self.q_table
-            or next_node not in self.q_table[self.node.node_id]
-            or function_id not in self.q_table[self.node.node_id][next_node]
-        ):
+        current_node_id = self.node.node_id
+        
+        # CORRECTED STRUCTURE ACCESS:
+        if (current_node_id not in self.q_table or 
+            function_id not in self.q_table[current_node_id] or
+            next_node not in self.q_table[current_node_id][function_id]):
             return DEFAULT_ESTIMATE
 
-        return self.q_table[self.node.node_id][next_node][function_id]
+        return self.q_table[current_node_id][function_id][next_node]
 
     def update_q_table_with_incomplete_info(
         self, next_node: int, function_id: str, estimated_time_remaining: float
@@ -494,13 +482,13 @@ class QRoutingApplication(Application):
         self.initialize_or_update_q_table()
 
         current_node_id = self.node.node_id
-
-        # Obtener valor actual o default (0.0)
-        current_q = (
-            self.q_table.get(current_node_id, {})
-            .get(next_node, {})
-            .get(function_id, 0.0)
-        )
+        
+        # CORRECTED STRUCTURE ACCESS:
+        current_q = DEFAULT_ESTIMATE
+        if (current_node_id in self.q_table and 
+            function_id in self.q_table[current_node_id] and
+            next_node in self.q_table[current_node_id][function_id]):
+            current_q = self.q_table[current_node_id][function_id][next_node]
 
         # Validaciones
         def is_invalid(value):
@@ -533,14 +521,14 @@ class QRoutingApplication(Application):
         # Inicializar subtablas si hiciera falta
         if current_node_id not in self.q_table:
             self.q_table[current_node_id] = {}
-        if next_node not in self.q_table[current_node_id]:
-            self.q_table[current_node_id][next_node] = {}
+        if function_id not in self.q_table[current_node_id]:
+            self.q_table[current_node_id][function_id] = {}
 
         # para ser compliants con si es el NodeFunction o un str crudo
         raw_function = function_id.value if hasattr(function_id, "value") else function_id
 
         # Guardar nuevo valor
-        self.q_table[current_node_id][next_node][raw_function] = updated_q
+        self.q_table[current_node_id][function_id][next_node] = updated_q
 
         log.info(f"✅ Updated Q-value: {updated_q}")
 
@@ -555,12 +543,7 @@ class QRoutingApplication(Application):
         # self.q_table[self.node.node_id][next_node] = updated_q
 
         registry.log_q_table_value_update(
-            self.node.node_id,
-            next_node,
-            current_q,
-            updated_q,
-            estimated_time_remaining,
-            None  # no hay 's' aún
+            current_node_id, next_node, current_q, updated_q, estimated_time_remaining, None
         )
 
     def is_invalid(value):
