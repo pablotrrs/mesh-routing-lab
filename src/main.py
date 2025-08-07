@@ -41,7 +41,7 @@ def setup_logging(log_level_str="INFO"):
     handlers = [log.StreamHandler()]
 
     log_file_path = os.path.join(reports_manager.results_dir, "logs.txt")
-    file_handler = log.FileHandler(log_file_path, mode="w")
+    file_handler = log.FileHandler(log_file_path, mode="w", encoding="utf-8")
     handlers.append(file_handler)
 
     log.root.handlers = []
@@ -131,6 +131,49 @@ def setup_arguments():
         default=0.0,
         help="Penalty for Q-Values of hops that cause a packet to lose (Only for Q_ROUTING)",
     )
+    parser.add_argument(
+        "--convergence_success_rate",
+        type=float,
+        default=0.7,
+        help="Minimum success rate required for convergence (default: 0.7)"
+    )
+    parser.add_argument(
+        "--convergence_epsilon_threshold",
+        type=float,
+        default=0.5,
+        help="Maximum epsilon value for convergence (default: 0.5)"
+    )
+    parser.add_argument(
+        "--convergence_min_episodes",
+        type=int,
+        default=80,
+        help="Minimum episodes before checking convergence (default: 80)"
+    )
+    parser.add_argument(
+        "--convergence_min_history",
+        type=int,
+        default=10,
+        help="Minimum performance history entries for convergence check (default: 10)"
+    )
+    parser.add_argument(
+        "--epsilon_start",
+        type=float,
+        default=0.9,
+        help="Initial epsilon value for exploration (default: 0.9)"
+    )
+    parser.add_argument(
+        "--epsilon_end",
+        type=float,
+        default=0.01,
+        help="Final epsilon value after decay (default: 0.01)"
+    )
+    parser.add_argument(
+        "--epsilon_decay_rate",
+        type=float,
+        default=0.995,
+        help="Epsilon decay rate per episode (default: 0.995)"
+    )
+
     return parser.parse_args()
 
 
@@ -196,6 +239,13 @@ def main():
         episode_timeout_ms=args.episode_timeout_ms,
         disconnection_probability=args.disconnection_probability,
         penalty=args.penalty,
+        convergence_success_rate=args.convergence_success_rate,
+        convergence_epsilon_threshold=args.convergence_epsilon_threshold,
+        convergence_min_episodes=args.convergence_min_episodes,
+        convergence_min_history=args.convergence_min_history,
+        epsilon_start=args.epsilon_start,
+        epsilon_end=args.epsilon_end,
+        epsilon_decay_rate=args.epsilon_decay_rate,
     )
 
     log.info(config)

@@ -95,6 +95,13 @@ class SimulationConfig:
     episode_timeout_ms: Optional[float] = 0.0
     disconnection_probability: float = 0.0
     penalty: float = 0.0
+    convergence_success_rate: float = 0.7
+    convergence_epsilon_threshold: float = 0.5
+    convergence_min_episodes: int = 80
+    convergence_min_history: int = 10
+    epsilon_start: float = 0.9
+    epsilon_end: float = 0.01
+    epsilon_decay_rate: float = 0.995
 
     def __post_init__(self):
         if self.episode_timeout_ms is None:
