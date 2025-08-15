@@ -256,8 +256,9 @@ class QRoutingApplication(Application):
             q_subtable = self.q_table[current_node_id][neighbor_id]
 
             if function_id not in q_subtable:
-                q_subtable[function_id] = 20000.0
-                log.debug(f"[Q-Table Init] ({current_node_id} → {neighbor_id} | {function_id}) = 20000.0")
+                rndm = random.uniform(0, 100)
+                q_subtable[function_id] = rndm
+                log.debug(f"[Q-Table Init] ({current_node_id} → {neighbor_id} | {function_id}) = {rndm}")
 
         log.info("self.q_table")
         log.info(self.q_table)
