@@ -24,16 +24,16 @@ BIG_BONUS = -50
 random.seed(42)
 # DEFAULT_ESTIMATE = 20000.0
 
-# Parámetros BALANCEADOS para equilibrio perfecto entre suavidad y rendimiento
-ALPHA = 0.09  # Learning rate balanceado
-GAMMA = 0.95  # Factor de descuento máximo para planificación a largo plazo
-EPSILON_INITIAL = 0.8   # Exploración inicial robusta pero no excesiva
-EPSILON_DECAY = 0.9997  # Decay lento para transición gradual
-EPSILON_MIN = 0.02     # Exploración mínima más alta para mantener adaptabilidad
+# Parámetros FINALES optimizados para máxima estabilidad y convergencia
+ALPHA = 0.11  # Learning rate ligeramente reducido para más estabilidad
+GAMMA = 0.97  # Factor de descuento aumentado para mejor planificación
+EPSILON_INITIAL = 0.72   # Exploración inicial reducida para convergencia más rápida
+EPSILON_DECAY = 0.9999  # Decay más lento para transición ultra-suave
+EPSILON_MIN = 0.012     # Exploración mínima reducida para máxima estabilidad
 
-# Parámetros optimizados para epsilon adaptativo balanceado
-EXPLORATION_PHASE_EPISODES = 80  # Más episodios de exploración inicial
-SMOOTHING_FACTOR = 0.85  # Menos agresivo en el suavizado
+# Parámetros finales para epsilon adaptativo refinado
+EXPLORATION_PHASE_EPISODES = 100  # Más episodios de exploración para aprendizaje completo
+SMOOTHING_FACTOR = 0.90  # Factor de suavizado aumentado para máxima estabilidad
 
 CURRENT_HOP_COUNT = 0
 CURRENT_EPISODE = 0  # Variable para trackear el episodio actual
@@ -73,21 +73,25 @@ class QRoutingApplication(Application):
 
     def get_adaptive_epsilon(self) -> float:
         """
-        Calcula epsilon adaptativo balanceado para suavidad + alta tasa de éxito.
-        Reduce exploración gradualmente manteniendo adaptabilidad.
+        Calcula epsilon adaptativo FINAL para máxima estabilidad y convergencia óptima.
+        Implementa transición ultra-suave optimizada para redes estáticas.
         """
         global CURRENT_EPISODE
         
         if CURRENT_EPISODE <= EXPLORATION_PHASE_EPISODES:
-            # Fase de exploración inicial: epsilon alto con reducción suave
+            # Fase de exploración inicial: reducción gradual optimizada
             phase_progress = CURRENT_EPISODE / EXPLORATION_PHASE_EPISODES
-            return EPSILON_INITIAL * (1 - phase_progress * 0.4)  # Solo reduce 40% en fase inicial
+            # Función cúbica suave para transición ultra-gradual
+            reduction_factor = 0.30 * (phase_progress ** 1.8)  # Reducción más conservadora
+            return EPSILON_INITIAL * (1 - reduction_factor)
         else:
-            # Fase de estabilización: epsilon bajo pero no extremo
+            # Fase de estabilización: convergencia ultra-suave hacia mínimo
             episodes_after_exploration = CURRENT_EPISODE - EXPLORATION_PHASE_EPISODES
-            stability_factor = min(episodes_after_exploration / 150, 0.8)  # 150 episodios, máximo 80% reducción
-            base_epsilon = EPSILON_INITIAL * 0.6  # Mantiene 60% del epsilon inicial como base
-            return max(base_epsilon * (1 - stability_factor) + EPSILON_MIN, EPSILON_MIN)
+            # Función exponencial muy suave para convergencia gradual
+            stability_factor = 1 - math.exp(-episodes_after_exploration / 200)  # Convergencia más lenta
+            base_epsilon = EPSILON_INITIAL * 0.68  # Base ligeramente mayor
+            final_epsilon = base_epsilon * (1 - stability_factor * 0.70) + EPSILON_MIN
+            return max(final_epsilon, EPSILON_MIN)
 
     def ensure_not_timeout(self):
         global EPISODE_TIMEOUT_TRIGGERED
