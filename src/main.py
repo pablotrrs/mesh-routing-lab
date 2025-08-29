@@ -41,7 +41,7 @@ def setup_logging(log_level_str="INFO"):
     handlers = [log.StreamHandler()]
 
     log_file_path = os.path.join(reports_manager.results_dir, "logs.txt")
-    file_handler = log.FileHandler(log_file_path, mode="w")
+    file_handler = log.FileHandler(log_file_path, mode="w", encoding="utf-8")
     handlers.append(file_handler)
 
     log.root.handlers = []
@@ -76,8 +76,8 @@ def setup_arguments():
     parser.add_argument(
         "--max_hops",
         type=int,
-        default=10,
-        help="Maximum number of hops allowed for each episode (default: 10)",
+        default=25,  # Aumentado el límite inicial para permitir mejor exploración
+        help="Maximum number of hops allowed for each episode (default: 25, will decrease adaptively)",
     )
     parser.add_argument(
         "--mean_disconnection_interval_ms",

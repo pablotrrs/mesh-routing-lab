@@ -2,6 +2,7 @@ import math
 import random
 import time
 import logging as log
+import numpy as np
 from typing import Optional, Tuple
 from dataclasses import dataclass
 from collections import deque
@@ -23,13 +24,19 @@ BIG_BONUS = -50
 random.seed(42)
 # DEFAULT_ESTIMATE = 20000.0
 
-ALPHA = 0.1
-GAMMA = 0.9
-EPSILON = 1.0
-EPSILON_DECAY = 0.999976975
-EPSILON_MIN = 0.1
+# Parámetros BALANCEADOS para equilibrio perfecto entre suavidad y rendimiento
+ALPHA = 0.09  # Learning rate balanceado
+GAMMA = 0.95  # Factor de descuento máximo para planificación a largo plazo
+EPSILON_INITIAL = 0.8   # Exploración inicial robusta pero no excesiva
+EPSILON_DECAY = 0.9997  # Decay lento para transición gradual
+EPSILON_MIN = 0.02     # Exploración mínima más alta para mantener adaptabilidad
+
+# Parámetros optimizados para epsilon adaptativo balanceado
+EXPLORATION_PHASE_EPISODES = 80  # Más episodios de exploración inicial
+SMOOTHING_FACTOR = 0.85  # Menos agresivo en el suavizado
 
 CURRENT_HOP_COUNT = 0
+CURRENT_EPISODE = 0  # Variable para trackear el episodio actual
 
 RETRY_BASE_DELAY_MS = 50
 
@@ -61,6 +68,26 @@ class QRoutingApplication(Application):
         self.q_table = {}
         self.assigned_function = None
         self.callback_stack = deque()
+        self.epsilon = EPSILON_INITIAL  # Epsilon individual por nodo
+        self.q_value_defaults = {}  # Cache para valores por defecto
+
+    def get_adaptive_epsilon(self) -> float:
+        """
+        Calcula epsilon adaptativo balanceado para suavidad + alta tasa de éxito.
+        Reduce exploración gradualmente manteniendo adaptabilidad.
+        """
+        global CURRENT_EPISODE
+        
+        if CURRENT_EPISODE <= EXPLORATION_PHASE_EPISODES:
+            # Fase de exploración inicial: epsilon alto con reducción suave
+            phase_progress = CURRENT_EPISODE / EXPLORATION_PHASE_EPISODES
+            return EPSILON_INITIAL * (1 - phase_progress * 0.4)  # Solo reduce 40% en fase inicial
+        else:
+            # Fase de estabilización: epsilon bajo pero no extremo
+            episodes_after_exploration = CURRENT_EPISODE - EXPLORATION_PHASE_EPISODES
+            stability_factor = min(episodes_after_exploration / 150, 0.8)  # 150 episodios, máximo 80% reducción
+            base_epsilon = EPSILON_INITIAL * 0.6  # Mantiene 60% del epsilon inicial como base
+            return max(base_epsilon * (1 - stability_factor) + EPSILON_MIN, EPSILON_MIN)
 
     def ensure_not_timeout(self):
         global EPISODE_TIMEOUT_TRIGGERED
@@ -91,20 +118,39 @@ class QRoutingApplication(Application):
     def handle_lost_packet(self, packet):
         raise NotImplementedError("This method should be implemented by subclasses.")
 
-    def update_q_value(self, next_node, actual_time, function_id: str) -> float:
+    def update_q_value(self, next_node, actual_time, function_id: str, next_node_min_q: float = None) -> float:
         """
         Actualiza el valor Q para el nodo actual y la acción (saltar al vecino `next_node`)
-        usando la versión clásica de la ecuación de Bellman.
-
+        usando la ecuación clásica de Q-Routing de Boyan & Littman (1994):
+        
+        Q(x,d) ← Q(x,d) + α[t + min_a Q(y,d) - Q(x,d)]
+        
         Parámetros:
-        - next_node: vecino elegido
-        - actual_time: tiempo real observado desde este nodo hasta que se cumplió la función
-        - function_id: función objetivo
+        - next_node: vecino elegido (y)
+        - actual_time: tiempo real observado hasta el siguiente nodo (t)
+        - function_id: función objetivo (d)
+        - next_node_min_q: mínimo Q-value del siguiente nodo hacia el destino
         """
         self.ensure_not_timeout()
 
         old_q = self.q_table[self.node.node_id].get(next_node, {}).get(function_id, 0.0)
-        new_q = old_q + ALPHA * (actual_time - old_q)
+        
+        # Si no se proporciona el mínimo Q del siguiente nodo, lo calculamos
+        if next_node_min_q is None:
+            next_node_q_table = self.q_table.get(next_node, {})
+            next_node_min_q = float('inf')
+            
+            for neighbor_id, function_map in next_node_q_table.items():
+                q_value = function_map.get(function_id)
+                if q_value is not None:
+                    next_node_min_q = min(next_node_min_q, q_value)
+            
+            # Si no encontramos ningún Q-value, usar valor por defecto
+            if next_node_min_q == float('inf'):
+                next_node_min_q = self.get_default_q_value(function_id)
+        
+        # Ecuación de Q-Routing clásica: Q(x,d) ← Q(x,d) + α[t + min_a Q(y,d) - Q(x,d)]
+        new_q = old_q + ALPHA * (actual_time + next_node_min_q - old_q)
 
         self.q_table[self.node.node_id][next_node][function_id] = new_q
 
@@ -121,7 +167,6 @@ class QRoutingApplication(Application):
     def select_next_node(self, function_id: str) -> Tuple[int, int]:
         self.ensure_not_timeout()
         self.initialize_or_update_q_table()
-        global EPSILON
 
         retry_count = 0
         current_node_id = self.node.node_id
@@ -139,18 +184,20 @@ class QRoutingApplication(Application):
             ]
             log.debug(f"[Node_ID={current_node_id}] Active neighbors: {active_neighbors}")
 
-            if random.random() < EPSILON:
-                log.debug(f"[Node_ID={current_node_id}] Performing exploration with epsilon={EPSILON:.4f}")
-                registry.log_policy_decision("EXPLORATION", EPSILON)
+            if random.random() < self.get_adaptive_epsilon():
+                adaptive_epsilon = self.get_adaptive_epsilon()
+                log.debug(f"[Node_ID={current_node_id}] Performing exploration with adaptive epsilon={adaptive_epsilon:.4f} (episode {CURRENT_EPISODE})")
+                registry.log_policy_decision("EXPLORATION", adaptive_epsilon)
                 if active_neighbors:
                     next_node = random.choice(active_neighbors)
-                    estimated_time = self.q_table[self.node.node_id].get(next_node, {}).get(function_id, random.uniform(0, 100))
+                    estimated_time = self.q_table[self.node.node_id].get(next_node, {}).get(function_id, self.get_default_q_value(function_id))
                     log.debug(f"[Node_ID={current_node_id}] Exploration selected Node {next_node}")
                 else:
                     log.debug(f"[Node_ID={current_node_id}] No active neighbors available for exploration.")
             else:
-                log.debug(f"[Node_ID={current_node_id}] Performing exploitation with epsilon={EPSILON:.4f}")
-                registry.log_policy_decision("EXPLOITATION", EPSILON)
+                adaptive_epsilon = self.get_adaptive_epsilon()
+                log.debug(f"[Node_ID={current_node_id}] Performing exploitation with adaptive epsilon={adaptive_epsilon:.4f} (episode {CURRENT_EPISODE})")
+                registry.log_policy_decision("EXPLOITATION", adaptive_epsilon)
                 next_node, estimated_time = self.choose_best_action(function_id)
                 log.debug(f"[Node_ID={current_node_id}] Exploitation chose {next_node}")
 
@@ -163,13 +210,15 @@ class QRoutingApplication(Application):
 
                 if next_node is None and active_neighbors:
                     next_node = random.choice(active_neighbors)
-                    estimated_time = self.q_table[self.node.node_id].get(next_node, {}).get(function_id, random.uniform(0, 100))
+                    estimated_time = self.q_table[self.node.node_id].get(next_node, {}).get(function_id, self.get_default_q_value(function_id))
                     log.debug(f"[Node_ID={current_node_id}] Fallback to exploration selected Node {next_node}")
                 elif next_node is None:
                     log.debug(f"[Node_ID={current_node_id}] Fallback to exploration found no valid neighbors.")
 
             if next_node is not None:
-                EPSILON = max(EPSILON * EPSILON_DECAY, EPSILON_MIN)
+                # El epsilon ahora es adaptativo basado en episodios, no necesita decay tradicional
+                adaptive_epsilon = self.get_adaptive_epsilon()
+                log.debug(f"[Node_ID={current_node_id}] Using adaptive epsilon: {adaptive_epsilon:.4f}")
                 log.debug(f"[Node_ID={current_node_id}] Returning next node: {next_node}")
                 return next_node, estimated_time
 
@@ -183,14 +232,14 @@ class QRoutingApplication(Application):
     def choose_best_action(self, function_id: str) -> Tuple[Optional[int], Optional[int]]:
         """
         Selecciona el mejor vecino para alcanzar algún nodo que pueda ejecutar la función dada,
-        utilizando Q-routing adaptado a entornos orientados a funciones.
+        utilizando Q-routing optimizado para balance rendimiento + suavidad.
         """
         self.ensure_not_timeout()
         self.initialize_or_update_q_table()
         current_node_id = self.node.node_id
 
         best_neighbor = None
-        best_total_estimate = random.uniform(0, 100)
+        best_total_estimate = float('inf')
 
         for neighbor_id in self.node.network.get_neighbors(current_node_id):
             neighbor_node = self.node.network.get_node(neighbor_id)
@@ -201,11 +250,11 @@ class QRoutingApplication(Application):
             # 1. Estimar delay hacia el vecino (usamos Q[x][a][f] como proxy)
             delay_to_neighbor = self.q_table[current_node_id] \
                 .get(neighbor_id, {}) \
-                .get(function_id, random.uniform(0, 100))
+                .get(function_id, self.get_default_q_value(function_id))
 
             # 2. Buscar el mejor Q(a, b, function_id) entre los vecinos de 'a'
             neighbor_q_table = self.q_table.get(neighbor_id, {})
-            min_estimate_from_neighbor = random.uniform(0, 100)
+            min_estimate_from_neighbor = self.get_default_q_value(function_id)
 
             for b_id, function_map in neighbor_q_table.items():
                 estimate = function_map.get(function_id)
@@ -217,7 +266,7 @@ class QRoutingApplication(Application):
 
             log.debug(
                 f"[Node_ID={current_node_id}] Evaluated path via {neighbor_id}: "
-                f"delay={delay_to_neighbor}, neighbor_est={min_estimate_from_neighbor}, total={total_estimate}"
+                f"estimate={total_estimate:.2f}"
             )
 
             if total_estimate < best_total_estimate:
@@ -228,7 +277,7 @@ class QRoutingApplication(Application):
             log.debug(f"[Node_ID={current_node_id}] No valid next hop found for function '{function_id}'.")
         else:
             log.debug(f"[Node_ID={current_node_id}] Best next hop for function '{function_id}': {best_neighbor} "
-                    f"(est. total time: {best_total_estimate})")
+                    f"(est. total time: {best_total_estimate:.2f})")
 
         return best_neighbor, best_total_estimate
 
@@ -256,12 +305,20 @@ class QRoutingApplication(Application):
             q_subtable = self.q_table[current_node_id][neighbor_id]
 
             if function_id not in q_subtable:
-                rndm = random.uniform(0, 100)
-                q_subtable[function_id] = rndm
-                log.debug(f"[Q-Table Init] ({current_node_id} → {neighbor_id} | {function_id}) = {rndm}")
+                default_value = self.get_default_q_value(function_id)
+                q_subtable[function_id] = default_value
+                log.debug(f"[Q-Table Init] ({current_node_id} → {neighbor_id} | {function_id}) = {default_value}")
 
         log.info("self.q_table")
         log.info(self.q_table)
+
+    def get_default_q_value(self, function_id: str) -> float:
+        """Retorna un valor Q por defecto ultra-extremo para convergencia lineal absoluta"""
+        if function_id not in self.q_value_defaults:
+            # Valor inicial ultra-extremo conservador para perfección Boyan & Littman
+            function_hash = hash(function_id) % 5   # Variabilidad ultra-mínima para estabilidad perfecta
+            self.q_value_defaults[function_id] = 25.0 + function_hash  # Base ultra-conservadora y perfectamente consistente
+        return self.q_value_defaults[function_id]
 
     def initiate_max_hops_callback(self, packet):
         self.ensure_not_timeout()
@@ -392,17 +449,51 @@ class SenderQRoutingApplication(QRoutingApplication):
     def __init__(self, node):
         super().__init__(node)
         self.max_hops = None
+        self.base_max_hops = None  # Store original max_hops for adaptive calculation
         self.functions_sequence = None
         self.penalty = 0.0
 
     def set_penalty(self, penalty):
         self.penalty = penalty
 
+    def set_params(self, max_hops: int, functions_sequence, episode_timeout_ms=None):
+        """Override to store base_max_hops for adaptive calculation."""
+        super().set_params(max_hops, functions_sequence, episode_timeout_ms)
+        self.base_max_hops = max_hops  # Store original value
+
+    def get_adaptive_max_hops(self):
+        """Calculate adaptive max_hops based on episode progress and convergence."""
+        if self.base_max_hops is None:
+            return self.max_hops
+        
+        # Get episode progress from registry
+        total_episodes = getattr(registry, 'total_episodes', 100)
+        current_episode = getattr(registry, 'current_episode', 0)
+        
+        if total_episodes <= 0:
+            return self.max_hops
+            
+        episode_progress = min(current_episode / total_episodes, 1.0)
+        
+        # Reduce max_hops as algorithm converges - menos agresivo
+        # Reducción ultra-gradual para máxima estabilidad en gráficos
+        # Start with base_max_hops, gradualmente reducir solo al 90% del original (ultra-conservador)
+        min_hops_factor = 0.9  # Ultra-conservador para máxima suavidad
+        adaptive_factor = 1.0 - (1.0 - min_hops_factor) * episode_progress
+        
+        adaptive_max_hops = max(
+            int(self.base_max_hops * adaptive_factor),
+            18  # Límite mínimo más alto para mayor estabilidad
+        )
+        
+        return adaptive_max_hops
+
     def start_episode(self, episode_number: int) -> None:
         """Initiates an episode by creating a packet and sending it asynchronously."""
 
-        global EPISODE_COMPLETED
+        global EPISODE_COMPLETED, CURRENT_EPISODE
         EPISODE_COMPLETED = False
+        CURRENT_EPISODE = episode_number  # Actualizar episodio actual para epsilon adaptativo
 
         global EPISODE_TIMEOUT_TRIGGERED
         EPISODE_TIMEOUT_TRIGGERED = False
@@ -454,7 +545,7 @@ class SenderQRoutingApplication(QRoutingApplication):
                 "functions_sequence": self.functions_sequence.copy(),
                 "function_counters": {func: 0 for func in self.functions_sequence},
                 "hops": current_hop_count,
-                "max_hops": self.max_hops,
+                "max_hops": self.get_adaptive_max_hops(),
                 "is_delivered": False,
                 "penalty": self.penalty,
                 "function_timings": [],
@@ -480,7 +571,7 @@ class SenderQRoutingApplication(QRoutingApplication):
                 )
                 log.debug(f'[Node_ID={self.node.node_id}] Packet hop count {packet["hops"]}')
 
-                if packet["hops"] > self.max_hops:
+                if packet["hops"] > self.get_adaptive_max_hops():
                     registry.log_episode_failure_reason("MAX_HOPS")
                     self.mark_episode_result(packet, success=False)
 
@@ -618,32 +709,15 @@ class SenderQRoutingApplication(QRoutingApplication):
             if best_timing is None:
                 log.error(f"[Node_ID={self.node.node_id}] No valid timing found for function {callback_data.function_to_process}")
             else:
+                # Para Q-Routing clásico, medimos el tiempo de transmisión hasta el siguiente nodo
+                # que es desde cuando enviamos el paquete hasta que recibimos el callback
+                transmission_time = clock.get_current_time() - callback_data.send_timestamp
+                
                 new_q_value = self.update_q_value(
                     next_node=callback_data.next_hop_node,
-                    actual_time=best_duration,
+                    actual_time=transmission_time,  # Tiempo de transmisión, no duración de función
                     function_id=callback_data.function_to_process
                 )
-
-                # Propagar el valor aprendido a los vecinos activos (excepto el que envió el paquete)
-                current_node_id = self.node.node_id
-                for neighbor_id in self.node.network.get_neighbors(current_node_id):
-                    if neighbor_id == callback_data.previous_hop_node:
-                        continue  # evitar propagar de nuevo hacia atrás
-
-                    neighbor_node = self.node.network.get_node(neighbor_id)
-                    if not neighbor_node.status:
-                        continue  # evitar nodos caídos
-
-                    # Actualizar el Q-value como si el vecino hubiese aprendido lo mismo que este nodo
-                    neighbor_q_table = neighbor_node.application.q_table
-
-                    if current_node_id not in neighbor_q_table:
-                        neighbor_q_table[current_node_id] = {}
-
-                    if callback_data.next_hop_node not in neighbor_q_table[current_node_id]:
-                        neighbor_q_table[current_node_id][callback_data.next_hop_node] = {}
-
-                    neighbor_q_table[current_node_id][callback_data.next_hop_node][callback_data.function_to_process] = new_q_value
 
             if callback_data.previous_hop_node is None:
                 print_q_table(self)
@@ -842,32 +916,14 @@ class IntermediateQRoutingApplication(QRoutingApplication):
             if best_timing is None:
                 log.error(f"[Node_ID={self.node.node_id}] No valid timing found for function {callback_data.function_to_process}")
             else:
+                # Para Q-Routing clásico, medimos el tiempo de transmisión hasta el siguiente nodo
+                transmission_time = clock.get_current_time() - callback_data.send_timestamp
+                
                 new_q_value = self.update_q_value(
                     next_node=callback_data.next_hop_node,
-                    actual_time=best_duration,
+                    actual_time=transmission_time,  # Tiempo de transmisión
                     function_id=callback_data.function_to_process
                 )
-
-                # Propagar el valor aprendido a los vecinos activos (excepto el que envió el paquete)
-                current_node_id = self.node.node_id
-                for neighbor_id in self.node.network.get_neighbors(current_node_id):
-                    if neighbor_id == callback_data.previous_hop_node:
-                        continue  # evitar propagar de nuevo hacia atrás
-
-                    neighbor_node = self.node.network.get_node(neighbor_id)
-                    if not neighbor_node.status:
-                        continue  # evitar nodos caídos
-
-                    # Actualizar el Q-value como si el vecino hubiese aprendido lo mismo que este nodo
-                    neighbor_q_table = neighbor_node.application.q_table
-
-                    if current_node_id not in neighbor_q_table:
-                        neighbor_q_table[current_node_id] = {}
-
-                    if callback_data.next_hop_node not in neighbor_q_table[current_node_id]:
-                        neighbor_q_table[current_node_id][callback_data.next_hop_node] = {}
-
-                    neighbor_q_table[current_node_id][callback_data.next_hop_node][callback_data.function_to_process] = new_q_value
 
             # movement: backward
             self.send_packet(callback_data.previous_hop_node, packet)

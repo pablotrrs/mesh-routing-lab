@@ -59,8 +59,11 @@ class Simulation:
             algorithm (Algorithm): The algorithm to run.
         """
         log.info(f"[{algorithm.name}] Running {self.config.episodes} episodes")
+        # Registrar información para epsilon adaptivo
+        registry.total_episodes = self.config.episodes
         self._setup_algorithm(algorithm)
         for episode_number in range(1, self.config.episodes + 1):
+            registry.current_episode = episode_number
             self._run_episode(episode_number, algorithm)
 
         log.info(

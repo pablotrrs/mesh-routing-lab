@@ -287,4 +287,14 @@ class PacketRegistry:
         reports_manager.config = self.config
         reports_manager.generate_reports()
 
+    @property
+    def current_episode(self) -> int:
+        """Retorna el número del episodio actual para estabilización Q-learning."""
+        return self._current_episode_number
+
+    @current_episode.setter
+    def current_episode(self, value: int) -> None:
+        """Establece el número del episodio actual."""
+        self._current_episode_number = value
+
 registry: PacketRegistry = PacketRegistry()
