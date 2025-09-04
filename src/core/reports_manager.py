@@ -8,6 +8,11 @@ import numpy as np
 
 from core.base import SimulationConfig
 
+try:
+    from algorithms import q_routing
+except ImportError:
+    q_routing = None
+
 
 class ReportsManager:
     """Manages and stores metrics for the simulation.
@@ -189,8 +194,9 @@ class ReportsManager:
                 # f"Int. reconexión fija: {config.reconnection_interval_ms} ms\n"
                 f"Int. desconexión media: {config.mean_disconnection_interval_ms} ms\n"
                 f"Int. reconexión media: {config.mean_reconnection_interval_ms} ms\n"
-                f"Epsilon: 0.1\n"
-                f"Epsilon decay: 0.999976975\n"
+                f"Epsilon inicial: {getattr(q_routing, 'EPSILON_INITIAL', 'N/A') if q_routing else 'N/A'}\n"
+                f"Epsilon mínimo: {getattr(q_routing, 'EPSILON_MIN', 'N/A') if q_routing else 'N/A'}\n"
+                f"Epsilon decay: {getattr(q_routing, 'EPSILON_DECAY', 'N/A') if q_routing else 'N/A'}\n"
                 # f"Bonus for hop processing correct function: -0.1 \n"
                 # f"Bonus for hop finishing processing functions: -50 \n"
                 # f"Initial Q-Values: 100 \n"

@@ -32,8 +32,9 @@ EPSILON_DECAY = 0.9999  # Decay más lento para transición ultra-suave
 EPSILON_MIN = 0.012     # Exploración mínima reducida para máxima estabilidad
 
 # Parámetros finales para epsilon adaptativo refinado
-EXPLORATION_PHASE_EPISODES = 100  # Más episodios de exploración para aprendizaje completo
-SMOOTHING_FACTOR = 0.90  # Factor de suavizado aumentado para máxima estabilidad
+EXPLORATION_PHASE_EPISODES = 200  # Más episodios de exploración para entrenamientos largos
+REFRESH_CYCLE_EPISODES = 1000     # Cada 1000 episodios, permite mini-exploración
+SMOOTHING_FACTOR = 0.90           # Factor de suavizado aumentado para máxima estabilidad
 
 CURRENT_HOP_COUNT = 0
 CURRENT_EPISODE = 0  # Variable para trackear el episodio actual
@@ -73,25 +74,45 @@ class QRoutingApplication(Application):
 
     def get_adaptive_epsilon(self) -> float:
         """
-        Calcula epsilon adaptativo FINAL para máxima estabilidad y convergencia óptima.
-        Implementa transición ultra-suave optimizada para redes estáticas.
+        Calcula epsilon adaptativo MEJORADO con ciclos de refresh para entrenamientos largos.
+        Evita picos anómalos en episodios tardíos mediante mini-exploraciones periódicas.
+        CORREGIDO: Manejo seguro de cycles y debugging.
         """
         global CURRENT_EPISODE
+        
+        # Determinar si estamos en un ciclo de refresh con manejo seguro
+        cycle_position = CURRENT_EPISODE % REFRESH_CYCLE_EPISODES
+        is_refresh_cycle = cycle_position < 50  # Primeros 50 episodios de cada ciclo = mini-exploración
+        
+        # Debug logging para detectar problemas
+        if CURRENT_EPISODE % 100 == 0:  # Log cada 100 episodios
+            log.debug(f"Episode {CURRENT_EPISODE}: cycle_position={cycle_position}, is_refresh={is_refresh_cycle}")
         
         if CURRENT_EPISODE <= EXPLORATION_PHASE_EPISODES:
             # Fase de exploración inicial: reducción gradual optimizada
             phase_progress = CURRENT_EPISODE / EXPLORATION_PHASE_EPISODES
             # Función cúbica suave para transición ultra-gradual
-            reduction_factor = 0.30 * (phase_progress ** 1.8)  # Reducción más conservadora
-            return EPSILON_INITIAL * (1 - reduction_factor)
+            reduction_factor = 0.25 * (phase_progress ** 1.6)  # Reducción más conservadora
+            epsilon = EPSILON_INITIAL * (1 - reduction_factor)
+            log.debug(f"Episode {CURRENT_EPISODE}: Exploration phase, epsilon={epsilon:.6f}")
+            return epsilon
         else:
-            # Fase de estabilización: convergencia ultra-suave hacia mínimo
-            episodes_after_exploration = CURRENT_EPISODE - EXPLORATION_PHASE_EPISODES
-            # Función exponencial muy suave para convergencia gradual
-            stability_factor = 1 - math.exp(-episodes_after_exploration / 200)  # Convergencia más lenta
-            base_epsilon = EPSILON_INITIAL * 0.68  # Base ligeramente mayor
-            final_epsilon = base_epsilon * (1 - stability_factor * 0.70) + EPSILON_MIN
-            return max(final_epsilon, EPSILON_MIN)
+            # Fase de estabilización con ciclos de refresh periódicos
+            base_epsilon = EPSILON_MIN * 2.0  # Base ligeramente mayor para mejor adaptabilidad
+            
+            if is_refresh_cycle:
+                # Mini-exploración cada 1000 episodios para evitar estancamiento
+                # CORREGIDO: Factor de refresh más conservador para evitar inestabilidad
+                refresh_boost = (50 - cycle_position) / 50 * 1.5  # Reducido de 3.0 a 1.5
+                refresh_factor = 1.0 + refresh_boost
+                refresh_epsilon = base_epsilon * refresh_factor
+                final_epsilon = min(refresh_epsilon, EPSILON_INITIAL * 0.2)  # Cap más restrictivo
+                log.debug(f"Episode {CURRENT_EPISODE}: Refresh cycle, epsilon={final_epsilon:.6f}")
+                return final_epsilon
+            else:
+                # Operación normal con epsilon bajo pero no extremo
+                log.debug(f"Episode {CURRENT_EPISODE}: Normal operation, epsilon={base_epsilon:.6f}")
+                return base_epsilon
 
     def ensure_not_timeout(self):
         global EPISODE_TIMEOUT_TRIGGERED
@@ -125,9 +146,11 @@ class QRoutingApplication(Application):
     def update_q_value(self, next_node, actual_time, function_id: str, next_node_min_q: float = None) -> float:
         """
         Actualiza el valor Q para el nodo actual y la acción (saltar al vecino `next_node`)
-        usando la ecuación clásica de Q-Routing de Boyan & Littman (1994):
+        usando la ecuación clásica de Q-Routing de Boyan & Littman (1994) con mejoras:
         
         Q(x,d) ← Q(x,d) + α[t + min_a Q(y,d) - Q(x,d)]
+        
+        Incluye Q-value decay para evitar información obsoleta en entrenamientos largos.
         
         Parámetros:
         - next_node: vecino elegido (y)
@@ -138,6 +161,13 @@ class QRoutingApplication(Application):
         self.ensure_not_timeout()
 
         old_q = self.q_table[self.node.node_id].get(next_node, {}).get(function_id, 0.0)
+        
+        # Aplicar Q-value decay muy suave para evitar información obsoleta
+        # Solo se aplica después de cierto número de episodios para no interferir con aprendizaje inicial
+        global CURRENT_EPISODE
+        if CURRENT_EPISODE > EXPLORATION_PHASE_EPISODES * 2:  # Después de fase de exploración extendida
+            decay_factor = 0.9999  # Decay muy suave (0.01% por episodio)
+            old_q *= decay_factor
         
         # Si no se proporciona el mínimo Q del siguiente nodo, lo calculamos
         if next_node_min_q is None:

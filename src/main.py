@@ -102,8 +102,8 @@ def setup_arguments():
     parser.add_argument(
         "--disconnection_probability",
         type=float,
-        default=0.1,
-        help="Probability for a node to disconnect (default: 0.1)",
+        default=0.0,
+        help="Probability for a node to disconnect (default: 0.0 for static networks)",
     )
     parser.add_argument(
         "--episode_timeout_ms",
