@@ -70,6 +70,7 @@ class DijkstraApplication(Application):
         self.routes = {}
         self.callback_stack = []
         self.assigned_function = None
+        self.broadcast_state = None
 
     def ensure_not_timeout(self):
         global EPISODE_TIMEOUT_TRIGGERED
@@ -80,35 +81,69 @@ class DijkstraApplication(Application):
     def select_next_function_node(self, packet):
         """
         Selecciona el siguiente nodo que debe procesar la próxima función faltante.
-        Si todos los nodos vecinos no tienen la función correspondiente en el mapa, elige el nodo con menor peso en la arista.
+        Utiliza las rutas más cortas calculadas por Dijkstra para encontrar el camino óptimo.
         """
         self.ensure_not_timeout()
 
-        # active_nodes = self.node.network.get_active_nodes()
-        # log.error(f"Nodos activos: {active_nodes}")
-
-        next_function = packet["functions_sequence"][
-            0
-        ]
-        neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) if self.node.network.get_node(neighbor).status]
-
+        next_function = packet["functions_sequence"][0]
+        
         log.debug(
             f"[Node_ID={self.node.node_id}] Selecting next node to process function: {next_function}"
         )
-        log.debug(f"[Node_ID={self.node.node_id}] Neighbors: {neighbors}")
         log.debug(
             f"[Node_ID={self.node.node_id}] Functions to node map: {packet['node_function_map']}"
         )
 
-        valid_neighbors = [
-            neighbor
-            for neighbor in neighbors
-            if packet["node_function_map"].get(neighbor) == next_function
+        # Buscar todos los nodos que tienen la función requerida
+        nodes_with_function = [
+            node_id for node_id, function in packet["node_function_map"].items()
+            if function == next_function and node_id != self.node.node_id
         ]
 
         log.debug(
-            f"[Node_ID={self.node.node_id}] Valid neighbors for function {next_function}: {valid_neighbors}"
+            f"[Node_ID={self.node.node_id}] Nodes with function {next_function}: {nodes_with_function}"
         )
+
+        if not nodes_with_function:
+            log.debug(f"[Node_ID={self.node.node_id}] No nodes found with function {next_function}")
+            return None
+
+        # Encontrar el nodo más cercano con la función requerida usando las rutas calculadas
+        best_target = None
+        best_next_hop = None
+        shortest_distance = float('inf')
+
+        for target_node in nodes_with_function:
+            if target_node in self.routes:
+                path = self.routes[target_node].get("path", [])
+                if len(path) > 1:  # Debe tener al menos [current_node, next_node, ...]
+                    # Calcular distancia total de la ruta
+                    total_distance = 0
+                    for i in range(len(path) - 1):
+                        total_distance += self.node.network.get_latency(path[i], path[i + 1])
+                    
+                    if total_distance < shortest_distance:
+                        shortest_distance = total_distance
+                        best_target = target_node
+                        best_next_hop = path[1]  # El siguiente nodo en el camino
+
+        if best_next_hop:
+            log.debug(
+                f"[Node_ID={self.node.node_id}] Using Dijkstra route to {best_target} via {best_next_hop}"
+            )
+            return best_next_hop
+
+        # Fallback: si no hay rutas calculadas, usar vecinos inmediatos
+        neighbors = [neighbor for neighbor in self.node.network.get_neighbors(self.node.node_id) 
+                    if self.node.network.get_node(neighbor).status]
+        
+        log.debug(f"[Node_ID={self.node.node_id}] Fallback to neighbors: {neighbors}")
+        
+        # Buscar vecinos con la función requerida
+        valid_neighbors = [
+            neighbor for neighbor in neighbors
+            if packet["node_function_map"].get(neighbor) == next_function
+        ]
 
         if valid_neighbors:
             selected_node = min(
@@ -116,45 +151,23 @@ class DijkstraApplication(Application):
                 key=lambda n: self.node.network.get_latency(self.node.node_id, n),
             )
             log.debug(
-                f"[Node_ID={self.node.node_id}] Selected node {selected_node} to process function {next_function}"
+                f"[Node_ID={self.node.node_id}] Selected neighbor {selected_node} with function {next_function}"
             )
             return selected_node
 
-        neighbors_without_function = [
-            neighbor
-            for neighbor in neighbors
-            if neighbor not in packet["node_function_map"] and neighbor != 0
-        ]
-
-        log.debug(
-            f"[Node_ID={self.node.node_id}] Neighbors without assigned function: {neighbors_without_function}"
-        )
-
-        if neighbors_without_function:
-            selected_node = min(
-                neighbors_without_function,
-                key=lambda n: self.node.network.get_latency(self.node.node_id, n),
-            )
-            log.debug(
-                f"[Node_ID={self.node.node_id}] Selected node {selected_node} without assigned function"
-            )
-            return selected_node
-
+        # Si no hay vecinos con la función, seleccionar el más cercano para exploración
         valid_closest_neighbors = [n for n in neighbors if n != 0]
-
         if valid_closest_neighbors:
             selected_node = min(
                 valid_closest_neighbors,
                 key=lambda n: self.node.network.get_latency(self.node.node_id, n),
             )
             log.debug(
-                f"[Node_ID={self.node.node_id}] Selected closest node {selected_node} (excluding 0)"
+                f"[Node_ID={self.node.node_id}] Selected closest neighbor {selected_node} for exploration"
             )
             return selected_node
 
-        log.debug(
-            f"[Node_ID={self.node.node_id}] No other nodes available"
-        )
+        log.debug(f"[Node_ID={self.node.node_id}] No suitable nodes available")
         return None
 
     def send_packet(self, to_node_id, packet):
@@ -548,17 +561,25 @@ class SenderDijkstraApplication(DijkstraApplication):
                     next_node = self.select_next_function_node(packet)
 
                     # if next node is not available, exponential backoff retries until it is or timeout or max hops reached
-                    if (
-                        next_node is None or self.node.network.get_node(next_node).status
-                    ):
+                    if next_node is None or not self.node.network.get_node(next_node).status:
                         retry_count = 0
-                        while next_node is not None and not self.node.network.get_node(next_node).status:
+                        while True:
+                            next_node = self.select_next_function_node(packet)
+                            
+                            if next_node is not None and self.node.network.get_node(next_node).status:
+                                break
+                                
                             self.ensure_not_timeout()
                             delay_ms = RETRY_BASE_DELAY_MS * (2 ** retry_count)
                             delay_ms = min(delay_ms, 100000)  # clamp para no pasarse de rosca
 
+                            reason = (
+                                "No suitable next node found."
+                                if next_node is None
+                                else f"Next node {next_node} is down."
+                            )
                             log.debug(
-                                f"[Node_ID={self.node.node_id}] Node {next_node} is down. Retrying in {delay_ms}ms..."
+                                f"[Node_ID={self.node.node_id}] {reason} Retrying in {delay_ms}ms..."
                             )
                             time.sleep(delay_ms / 1000)
                             retry_count += 1
@@ -566,11 +587,9 @@ class SenderDijkstraApplication(DijkstraApplication):
                         log.debug(
                             f"[Node_ID={self.node.node_id}] Node {next_node} is back online. Resuming packet delivery."
                         )
-                        self.callback_stack.append(packet["from_node_id"])
-                        self.send_packet(next_node, packet)
-                    else:
-                        self.callback_stack.append(packet["from_node_id"])
-                        self.send_packet(next_node, packet)
+                    
+                    self.callback_stack.append(packet["from_node_id"])
+                    self.send_packet(next_node, packet)
                 else:
                     log.debug(f"[Node_ID={self.node.node_id}] Function sequence completed.")
                     episode_number = packet["episode_number"]
