@@ -242,6 +242,30 @@ class Application(ABC):
         Returns:
             bool: True if the packet was sent successfully, False otherwise.
         """
+        # Ensure packet has max_hops field - critical for validation
+        if "max_hops" not in packet:
+            packet["max_hops"] = getattr(self, 'max_hops', 50)
+            log.debug(f"[Node_ID={self.node.node_id}] Packet missing max_hops, setting to {packet['max_hops']}")
+        
+        # Validate max hops BEFORE incrementing and sending
+        current_hops = packet.get("hops", 0)
+        max_hops = packet["max_hops"]
+        
+        # Emergency hard limit - prevent any packet from exceeding 20 hops ever
+        if current_hops >= 20:
+            log.error(
+                f"[Node_ID={self.node.node_id}] EMERGENCY STOP: Packet exceeded absolute hop limit of 20. Current hops: {current_hops}."
+            )
+            return False
+        
+        log.debug(f"[Node_ID={self.node.node_id}] send_packet: current_hops={current_hops}, max_hops={max_hops}")
+        
+        if current_hops >= max_hops:
+            log.warning(
+                f"[Node_ID={self.node.node_id}] DROPPING PACKET: Max hops ({max_hops}) would be exceeded. Current hops: {current_hops}."
+            )
+            return False
+
         if packet.get("hops") is not None:
             packet["hops"] += 1
         else:
@@ -250,17 +274,37 @@ class Application(ABC):
         packet["from_node_id"] = self.node.node_id
 
         log.debug(
-            f"[Node_ID={self.node.node_id}] Sending packet to Node {to_node_id}\n"
+            f"[Node_ID={self.node.node_id}] SENDING packet to Node {to_node_id}. Hops: {packet['hops']}/{max_hops}"
         )
         self.node.network.send(self.node.node_id, to_node_id, packet)
 
-        if packet["hops"] > packet.get("max_hops", float("inf")):
-            log.debug(
-                f"[Node_ID={self.node.node_id}] Max hops reached. Dropping packet."
-            )
-            return False
-
         return True
+
+    def create_packet_with_limits(self, base_packet: dict, new_packet_data: dict) -> dict:
+        """Creates a new packet inheriting critical fields from the base packet.
+        
+        Args:
+            base_packet (dict): The original packet to inherit from.
+            new_packet_data (dict): The new packet data.
+            
+        Returns:
+            dict: New packet with inherited max_hops and proper hops initialization.
+        """
+        # Start with new packet data
+        new_packet = new_packet_data.copy()
+        
+        # Inherit critical fields from base packet
+        if "max_hops" in base_packet:
+            new_packet["max_hops"] = base_packet["max_hops"]
+        else:
+            # Fallback to instance max_hops
+            new_packet["max_hops"] = getattr(self, 'max_hops', 50)
+        
+        # Initialize hops if not present
+        if "hops" not in new_packet:
+            new_packet["hops"] = base_packet.get("hops", 0)
+            
+        return new_packet
 
     @abstractmethod
     def receive_packet(self, packet: dict) -> None:

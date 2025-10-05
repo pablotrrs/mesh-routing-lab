@@ -220,21 +220,75 @@ class PacketRegistry:
         """Guarda el motivo del fallo del episodio actual (solo si falla).
 
         Args:
-            reason (str): 'MAX_HOPS' o 'TIMEOUT'.
+            reason (str): Razón específica del fallo que será mapeada a categorías estándar.
         """
-        if reason not in {"MAX_HOPS", "TIMEOUT"}:
-            log.warning(f"Invalid failure reason: {reason}")
+        # Mapeo de razones específicas a categorías estándar para mejor análisis
+        reason_mapping = {
+            "ROUTING_LOOP": "MAX_HOPS",  # Los bucles son conceptualmente similares a exceso de hops
+            "TOO_MANY_BOUNCES": "MAX_HOPS",  # Demasiados rebotes también
+            "INVALID_NEXT_NODE": "NO_ROUTE",  # Nodo inválido significa no hay ruta válida
+            "INVALID_PREVIOUS_HOP": "NO_ROUTE",  # Hop anterior inválido también
+            "NETWORK_DISCONNECTED": "NO_ROUTE",  # Red desconectada = sin ruta
+            "CALLBACK_STACK_EMPTY": "NO_ROUTE",  # Stack vacío = problema de ruta
+            "UNKNOWN_FAILURE": "NO_ROUTE"  # Fallos desconocidos como problema de ruta
+        }
+        
+        # Aplicar mapeo si la razón específica tiene una categoría estándar
+        mapped_reason = reason_mapping.get(reason, reason)
+        
+        # Razones válidas estándar
+        valid_reasons = {"MAX_HOPS", "TIMEOUT", "RETRY_EXHAUSTED", "NETWORK_PARTITIONED", "NO_ROUTE"}
+        
+        # Si después del mapeo sigue siendo inválida, registrar como NO_ROUTE por defecto
+        if mapped_reason not in valid_reasons:
+            log.warning(f"Invalid failure reason: {reason}, mapping to NO_ROUTE")
+            mapped_reason = "NO_ROUTE"
+            
+        self._episode_failure_reason = mapped_reason
+        log.debug(f"[Episode {self._current_episode_number}] Registered failure reason: {reason} -> {mapped_reason}")
+
+    def log_retry_attempt(self, node_id: int, operation: str, attempt: int, max_attempts: int) -> None:
+        """Registra intentos de reintento para análisis de vulnerabilidad."""
+        if self._current_episode_number not in self.packet_log:
             return
-        self._episode_failure_reason = reason
-        log.debug(f"[Episode {self._current_episode_number}] Registered failure reason: {reason}")
+        
+        if "retry_attempts" not in self.packet_log[self._current_episode_number]:
+            self.packet_log[self._current_episode_number]["retry_attempts"] = []
+        
+        self.packet_log[self._current_episode_number]["retry_attempts"].append({
+            "node_id": node_id,
+            "operation": operation,
+            "attempt": attempt,
+            "max_attempts": max_attempts,
+            "timestamp": clock.get_current_time()
+        })
+        
+        log.debug(f"[Node {node_id}] Retry attempt {attempt}/{max_attempts} for {operation}")
+
+    def log_timeout_cause(self, cause: str) -> None:
+        """Registra la causa específica del timeout."""
+        if self._current_episode_number not in self.packet_log:
+            return
+        
+        self.packet_log[self._current_episode_number]["timeout_cause"] = cause
+        log.debug(f"[Episode {self._current_episode_number}] Timeout cause: {cause}")
 
     def log_episode_end(self) -> None:
         episode_number = self._current_episode_number
         algorithm = self._current_algorithm
         start_time = self._current_episode_start_time
-        end_time = clock.get_current_time()
-
+        current_time = clock.get_current_time()
+        
+        # Obtener datos del episodio
         episode_data = self.packet_log.get(episode_number, {})
+        
+        # Si hay failure_reason de TIMEOUT, limitar end_time al timeout configurado
+        if self._episode_failure_reason == "TIMEOUT":
+            # Para timeouts, el tiempo de fin debe ser exactamente start_time + timeout
+            end_time = start_time + self.config.episode_timeout_ms
+        else:
+            end_time = current_time
+
         episode_success = episode_data.get("episode_success", False)
         route = episode_data.get("route", [])
         total_hops = len(route)
@@ -258,6 +312,10 @@ class PacketRegistry:
             "dynamic_changes": dynamic_changes,
             "dynamic_changes_count": len(dynamic_changes),
         }
+
+        # Agregar retry_attempts si existen
+        if "retry_attempts" in episode_data:
+            episode_entry["retry_attempts"] = episode_data["retry_attempts"]
 
         if not episode_success and self._episode_failure_reason:
             episode_entry["failure_reason"] = self._episode_failure_reason

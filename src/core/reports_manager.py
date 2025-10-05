@@ -35,6 +35,19 @@ class ReportsManager:
         self._save_results_to_excel(os.path.join(self.results_dir, "resultados_simulacion.xlsx"))
         self._generate_comparative_graphs_from_excel(os.path.join(self.results_dir, "resultados_simulacion.xlsx"))
         self.generate_q_table_heatmap(self.results_dir)
+        
+        # Generar gráficos de análisis adicionales
+        log.info("Generating additional analysis charts...")
+        try:
+            # Los siguientes métodos usan datos directamente del registry, no del Excel
+            output_dirs = {"all": self.results_dir}
+            self._generate_failure_causes_chart({}, output_dirs)
+            self._generate_retry_attempts_chart({}, output_dirs)
+            self._generate_timeout_analysis_chart({"episode_duration": {}, "episode_success": {}}, output_dirs)
+            log.info("Additional analysis charts generated successfully.")
+        except Exception as e:
+            log.error(f"Error generating additional analysis charts: {e}")
+            log.debug(f"Full traceback: {e}", exc_info=True)
 
     @staticmethod
     def get_next_results_directory(base_path="../resources/results"):
@@ -267,6 +280,15 @@ class ReportsManager:
         save_line_chart(all_data["episode_duration"], "Duración del Episodio", "Duración (ms)", "Duracion_Episodio.png", output_dirs)
         save_line_chart(all_data["total_hops"], "Cantidad de Hops por Episodio", "Cantidad de Hops", "Total_Hops_Episodio.png", output_dirs)
 
+        # Gráfico de CAUSAS DE FALLO - CRUCIAL para análisis académico
+        self._generate_failure_causes_chart(all_data, output_dirs)
+        
+        # Gráfico de REINTENTOS POR ALGORITMO - Muestra vulnerabilidad
+        self._generate_retry_attempts_chart(all_data, output_dirs)
+        
+        # Gráfico de TIMEOUTS vs FALLOS RÁPIDOS
+        self._generate_timeout_analysis_chart(all_data, output_dirs)
+
         # Tasa de éxito por algoritmo
         plt.figure(figsize=(12, 8), dpi=150)
         success_counts = {alg: {"TRUE": 0, "FALSE": 0} for alg in all_data["episode_success"]}
@@ -337,7 +359,10 @@ class ReportsManager:
         heatmap_paths = []
         for episode in episodes:
             for route in episode["route"]:
-                max_node = max(max_node, route["from"], route["to"])
+                # Solo procesar nodos válidos (enteros), evitando "N/A" de paquetes perdidos
+                from_node = route["from"] if isinstance(route["from"], int) else 0
+                to_node = route["to"] if isinstance(route["to"], int) else 0
+                max_node = max(max_node, from_node, to_node)
                 if "q_value" in route:
                     q_values.append(route["q_value"])
         num_nodes = max_node + 1 
@@ -408,6 +433,201 @@ class ReportsManager:
             log.debug(f"GIF of Q-Table heatmaps saved to {gif_path}")
         except ImportError:
             log.error("imageio library is required to generate GIFs. Please install it using 'pip install imageio'.")
+
+    def _generate_failure_causes_chart(self, all_data, output_dirs):
+        """Genera gráfico de causas de fallo por algoritmo."""
+        from core.packet_registry import registry
+        
+        failure_causes = {}
+        for algorithm in registry.metrics.keys():
+            if algorithm in ["simulation_id", "parameters", "total_time", "runned_at"]:
+                continue
+                
+            failure_causes[algorithm] = {
+                "TIMEOUT": 0,
+                "RETRY_EXHAUSTED": 0, 
+                "MAX_HOPS": 0,
+                "NO_ROUTE": 0,
+                "OTHER": 0
+            }
+            
+            episodes = registry.metrics.get(algorithm, {}).get("episodes", [])
+            for episode in episodes:
+                episode_success = episode.get("episode_success", True)
+                
+                # Solo procesar episodios fallidos
+                if not episode_success:
+                    if "failure_reason" in episode:
+                        # Episodio con causa específica
+                        cause = episode.get("failure_reason", "OTHER")
+                        if cause in failure_causes[algorithm]:
+                            failure_causes[algorithm][cause] += 1
+                        else:
+                            failure_causes[algorithm]["OTHER"] += 1
+                    else:
+                        # Episodio fallido sin causa específica
+                        failure_causes[algorithm]["OTHER"] += 1
+
+        # Crear gráfico de barras apiladas
+        plt.figure(figsize=(12, 8), dpi=150)
+        algorithms = list(failure_causes.keys())
+        if not algorithms:
+            return
+            
+        causes = ["TIMEOUT", "RETRY_EXHAUSTED", "MAX_HOPS", "NO_ROUTE", "OTHER"]
+        colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57']
+        
+        bottom = np.zeros(len(algorithms))
+        for i, cause in enumerate(causes):
+            values = [failure_causes[alg][cause] for alg in algorithms]
+            plt.bar(algorithms, values, bottom=bottom, label=cause, color=colors[i])
+            bottom += values
+
+        plt.title("Causas de Fallo por Algoritmo")
+        plt.xlabel("Algoritmo") 
+        plt.ylabel("Cantidad de Fallos")
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        
+        for target_dir in output_dirs.values():
+            plt.savefig(os.path.join(target_dir, "Causas_Fallo_Algoritmo.png"), bbox_inches="tight")
+        plt.close()
+
+    def _generate_retry_attempts_chart(self, all_data, output_dirs):
+        """Genera gráfico de reintentos por algoritmo."""
+        from core.packet_registry import registry
+        
+        retry_data = {}
+        for algorithm in registry.metrics.keys():
+            if algorithm in ["simulation_id", "parameters", "total_time", "runned_at"]:
+                continue
+                
+            retry_counts = []
+            episodes = registry.metrics.get(algorithm, {}).get("episodes", [])
+            
+            for episode in episodes:
+                retry_attempts = episode.get("retry_attempts", [])
+                episode_retries = len(retry_attempts)
+                retry_counts.append(episode_retries)
+            
+            retry_data[algorithm] = retry_counts
+
+        # Gráfico de líneas mostrando reintentos por episodio
+        plt.figure(figsize=(14, 8), dpi=150)
+        for alg, retries in retry_data.items():
+            if retries:  # Solo graficar si hay datos
+                plt.plot(range(1, len(retries) + 1), retries, label=f"Algorithm.{alg}", linewidth=2, marker='o', markersize=3)
+
+        plt.title("Reintentos por Episodio")
+        plt.xlabel("Episodio")
+        plt.ylabel("Cantidad de Reintentos") 
+        plt.grid(True, alpha=0.3)
+        plt.legend()
+        
+        for target_dir in output_dirs.values():
+            plt.savefig(os.path.join(target_dir, "Reintentos_Por_Episodio.png"), bbox_inches="tight")
+        plt.close()
+
+    def _generate_timeout_analysis_chart(self, all_data, output_dirs):
+        """Analiza si los fallos son por timeout o por fallo rápido."""
+        from core.packet_registry import registry
+        
+        # Si all_data está vacío, usar datos directamente del registry
+        if not all_data.get("episode_duration") or not all_data.get("episode_success"):
+            log.debug("Using registry data for timeout analysis chart")
+            
+            episode_timeout = registry.metrics.get('parameters', {}).get('episode_timeout_ms', 3000)
+            timeout_threshold = episode_timeout * 0.8  # 80% del timeout configurado
+            
+            timeout_analysis = {}
+            for algorithm in registry.metrics.keys():
+                if algorithm in ["simulation_id", "parameters", "total_time", "runned_at"]:
+                    continue
+                    
+                episodes = registry.metrics.get(algorithm, {}).get("episodes", [])
+                if not episodes:
+                    continue
+                    
+                quick_failures = 0
+                timeout_failures = 0 
+                successes_count = 0
+                
+                for episode in episodes:
+                    episode_success = episode.get("episode_success", False)
+                    episode_duration = episode.get("end_time", 0) - episode.get("start_time", 0)
+                    
+                    if not episode_success:
+                        if episode_duration >= timeout_threshold:
+                            timeout_failures += 1
+                        else:
+                            quick_failures += 1
+                    else:
+                        successes_count += 1
+                
+                timeout_analysis[algorithm] = {
+                    "Éxitos": successes_count,
+                    "Fallos Rápidos": quick_failures, 
+                    "Fallos por Timeout": timeout_failures
+                }
+        else:
+            # Usar un umbral dinámico basado en el timeout configurado
+            episode_timeout = registry.metrics.get('parameters', {}).get('episode_timeout_ms', 3000)
+            timeout_threshold = episode_timeout * 0.8  # 80% del timeout configurado
+            
+            timeout_analysis = {}
+            for alg, durations in all_data["episode_duration"].items():
+                successes = all_data["episode_success"].get(alg, [])
+                
+                quick_failures = 0
+                timeout_failures = 0 
+                successes_count = 0
+                
+                for duration, success in zip(durations, successes):
+                    if not success:  # Changed: success is boolean, not string
+                        if duration >= timeout_threshold:
+                            timeout_failures += 1
+                        else:
+                            quick_failures += 1
+                    else:
+                        successes_count += 1
+                
+                timeout_analysis[alg] = {
+                    "Éxitos": successes_count,
+                    "Fallos Rápidos": quick_failures, 
+                    "Fallos por Timeout": timeout_failures
+                }
+
+        # Gráfico de barras agrupadas
+        plt.figure(figsize=(12, 8), dpi=150)
+        algorithms = list(timeout_analysis.keys())
+        if not algorithms:
+            return
+            
+        categories = ["Éxitos", "Fallos Rápidos", "Fallos por Timeout"]
+        colors = ['#2ECC71', '#F39C12', '#E74C3C']
+        
+        x = np.arange(len(algorithms))
+        width = 0.25
+        
+        for i, category in enumerate(categories):
+            values = [timeout_analysis[alg][category] for alg in algorithms]
+            plt.bar(x + i*width, values, width, label=category, color=colors[i])
+            
+            # Agregar valores en las barras
+            for j, v in enumerate(values):
+                if v > 0:
+                    plt.text(x[j] + i*width, v + 0.5, str(v), ha='center', va='bottom')
+
+        plt.title("Análisis de Tipos de Fallo")
+        plt.xlabel("Algoritmo")
+        plt.ylabel("Cantidad de Episodios")
+        plt.xticks(x + width, algorithms)
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        
+        for target_dir in output_dirs.values():
+            plt.savefig(os.path.join(target_dir, "Analisis_Tipos_Fallo.png"), bbox_inches="tight")
+        plt.close()
 
 
 from tabulate import tabulate

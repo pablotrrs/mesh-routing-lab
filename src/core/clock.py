@@ -62,6 +62,15 @@ class Clock:
         self.time += increment
         return self.time
 
+    def reset(self) -> None:
+        """Resets the clock to time 0.
+
+        This method should be used when starting a new simulation phase
+        to ensure consistent timing across different algorithm runs.
+        """
+        with self.lock:
+            self.time = 0
+
 
 # Global instance of the clock
 clock: Clock = Clock()

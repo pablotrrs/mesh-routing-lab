@@ -44,6 +44,8 @@ class Simulation:
 
         for algorithm in self.config.algorithms:
             registry.log_algorithm_start(algorithm)
+            # Reiniciar el estado de la red para cada algoritmo
+            self._reset_network_state()
             self._run_algorithm(algorithm)
             registry.log_algorithm_end()
 
@@ -69,6 +71,31 @@ class Simulation:
         log.info(
             f"[{algorithm}] Finished running {self.config.episodes} episodes"
         )
+
+    def _reset_network_state(self) -> None:
+        """Resets the network state to ensure fair comparison between algorithms."""
+        log.info("Resetting network state for fair algorithm comparison")
+        
+        # Parar cambios dinámicos temporalmente
+        self.network.stop_dynamic_changes()
+        
+        # Reactivar todos los nodos
+        for node_id, node in self.network.nodes.items():
+            node.status = True
+            # Limpiar atributos de desconexión/reconexión
+            if hasattr(node, 'disconnected_at'):
+                delattr(node, 'disconnected_at')
+            if hasattr(node, 'reconnect_time'):
+                delattr(node, 'reconnect_time')
+        
+        # NO limpiar eventos de cambios dinámicos - deben continuar para ambos algoritmos
+        # Reiniciar el reloj para que cada algoritmo empiece desde 0
+        clock.reset()
+        
+        # Reiniciar cambios dinámicos con el nuevo tiempo
+        self.network.start_dynamic_changes()
+        
+        log.info("Network state reset completed")
 
     def _run_episode(self, episode_number: int, algorithm: Algorithm) -> None:
         """Runs a single episode for the selected algorithm.

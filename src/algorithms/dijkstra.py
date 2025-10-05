@@ -16,6 +16,7 @@ from utils.custom_excep_hook import custom_thread_excepthook
 EPISODE_TIMEOUT_TRIGGERED = False
 
 RETRY_BASE_DELAY_MS = 50
+MAX_RETRIES = 2  # Límite máximo de reintentos antes de marcar como RETRY_EXHAUSTED
 
 EPISODE_COMPLETED = False
 
@@ -168,6 +169,9 @@ class DijkstraApplication(Application):
             return selected_node
 
         log.debug(f"[Node_ID={self.node.node_id}] No suitable nodes available")
+        # Solo registrar NO_ROUTE si no estamos ya en un proceso de retry
+        # (para evitar múltiples registros del mismo problema)
+        # registry.log_episode_failure_reason("NO_ROUTE") - Se registrará cuando se agoten los reintentos
         return None
 
     def send_packet(self, to_node_id, packet):
@@ -175,16 +179,39 @@ class DijkstraApplication(Application):
         if to_node_id is None:
             raise ValueError("Can't send to node None!")
 
+        # Ensure packet has max_hops field - critical for validation
+        if "max_hops" not in packet:
+            packet["max_hops"] = getattr(self, 'max_hops', 50)
+            log.debug(f"[Node_ID={self.node.node_id}] Packet missing max_hops, setting to {packet['max_hops']}")
+
+        # Validate max_hops BEFORE incrementing and sending
+        current_hops = packet.get("hops", 0)
+        max_hops = packet["max_hops"]
+        
+        # Special handling for broadcast packets - they have higher limits
+        if packet.get("is_broadcast", False):
+            # Broadcast packets use higher limits and don't count toward episode hop limits
+            if current_hops >= max_hops:
+                log.warning(f"[Node_ID={self.node.node_id}] Broadcast max hops ({max_hops}) would be exceeded. Current hops: {current_hops}. Dropping packet.")
+                return False
+        else:
+            # Regular episode packets follow strict hop limits
+            if current_hops >= max_hops:
+                log.warning(f"[Node_ID={self.node.node_id}] Max hops ({max_hops}) would be exceeded. Current hops: {current_hops}. Dropping packet.")
+                registry.log_episode_failure_reason("MAX_HOPS")
+                return False  # Return False instead of raising exception
+
         if "hops" in packet:
             packet["hops"] += 1
         else:
-            packet["hops"] = 0
+            packet["hops"] = 1
 
         if "from_node_id" in packet:
             packet["from_node_id"] = self.node.node_id
 
-        log.debug(f"\n[Node_ID={self.node.node_id}] Sending packet to Node {to_node_id}\n")
+        log.debug(f"\n[Node_ID={self.node.node_id}] Sending packet to Node {to_node_id}. Hops: {packet['hops']}/{max_hops}\n")
         self.node.network.send(self.node.node_id, to_node_id, packet)
+        return True
 
     def get_assigned_function(self) -> str:
         """Returns the function assigned to this node or 'N/A' if None."""
@@ -304,6 +331,20 @@ class SenderDijkstraApplication(DijkstraApplication):
                     if next_node is not None and self.node.network.get_node(next_node).status:
                         break
 
+                    # Registrar intento de retry
+                    registry.log_retry_attempt(self.node.node_id, "select_next_function_node", retry_count + 1, MAX_RETRIES)
+
+                    # Verificar límite de reintentos
+                    if retry_count >= MAX_RETRIES:
+                        reason = (
+                            "No suitable next node found after max retries."
+                            if next_node is None
+                            else f"Next node {next_node} is down after max retries."
+                        )
+                        log.warning(f"[Node_ID={self.node.node_id}] {reason}")
+                        registry.log_episode_failure_reason("RETRY_EXHAUSTED")
+                        raise EpisodeEnded(success=False)
+
                     delay_ms = RETRY_BASE_DELAY_MS * (2 ** retry_count)
                     delay_ms = min(delay_ms, 100000)
 
@@ -313,7 +354,7 @@ class SenderDijkstraApplication(DijkstraApplication):
                         else f"Next node {next_node} is down."
                     )
                     log.debug(
-                        f"[Node_ID={self.node.node_id}] {reason} Retrying in {delay_ms}ms..."
+                        f"[Node_ID={self.node.node_id}] {reason} Retrying in {delay_ms}ms... (Attempt {retry_count + 1}/{MAX_RETRIES})"
                     )
 
                     time.sleep(delay_ms / 1000)
@@ -323,10 +364,16 @@ class SenderDijkstraApplication(DijkstraApplication):
                     f"[Node_ID={self.node.node_id}] Node {next_node} is back online and selected. Resuming."
                 )
 
-                self.send_packet(next_node, packet)
+                if not self.send_packet(next_node, packet):
+                    log.warning(f"[Node_ID={self.node.node_id}] Episode packet dropped due to hop limit")
+                    self.mark_episode_result(packet, success=False)
+                    return
 
             else:
-                self.send_packet(next_node, packet)
+                if not self.send_packet(next_node, packet):
+                    log.warning(f"[Node_ID={self.node.node_id}] Episode packet dropped due to hop limit")
+                    self.mark_episode_result(packet, success=False)
+                    return
 
         except EpisodeEnded as e:
             log.debug(f"[Sender Node] Episode ended with success={e.success}")
@@ -379,6 +426,9 @@ class SenderDijkstraApplication(DijkstraApplication):
             "function_counters": {func: 0 for func in self.functions_sequence},
             "node_function_map": {},
             "latency_map": {},
+            "hops": 0,
+            "max_hops": 1000,  # High limit for broadcast - separate from episode hops
+            "is_broadcast": True,  # Mark as broadcast to differentiate from episode packets
         }
 
         self.broadcast_state = BroadcastState()
@@ -394,11 +444,20 @@ class SenderDijkstraApplication(DijkstraApplication):
                 retry_count = 0
                 while neighbor is not None and not self.node.network.get_node(neighbor).status:
                     self.ensure_not_timeout()
+
+                    # Registrar intento de retry
+                    registry.log_retry_attempt(self.node.node_id, "broadcast_to_neighbor", retry_count + 1, MAX_RETRIES)
+
+                    # Verificar límite de reintentos
+                    if retry_count >= MAX_RETRIES:
+                        log.warning(f"[BROADCAST] Node {neighbor} unreachable after {MAX_RETRIES} attempts, skipping")
+                        break  # Saltar este vecino, continuar con otros
+
                     delay_ms = RETRY_BASE_DELAY_MS * (2 ** retry_count)
                     delay_ms = min(delay_ms, 100000)  # clamp para no pasarse de rosca
 
                     log.debug(
-                        f"[BROADCAST] Node {neighbor} is down. Retrying in {delay_ms}ms..."
+                        f"[BROADCAST] Node {neighbor} is down. Retrying in {delay_ms}ms... (Attempt {retry_count + 1}/{MAX_RETRIES})"
                     )
                     time.sleep(delay_ms / 1000)
                     retry_count += 1
@@ -568,6 +627,20 @@ class SenderDijkstraApplication(DijkstraApplication):
                             
                             if next_node is not None and self.node.network.get_node(next_node).status:
                                 break
+
+                            # Registrar intento de retry
+                            registry.log_retry_attempt(self.node.node_id, "intermediate_select_next_node", retry_count + 1, MAX_RETRIES)
+
+                            # Verificar límite de reintentos
+                            if retry_count >= MAX_RETRIES:
+                                reason = (
+                                    "No suitable next node found after max retries."
+                                    if next_node is None
+                                    else f"Next node {next_node} is down after max retries."
+                                )
+                                log.warning(f"[Node_ID={self.node.node_id}] {reason}")
+                                registry.log_episode_failure_reason("RETRY_EXHAUSTED")
+                                return  # Salir del procesamiento
                                 
                             self.ensure_not_timeout()
                             delay_ms = RETRY_BASE_DELAY_MS * (2 ** retry_count)
@@ -579,7 +652,7 @@ class SenderDijkstraApplication(DijkstraApplication):
                                 else f"Next node {next_node} is down."
                             )
                             log.debug(
-                                f"[Node_ID={self.node.node_id}] {reason} Retrying in {delay_ms}ms..."
+                                f"[Node_ID={self.node.node_id}] {reason} Retrying in {delay_ms}ms... (Attempt {retry_count + 1}/{MAX_RETRIES})"
                             )
                             time.sleep(delay_ms / 1000)
                             retry_count += 1
@@ -589,7 +662,11 @@ class SenderDijkstraApplication(DijkstraApplication):
                         )
                     
                     self.callback_stack.append(packet["from_node_id"])
-                    self.send_packet(next_node, packet)
+                    if not self.send_packet(next_node, packet):
+                        log.warning(f"[Node_ID={self.node.node_id}] Packet hop failed - too many hops")
+                        registry.log_episode_failure_reason("MAX_HOPS") 
+                        # Send failure callback
+                        self.send_max_hops_callback(packet)
                 else:
                     log.debug(f"[Node_ID={self.node.node_id}] Function sequence completed.")
                     episode_number = packet["episode_number"]
@@ -621,14 +698,15 @@ class SenderDijkstraApplication(DijkstraApplication):
                     if (
                         neighbor != packet.from_node_id
                     ):
-                        broadcast_packet = {
+                        broadcast_packet = self.create_packet_with_limits(packet, {
                             "type": PacketType.BROADCAST,
-                            "message_id": message_id,
+                            "message_id": packet["message_id"],
                             "from_node_id": self.node.node_id,
                             "episode_number": packet.episode_number,
                             "visited_nodes": {self.node.node_id},
                             "latency_map": packet["latency_map"],
-                        }
+                            "is_broadcast": True,  # Mark as broadcast like the original packet
+                        })
                         self.send_packet(neighbor, broadcast_packet)
 
                 if self.broadcast_state.expected_acks == 0:
@@ -721,7 +799,19 @@ class SenderDijkstraApplication(DijkstraApplication):
                 )
                 global broken_path
                 broken_path = True
+                
+                # Check max_hops BEFORE incrementing
+                current_hops = packet.get("hops", 0)
+                max_hops = packet.get("max_hops", float("inf"))
+                
+                if current_hops >= max_hops:
+                    log.warning(f"[Node_ID={self.node.node_id}] Max hops ({max_hops}) would be exceeded in broken path. Current hops: {current_hops}. Dropping packet.")
+                    registry.log_episode_failure_reason("MAX_HOPS")
+                    self.mark_episode_result(packet, success=False)
+                    return
+                
                 packet["hops"] += 1
+                
                 registry.log_lost_packet(
                     packet["episode_number"],
                     packet["from_node_id"],
@@ -759,6 +849,23 @@ class SenderDijkstraApplication(DijkstraApplication):
         registry.log_complete_episode(episode_number, success)
 
         raise EpisodeEnded(success)
+
+    def send_max_hops_callback(self, packet):
+        """Send a MAX_HOPS failure callback when hop limit is exceeded."""
+        if self.callback_stack:
+            previous_node = self.callback_stack.pop()
+            failure_packet = {
+                "type": PacketType.MAX_HOPS,
+                "episode_number": packet["episode_number"],
+                "from_node_id": self.node.node_id,
+                "hops": 0,  # Reset hops for callback
+                "max_hops": self.max_hops,
+            }
+            # Don't check send_packet return for callbacks to avoid infinite loops
+            self.send_packet(previous_node, failure_packet)
+        else:
+            # No callback stack, mark episode as failed
+            self.mark_episode_result(packet, success=False)
 
     def _log_routes(self):
         """
@@ -925,6 +1032,7 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                         },
                         "node_function_map": packet["node_function_map"],
                         "latency_map": updated_latency_map,
+                        "is_broadcast": True,  # Mark as broadcast
                     }
                     broadcast_packet["visited_nodes"].add(self.node.node_id)
                     self.send_packet(neighbor, broadcast_packet)
@@ -1041,18 +1149,21 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                 self.send_packet(previous_node, packet)
 
             case PacketType.PACKET_HOP:
+                # Check max_hops BEFORE processing further
+                current_hops = packet.get("hops", 0)
+                max_hops = packet.get("max_hops", float("inf"))
 
-                if packet["hops"] > packet["max_hops"]:
+                if current_hops > max_hops:
                     log.debug(
                         f"[Node_ID={self.node.node_id}] Max hops reached. Initiating callback"
                     )
 
-                    failure_packet = {
+                    failure_packet = self.create_packet_with_limits(packet, {
                         "type": PacketType.MAX_HOPS,
                         "episode_number": packet["episode_number"],
                         "from_node_id": self.node.node_id,
-                        "hops": packet["hops"] + 1,
-                    }
+                        "hops": min(current_hops + 1, max_hops),  # Ensure we don't exceed max_hops
+                    })
 
                     from_node_id = packet["from_node_id"]
                     log.debug(
@@ -1117,13 +1228,25 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                         if next_node is not None and self.node.network.get_node(next_node).status:
                             break
 
+                        # Registrar intento de retry
+                        registry.log_retry_attempt(self.node.node_id, "intermediate_final_select_next_node", retry_count + 1, MAX_RETRIES)
+
+                        # Verificar límite de reintentos
+                        if retry_count >= MAX_RETRIES:
+                            if next_node is None:
+                                log.warning(f"[Node_ID={self.node.node_id}] No suitable next node found after {MAX_RETRIES} attempts")
+                            else:
+                                log.warning(f"[Node_ID={self.node.node_id}] Node {next_node} unreachable after {MAX_RETRIES} attempts")
+                            registry.log_episode_failure_reason("RETRY_EXHAUSTED")
+                            return  # Salir del procesamiento
+
                         delay_ms = RETRY_BASE_DELAY_MS * (2 ** retry_count)
                         delay_ms = min(delay_ms, 100000)  # Clamp para no irse al carajo
 
                         if next_node is None:
-                            log.debug(f"[Node_ID={self.node.node_id}] No suitable next node found. Retrying in {delay_ms}ms...")
+                            log.debug(f"[Node_ID={self.node.node_id}] No suitable next node found. Retrying in {delay_ms}ms... (Attempt {retry_count + 1}/{MAX_RETRIES})")
                         else:
-                            log.debug(f"[Node_ID={self.node.node_id}] Node {next_node} is down. Retrying in {delay_ms}ms...")
+                            log.debug(f"[Node_ID={self.node.node_id}] Node {next_node} is down. Retrying in {delay_ms}ms... (Attempt {retry_count + 1}/{MAX_RETRIES})")
 
                         time.sleep(delay_ms / 1000)
                         retry_count += 1
@@ -1132,7 +1255,11 @@ class IntermediateDijkstraApplication(DijkstraApplication):
                         f"[Node_ID={self.node.node_id}] Node {next_node} is back online. Resuming packet delivery."
                     )
                     self.callback_stack.append(packet["from_node_id"])
-                    self.send_packet(next_node, packet)
+                    if not self.send_packet(next_node, packet):
+                        log.warning(f"[Node_ID={self.node.node_id}] Intermediate packet hop failed - too many hops. Dropping packet.")
+                        registry.log_episode_failure_reason("MAX_HOPS") 
+                        # Intermediate nodes don't send callbacks - just drop the packet to avoid infinite recursion
+                        return
                 else:
                     log.debug(f"[Node_ID={self.node.node_id}] Function sequence completed.")
 

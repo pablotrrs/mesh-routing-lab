@@ -18,28 +18,29 @@ from utils.custom_excep_hook import custom_thread_excepthook
 
 EPISODE_TIMEOUT_TRIGGERED = False
 
-SMALL_BONUS = -0.1
-BIG_BONUS = -50
+SMALL_BONUS = -0.3   # Bonus más balanceado para rutas exitosas (mejorado)
+BIG_BONUS = -8.0     # Penalty más moderada para fallos (mejorado)
 
 random.seed(42)
 # DEFAULT_ESTIMATE = 20000.0
 
-# Parámetros FINALES optimizados para máxima estabilidad y convergencia
-ALPHA = 0.11  # Learning rate ligeramente reducido para más estabilidad
-GAMMA = 0.97  # Factor de descuento aumentado para mejor planificación
-EPSILON_INITIAL = 0.72   # Exploración inicial reducida para convergencia más rápida
-EPSILON_DECAY = 0.9999  # Decay más lento para transición ultra-suave
-EPSILON_MIN = 0.012     # Exploración mínima reducida para máxima estabilidad
+# Parámetros BALANCEADOS optimizados para estabilidad y rendimiento
+ALPHA = 0.25  # Learning rate moderado para aprendizaje estable
+GAMMA = 0.95  # Factor de descuento equilibrado para balance inmediato/futuro
+EPSILON_INITIAL = 0.75   # Exploración inicial moderada 
+EPSILON_DECAY = 0.999  # Decay suave para exploración prolongada
+EPSILON_MIN = 0.05     # Exploración mínima más alta para mantener adaptabilidad
 
-# Parámetros finales para epsilon adaptativo refinado
-EXPLORATION_PHASE_EPISODES = 200  # Más episodios de exploración para entrenamientos largos
-REFRESH_CYCLE_EPISODES = 1000     # Cada 1000 episodios, permite mini-exploración
-SMOOTHING_FACTOR = 0.90           # Factor de suavizado aumentado para máxima estabilidad
+# Parámetros para epsilon adaptativo AGRESIVO
+EXPLORATION_PHASE_EPISODES = 150  # Fase de exploración más corta
+REFRESH_CYCLE_EPISODES = 800     # Ciclos más frecuentes de re-exploración
+SMOOTHING_FACTOR = 0.85           # Factor de suavizado para respuesta rápida
 
 CURRENT_HOP_COUNT = 0
 CURRENT_EPISODE = 0  # Variable para trackear el episodio actual
 
-RETRY_BASE_DELAY_MS = 50
+RETRY_BASE_DELAY_MS = 30
+MAX_RETRIES = 5  # Más reintentos para redes con alta probabilidad de desconexión
 
 EPISODE_COMPLETED = False
 
@@ -50,6 +51,8 @@ class PacketType(str, Enum):
     PACKET_HOP = "PACKET_HOP"
     CALLBACK = "CALLBACK"
     MAX_HOPS_REACHED = "MAX_HOPS_REACHED"
+    DATA = "DATA"  # Add generic data type
+    BROKEN_PATH = "BROKEN_PATH"  # Add for consistency with Bellman-Ford
 
 
 @dataclass
@@ -74,44 +77,27 @@ class QRoutingApplication(Application):
 
     def get_adaptive_epsilon(self) -> float:
         """
-        Calcula epsilon adaptativo MEJORADO con ciclos de refresh para entrenamientos largos.
-        Evita picos anómalos en episodios tardíos mediante mini-exploraciones periódicas.
-        CORREGIDO: Manejo seguro de cycles y debugging.
+        Epsilon adaptativo simplificado para estabilidad mejorada.
+        - Fase inicial: exploración alta que decrece gradualmente  
+        - Fase estable: exploración moderada con refresh periódicos
         """
         global CURRENT_EPISODE
         
-        # Determinar si estamos en un ciclo de refresh con manejo seguro
-        cycle_position = CURRENT_EPISODE % REFRESH_CYCLE_EPISODES
-        is_refresh_cycle = cycle_position < 50  # Primeros 50 episodios de cada ciclo = mini-exploración
-        
-        # Debug logging para detectar problemas
-        if CURRENT_EPISODE % 100 == 0:  # Log cada 100 episodios
-            log.debug(f"Episode {CURRENT_EPISODE}: cycle_position={cycle_position}, is_refresh={is_refresh_cycle}")
-        
         if CURRENT_EPISODE <= EXPLORATION_PHASE_EPISODES:
-            # Fase de exploración inicial: reducción gradual optimizada
+            # Fase de exploración inicial: reducción más gradual
             phase_progress = CURRENT_EPISODE / EXPLORATION_PHASE_EPISODES
-            # Función cúbica suave para transición ultra-gradual
-            reduction_factor = 0.25 * (phase_progress ** 1.6)  # Reducción más conservadora
+            reduction_factor = 0.3 * (phase_progress ** 1.4)  # Curva suave
             epsilon = EPSILON_INITIAL * (1 - reduction_factor)
-            log.debug(f"Episode {CURRENT_EPISODE}: Exploration phase, epsilon={epsilon:.6f}")
-            return epsilon
+            return max(epsilon, EPSILON_MIN * 3)  # Mínimo más alto para mejor exploración
         else:
-            # Fase de estabilización con ciclos de refresh periódicos
-            base_epsilon = EPSILON_MIN * 2.0  # Base ligeramente mayor para mejor adaptabilidad
+            # Fase estable con epsilon moderado y refresh periódicos simples
+            cycle_position = CURRENT_EPISODE % 1000
+            base_epsilon = EPSILON_MIN * 4  # Base más alta para mejor adaptabilidad
             
-            if is_refresh_cycle:
-                # Mini-exploración cada 1000 episodios para evitar estancamiento
-                # CORREGIDO: Factor de refresh más conservador para evitar inestabilidad
-                refresh_boost = (50 - cycle_position) / 50 * 1.5  # Reducido de 3.0 a 1.5
-                refresh_factor = 1.0 + refresh_boost
-                refresh_epsilon = base_epsilon * refresh_factor
-                final_epsilon = min(refresh_epsilon, EPSILON_INITIAL * 0.2)  # Cap más restrictivo
-                log.debug(f"Episode {CURRENT_EPISODE}: Refresh cycle, epsilon={final_epsilon:.6f}")
-                return final_epsilon
+            if cycle_position < 50:  # Refresh cada 1000 episodios
+                refresh_factor = 1.5  # Factor moderado
+                return min(base_epsilon * refresh_factor, EPSILON_INITIAL * 0.3)
             else:
-                # Operación normal con epsilon bajo pero no extremo
-                log.debug(f"Episode {CURRENT_EPISODE}: Normal operation, epsilon={base_epsilon:.6f}")
                 return base_epsilon
 
     def ensure_not_timeout(self):
@@ -212,12 +198,14 @@ class QRoutingApplication(Application):
             all_neighbors = self.node.network.get_neighbors(current_node_id)
             log.debug(f"[Node_ID={current_node_id}] All neighbors: {all_neighbors}")
 
+            # Filtrado básico de vecinos activos
             active_neighbors = [
                 neighbor for neighbor in all_neighbors
                 if self.node.network.get_node(neighbor).status and neighbor != current_node_id
             ]
             log.debug(f"[Node_ID={current_node_id}] Active neighbors: {active_neighbors}")
 
+            # Exploración vs Explotación (lógica original simplificada)
             if random.random() < self.get_adaptive_epsilon():
                 adaptive_epsilon = self.get_adaptive_epsilon()
                 log.debug(f"[Node_ID={current_node_id}] Performing exploration with adaptive epsilon={adaptive_epsilon:.4f} (episode {CURRENT_EPISODE})")
@@ -235,6 +223,7 @@ class QRoutingApplication(Application):
                 next_node, estimated_time = self.choose_best_action(function_id)
                 log.debug(f"[Node_ID={current_node_id}] Exploitation chose {next_node}")
 
+                # Validación básica
                 if next_node is not None and next_node == current_node_id:
                     log.debug(f"[Node_ID={current_node_id}] Exploitation selected self node. Invalid.")
                     next_node = None
@@ -242,6 +231,7 @@ class QRoutingApplication(Application):
                     log.debug(f"[Node_ID={current_node_id}] Exploitation selected inactive node {next_node}.")
                     next_node = None
 
+                # Fallback simple a exploración
                 if next_node is None and active_neighbors:
                     next_node = random.choice(active_neighbors)
                     estimated_time = self.q_table[self.node.node_id].get(next_node, {}).get(function_id, self.get_default_q_value(function_id))
@@ -256,12 +246,19 @@ class QRoutingApplication(Application):
                 log.debug(f"[Node_ID={current_node_id}] Returning next node: {next_node}")
                 return next_node, estimated_time
 
-            self.ensure_not_timeout()
-            delay_ms = RETRY_BASE_DELAY_MS * (2 ** retry_count)
-            delay_ms = min(delay_ms, 10000)
-            log.debug(f"[Node_ID={current_node_id}] No valid next node found. Retrying in {delay_ms}ms...")
-            time.sleep(delay_ms / 1000)
+            # Manejo simplificado de reintentos
+            registry.log_retry_attempt(current_node_id, "select_next_node", retry_count + 1, MAX_RETRIES)
             retry_count += 1
+
+            # Verificar límite de reintentos
+            if retry_count >= MAX_RETRIES:
+                log.warning(f"[Node_ID={current_node_id}] Max retries ({MAX_RETRIES}) exceeded in select_next_node")
+                registry.log_episode_failure_reason("RETRY_EXHAUSTED")
+                raise EpisodeEnded(success=False)
+
+            # Espera breve antes del siguiente intento
+            self.ensure_not_timeout()
+            time.sleep(0.1)  # 100ms de espera
 
     def choose_best_action(self, function_id: str) -> Tuple[Optional[int], Optional[int]]:
         """
@@ -347,11 +344,11 @@ class QRoutingApplication(Application):
         log.info(self.q_table)
 
     def get_default_q_value(self, function_id: str) -> float:
-        """Retorna un valor Q por defecto ultra-extremo para convergencia lineal absoluta"""
+        """Retorna un valor Q por defecto OPTIMISTA para redes dinámicas"""
         if function_id not in self.q_value_defaults:
-            # Valor inicial ultra-extremo conservador para perfección Boyan & Littman
-            function_hash = hash(function_id) % 5   # Variabilidad ultra-mínima para estabilidad perfecta
-            self.q_value_defaults[function_id] = 25.0 + function_hash  # Base ultra-conservadora y perfectamente consistente
+            # Valor inicial OPTIMISTA para fomentar exploración agresiva
+            function_hash = hash(function_id) % 3   # Menor variabilidad
+            self.q_value_defaults[function_id] = 8.0 + function_hash  # Base optimista para estimular exploración
         return self.q_value_defaults[function_id]
 
     def initiate_max_hops_callback(self, packet):
@@ -366,14 +363,17 @@ class QRoutingApplication(Application):
 
         if not CALLBACK_STACK:
             if self.didnt_make_it_further_than_first_hop(route):
-                self.send_packet(packet["from_node_id"], callback_packet)
+                if not self.send_packet(packet["from_node_id"], callback_packet):
+                    log.debug(f"[Node_ID={self.node.node_id}] Max hops callback dropped due to hop limit")
+                    registry.log_episode_failure_reason("MAX_HOPS")
+                    self.mark_episode_result(packet, success=False)
 
-        callback_packet = {
+        callback_packet = self.create_packet_with_limits(packet, {
             "type": PacketType.MAX_HOPS_REACHED,
             "episode_number": packet["episode_number"],
             "from_node_id": self.node.node_id,
             "hops": packet["hops"],
-        }
+        })
 
         callback_data = CALLBACK_STACK.pop()
         log.debug(
@@ -385,7 +385,10 @@ class QRoutingApplication(Application):
         # )
 
         # movement: backward
-        self.send_packet(callback_data.previous_hop_node, callback_packet)
+        if not self.send_packet(callback_data.previous_hop_node, callback_packet):
+            log.debug(f"[Node_ID={self.node.node_id}] Max hops reached callback dropped due to hop limit")
+            registry.log_episode_failure_reason("MAX_HOPS")
+            self.mark_episode_result(packet, success=False)
         return
 
     def didnt_make_it_further_than_first_hop(self, route):
@@ -496,31 +499,10 @@ class SenderQRoutingApplication(QRoutingApplication):
         self.base_max_hops = max_hops  # Store original value
 
     def get_adaptive_max_hops(self):
-        """Calculate adaptive max_hops based on episode progress and convergence."""
-        if self.base_max_hops is None:
-            return self.max_hops
-        
-        # Get episode progress from registry
-        total_episodes = getattr(registry, 'total_episodes', 100)
-        current_episode = getattr(registry, 'current_episode', 0)
-        
-        if total_episodes <= 0:
-            return self.max_hops
-            
-        episode_progress = min(current_episode / total_episodes, 1.0)
-        
-        # Reduce max_hops as algorithm converges - menos agresivo
-        # Reducción ultra-gradual para máxima estabilidad en gráficos
-        # Start with base_max_hops, gradualmente reducir solo al 90% del original (ultra-conservador)
-        min_hops_factor = 0.9  # Ultra-conservador para máxima suavidad
-        adaptive_factor = 1.0 - (1.0 - min_hops_factor) * episode_progress
-        
-        adaptive_max_hops = max(
-            int(self.base_max_hops * adaptive_factor),
-            18  # Límite mínimo más alto para mayor estabilidad
-        )
-        
-        return adaptive_max_hops
+        """Return the strict max_hops limit set by user configuration."""
+        # DISABLED: Adaptive max_hops to ensure strict limit compliance
+        # Always return the original max_hops value set by user
+        return self.max_hops
 
     def start_episode(self, episode_number: int) -> None:
         """Initiates an episode by creating a packet and sending it asynchronously."""
@@ -599,13 +581,23 @@ class SenderQRoutingApplication(QRoutingApplication):
                     f"[Node_ID={self.node.node_id}] No valid next node found. Can't initiate episode!."
                 )
                 # movement: none
+                # Check max_hops BEFORE incrementing
+                current_hops = packet.get("hops", 0)
+                max_hops = packet.get("max_hops", float("inf"))
+                
+                if current_hops >= max_hops:
+                    registry.log_episode_failure_reason("MAX_HOPS")
+                    self.mark_episode_result(packet, success=False)
+                    return
+                
                 packet["hops"] += 1
                 registry.log_lost_packet(
                     packet["episode_number"], packet["from_node_id"], None, packet["type"]
                 )
                 log.debug(f'[Node_ID={self.node.node_id}] Packet hop count {packet["hops"]}')
 
-                if packet["hops"] > self.get_adaptive_max_hops():
+                # Recheck after increment (this should not be needed but as safety)
+                if packet["hops"] > max_hops:
                     registry.log_episode_failure_reason("MAX_HOPS")
                     self.mark_episode_result(packet, success=False)
 
@@ -630,7 +622,10 @@ class SenderQRoutingApplication(QRoutingApplication):
                 )
 
                 # movement: forward
-                self.send_packet(next_node, packet)
+                if not self.send_packet(next_node, packet):
+                    log.debug(f"[Node_ID={self.node.node_id}] Forward packet dropped due to hop limit")
+                    registry.log_episode_failure_reason("MAX_HOPS")
+                    self.mark_episode_result(packet, success=False)
                 return
 
         except EpisodeEnded as e:
@@ -675,12 +670,21 @@ class SenderQRoutingApplication(QRoutingApplication):
                 f"[Node_ID={self.node.node_id}] No valid next node found. Stopping packet hop."
             )
             # movement: none
+            # Check max_hops BEFORE incrementing
+            current_hops = packet.get("hops", 0)
+            max_hops = packet.get("max_hops", float("inf"))
+            
+            if current_hops >= max_hops:
+                registry.log_episode_failure_reason("MAX_HOPS")
+                self.mark_episode_result(packet, success=False)
+                return
+                
             packet["hops"] += 1
             registry.log_lost_packet(
                 packet["episode_number"], packet["from_node_id"], None, packet["type"]
             )
-            if packet["hops"] > packet["max_hops"]:
-                # max hops reached
+            if packet["hops"] > max_hops:
+                # max hops reached (safety check)
                 registry.log_episode_failure_reason("MAX_HOPS")
                 self.mark_episode_result(packet, success=False)
             else:
@@ -759,8 +763,13 @@ class SenderQRoutingApplication(QRoutingApplication):
                     f'\n[Node_ID={self.node.node_id}] Episode {packet["episode_number"]} finished.'
                 )
                 self.mark_episode_result(packet, success=True)
+                return
 
-            self.send_packet(callback_data.previous_hop_node, packet)
+            # Check if packet can be sent (hop validation)
+            if not self.send_packet(callback_data.previous_hop_node, packet):
+                log.debug(f"[Node_ID={self.node.node_id}] Callback packet dropped due to hop limit")
+                registry.log_episode_failure_reason("MAX_HOPS")
+                self.mark_episode_result(packet, success=False)
             return
 
         else:
@@ -818,6 +827,21 @@ class IntermediateQRoutingApplication(QRoutingApplication):
     def handle_packet_hop(self, packet):
         self.ensure_not_timeout()
         self.initialize_or_update_q_table()
+
+        # Detección básica de bucles (solo para casos extremos)
+        if "visited_nodes" not in packet:
+            packet["visited_nodes"] = []
+        
+        # Permitir hasta 3 visitas al mismo nodo (menos restrictivo)
+        current_node_visits = packet["visited_nodes"].count(self.node.node_id)
+        if current_node_visits >= 3:
+            log.warning(f"[Node_ID={self.node.node_id}] Loop detected - packet has visited this node {current_node_visits} times. Initiating callback.")
+            registry.log_episode_failure_reason("LOOP_DETECTED")
+            self.initiate_max_hops_callback(packet)
+            return
+            
+        # Record this visit
+        packet["visited_nodes"].append(self.node.node_id)
 
         if packet["hops"] > packet["max_hops"]:
             global EPISODE_COMPLETED
@@ -901,16 +925,28 @@ class IntermediateQRoutingApplication(QRoutingApplication):
                 "estimated_time": estimated_time,
             })
 
-            self.send_packet(next_node, packet)
+            if not self.send_packet(next_node, packet):
+                log.debug(f"[Node_ID={self.node.node_id}] Q-Routing packet dropped due to hop limit")
+                registry.log_episode_failure_reason("MAX_HOPS")
+                self.mark_episode_result(packet, success=False)
+                return
 
         else:
             # No hay siguiente nodo válido → intentar de nuevo si quedan hops
+            # Check max_hops BEFORE incrementing
+            current_hops = packet.get("hops", 0)
+            max_hops = packet.get("max_hops", float("inf"))
+            
+            if current_hops >= max_hops:
+                self.initiate_max_hops_callback(packet)
+                return
+                
             packet["hops"] += 1
             registry.log_lost_packet(
                 packet["episode_number"], packet["from_node_id"], None, packet["type"]
             )
 
-            if packet["hops"] >= packet["max_hops"]:
+            if packet["hops"] > max_hops:
                 self.initiate_max_hops_callback(packet)
                 return
             else:
@@ -920,6 +956,21 @@ class IntermediateQRoutingApplication(QRoutingApplication):
     def handle_echo_callback(self, packet):
         """Maneja el callback cuando regresa el paquete."""
         self.ensure_not_timeout()
+        
+        # Anti-loop detection for callbacks
+        if "callback_visited_nodes" not in packet:
+            packet["callback_visited_nodes"] = []
+        
+        current_callback_visits = packet["callback_visited_nodes"].count(self.node.node_id)
+        
+        if current_callback_visits >= 2:  # Allow max 2 callback visits to same node
+            log.warning(f"[Node_ID={self.node.node_id}] Callback loop detected - ending episode")
+            registry.log_episode_failure_reason("CALLBACK_LOOP_DETECTED")
+            self.mark_episode_result(packet, success=False)
+            return
+            
+        packet["callback_visited_nodes"].append(self.node.node_id)
+        
         global CALLBACK_STACK
 
         while CALLBACK_STACK:
@@ -960,11 +1011,31 @@ class IntermediateQRoutingApplication(QRoutingApplication):
                 )
 
             # movement: backward
-            self.send_packet(callback_data.previous_hop_node, packet)
+            # Create a new callback packet to avoid carrying forward high hop counts
+            new_packet_data = {
+                "type": packet.get("type", PacketType.DATA),  # Use PacketType enum
+                "destination_node": packet.get("source_node"),  # Original source
+                "source_node": self.node.node_id,
+                "payload": packet.get("payload", {}),
+                "packet_type": packet.get("packet_type", "DATA"),
+                "episode_id": packet.get("episode_id"),
+                "episode_number": packet.get("episode_number")
+            }
+            
+            callback_packet = self.create_packet_with_limits(packet, new_packet_data)
+            
+            # Copy essential callback data but reset hops
+            if "function_timings" in packet:
+                callback_packet["function_timings"] = packet["function_timings"]
+            
+            if not self.send_packet(callback_data.previous_hop_node, callback_packet):
+                log.debug(f"[Node_ID={self.node.node_id}] Backward callback dropped due to hop limit")
+                registry.log_episode_failure_reason("MAX_HOPS")
+                # Episode will be handled by timeout mechanism
             return
 
         log.error(f"[Node_ID={self.node.node_id}] Callback stack exhausted without valid steps. Episode will be aborted.")
-        self.mark_episode_result(packet, success=False)
+        registry.log_episode_failure_reason("NO_ROUTE")
 
     def handle_lost_packet(self, packet) -> None:
         self.ensure_not_timeout()
@@ -979,22 +1050,28 @@ class IntermediateQRoutingApplication(QRoutingApplication):
         # )
 
         # movement: backward
-        self.send_packet(callback_data.previous_hop_node, packet)
+        if not self.send_packet(callback_data.previous_hop_node, packet):
+            log.debug(f"[Node_ID={self.node.node_id}] Lost packet callback dropped due to hop limit")
+            registry.log_episode_failure_reason("MAX_HOPS")
+            self.mark_episode_result(packet, success=False)
         return
 
     def initiate_full_echo_callback(self, packet):
         """Inicia el proceso de full echo callback hacia el nodo anterior."""
         self.ensure_not_timeout()
 
-        callback_packet = {
+        callback_packet = self.create_packet_with_limits(packet, {
             "type": PacketType.CALLBACK,
             "episode_number": packet["episode_number"],
             "from_node_id": self.node.node_id,
             "function_timings":packet["function_timings"]
-        }
+        })
 
         # movement: backward
-        self.send_packet(packet["from_node_id"], callback_packet)
+        if not self.send_packet(packet["from_node_id"], callback_packet):
+            log.debug(f"[Node_ID={self.node.node_id}] Lost packet callback to sender dropped due to hop limit")
+            registry.log_episode_failure_reason("MAX_HOPS")
+            self.mark_episode_result(packet, success=False)
         return
 
     def assign_function(self, packet):
@@ -1039,6 +1116,33 @@ class IntermediateQRoutingApplication(QRoutingApplication):
         #     reward,
         #     None  # no hay "estimated time" acá, es reward puro
         # )
+
+    def mark_episode_result(self, packet, success=True):
+        """
+        Marca un episodio como exitoso o fallido y lo registra en el registry global.
+        Versión simplificada para nodos intermedios.
+
+        Args:
+            packet (dict): El paquete asociado al episodio.
+            success (bool): `True` si el episodio fue exitoso, `False` si falló.
+        """
+        self.ensure_not_timeout()
+        global EPISODE_COMPLETED
+        EPISODE_COMPLETED = True
+
+        status_text = "SUCCESS" if success else "FAILURE"
+        episode_number = packet.get("episode_number", "Unknown")
+        log.debug(
+            f"\n[Node_ID={self.node.node_id}] Marking Episode {episode_number} as {status_text}."
+        )
+
+        try:
+            if success:
+                registry.log_successful_episode(episode_number, packet.get("hops", 0))
+            else:
+                registry.log_failed_episode(episode_number, packet.get("hops", 0))
+        except Exception as e:
+            log.error(f"[Node_ID={self.node.node_id}] Error logging episode result: {e}")
 
     def __str__(self):
         return f"IntermediateNode(id={self.node.node_id}, neighbors={self.node.network.get_neighbors(self.node.node_id)})"

@@ -111,6 +111,7 @@ class Network:
 
     def start_dynamic_changes(self) -> None:
         """Starts a thread to apply dynamic changes based on the central clock."""
+        self.running = True  # ¡Importante! Activar el flag antes de iniciar el hilo
         current_time = clock.get_current_time()
         log.debug(f"Network clock starts: {current_time}")
         threading.Thread(target=self._monitor_dynamic_changes, daemon=True).start()
@@ -294,17 +295,27 @@ class Network:
             self.get_latency(from_node_id, to_node_id) if to_node_id != "N/A" else 0
         )
 
-        registry.log_packet_hop(
-            episode_number,
-            from_node_id,
-            to_node_id,
-            self.nodes[from_node_id].get_assigned_function()
-            if self.nodes[from_node_id].get_assigned_function()
-            else "N/A",
-            "active" if from_node_id in self.active_nodes else "inactive",
-            latency,
-            packet["type"].value,
+        # Only log hops for episode packets (PACKET_HOP, DATA) - exclude broadcast and control packets  
+        packet_type = packet.get("type", "")
+        packet_type_value = packet_type.value if hasattr(packet_type, 'value') else str(packet_type)
+        is_broadcast = packet.get("is_broadcast", False)
+        is_episode_packet = (
+            not is_broadcast and 
+            packet_type_value in ["PACKET_HOP", "DATA"]  # Only count actual episode progression packets
         )
+        
+        if is_episode_packet:
+            registry.log_packet_hop(
+                episode_number,
+                from_node_id,
+                to_node_id,
+                self.nodes[from_node_id].get_assigned_function()
+                if self.nodes[from_node_id].get_assigned_function()
+                else "N/A",
+                "active" if from_node_id in self.active_nodes else "inactive",
+                latency,
+                packet["type"].value,
+            )
 
         if self.is_node_reachable(from_node_id, to_node_id):
             log.debug(
