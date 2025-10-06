@@ -74,6 +74,11 @@ class QRoutingApplication(Application):
         self.callback_stack = deque()
         self.epsilon = EPSILON_INITIAL  # Epsilon individual por nodo
         self.q_value_defaults = {}  # Cache para valores por defecto
+        
+        # Sistema de memoria de conectividad mejorado
+        self.connectivity_memory = {}  # Memoria de tasas de éxito por nodo
+        self.node_attempt_counts = {}  # Contador de intentos por nodo
+        self.node_success_counts = {}  # Contador de éxitos por nodo
 
     def get_adaptive_epsilon(self) -> float:
         """
@@ -205,21 +210,33 @@ class QRoutingApplication(Application):
             ]
             log.debug(f"[Node_ID={current_node_id}] Active neighbors: {active_neighbors}")
 
-            # Exploración vs Explotación (lógica original simplificada)
-            if random.random() < self.get_adaptive_epsilon():
-                adaptive_epsilon = self.get_adaptive_epsilon()
-                log.debug(f"[Node_ID={current_node_id}] Performing exploration with adaptive epsilon={adaptive_epsilon:.4f} (episode {CURRENT_EPISODE})")
-                registry.log_policy_decision("EXPLORATION", adaptive_epsilon)
+            # Exploración vs Explotación con optimizaciones inteligentes
+            function_specific_epsilon = self.get_function_specific_epsilon(function_id)
+            if random.random() < function_specific_epsilon:
+                log.debug(f"[Node_ID={current_node_id}] Performing exploration with function-specific epsilon={function_specific_epsilon:.4f} for {function_id} (episode {CURRENT_EPISODE})")
+                registry.log_policy_decision("EXPLORATION", function_specific_epsilon)
                 if active_neighbors:
-                    next_node = random.choice(active_neighbors)
+                    # Selección inteligente usando conectividad y distancia
+                    best_exploration_node = None
+                    best_exploration_score = float('-inf')
+                    
+                    for neighbor in active_neighbors:
+                        connectivity_bonus = self.get_connectivity_bonus(neighbor)
+                        distance_weighted_q = self.get_distance_weighted_q_value(neighbor, function_id)
+                        exploration_score = connectivity_bonus + distance_weighted_q
+                        
+                        if exploration_score > best_exploration_score:
+                            best_exploration_score = exploration_score
+                            best_exploration_node = neighbor
+                    
+                    next_node = best_exploration_node if best_exploration_node else random.choice(active_neighbors)
                     estimated_time = self.q_table[self.node.node_id].get(next_node, {}).get(function_id, self.get_default_q_value(function_id))
-                    log.debug(f"[Node_ID={current_node_id}] Exploration selected Node {next_node}")
+                    log.debug(f"[Node_ID={current_node_id}] Exploration selected Node {next_node} with score {best_exploration_score:.3f}")
                 else:
                     log.debug(f"[Node_ID={current_node_id}] No active neighbors available for exploration.")
             else:
-                adaptive_epsilon = self.get_adaptive_epsilon()
-                log.debug(f"[Node_ID={current_node_id}] Performing exploitation with adaptive epsilon={adaptive_epsilon:.4f} (episode {CURRENT_EPISODE})")
-                registry.log_policy_decision("EXPLOITATION", adaptive_epsilon)
+                log.debug(f"[Node_ID={current_node_id}] Performing exploitation with function-specific epsilon={function_specific_epsilon:.4f} for {function_id} (episode {CURRENT_EPISODE})")
+                registry.log_policy_decision("EXPLOITATION", function_specific_epsilon)
                 next_node, estimated_time = self.choose_best_action(function_id)
                 log.debug(f"[Node_ID={current_node_id}] Exploitation chose {next_node}")
 
@@ -231,18 +248,30 @@ class QRoutingApplication(Application):
                     log.debug(f"[Node_ID={current_node_id}] Exploitation selected inactive node {next_node}.")
                     next_node = None
 
-                # Fallback simple a exploración
+                # Fallback inteligente a exploración con optimizaciones
                 if next_node is None and active_neighbors:
-                    next_node = random.choice(active_neighbors)
+                    # Usar optimizaciones para el fallback
+                    best_fallback_node = None
+                    best_fallback_score = float('-inf')
+                    
+                    for neighbor in active_neighbors:
+                        connectivity_bonus = self.get_connectivity_bonus(neighbor)
+                        distance_weighted_q = self.get_distance_weighted_q_value(neighbor, function_id)
+                        fallback_score = connectivity_bonus + distance_weighted_q
+                        
+                        if fallback_score > best_fallback_score:
+                            best_fallback_score = fallback_score
+                            best_fallback_node = neighbor
+                    
+                    next_node = best_fallback_node if best_fallback_node else random.choice(active_neighbors)
                     estimated_time = self.q_table[self.node.node_id].get(next_node, {}).get(function_id, self.get_default_q_value(function_id))
-                    log.debug(f"[Node_ID={current_node_id}] Fallback to exploration selected Node {next_node}")
+                    log.debug(f"[Node_ID={current_node_id}] Intelligent fallback selected Node {next_node} with score {best_fallback_score:.3f}")
                 elif next_node is None:
-                    log.debug(f"[Node_ID={current_node_id}] Fallback to exploration found no valid neighbors.")
+                    log.debug(f"[Node_ID={current_node_id}] Fallback found no valid neighbors.")
 
             if next_node is not None:
-                # El epsilon ahora es adaptativo basado en episodios, no necesita decay tradicional
-                adaptive_epsilon = self.get_adaptive_epsilon()
-                log.debug(f"[Node_ID={current_node_id}] Using adaptive epsilon: {adaptive_epsilon:.4f}")
+                # Usar epsilon específico por función para logging
+                log.debug(f"[Node_ID={current_node_id}] Using function-specific epsilon: {function_specific_epsilon:.4f}")
                 log.debug(f"[Node_ID={current_node_id}] Returning next node: {next_node}")
                 return next_node, estimated_time
 
@@ -278,12 +307,19 @@ class QRoutingApplication(Application):
             if not neighbor_node.status:
                 continue  # Saltamos vecinos caídos
 
-            # 1. Estimar delay hacia el vecino (usamos Q[x][a][f] como proxy)
+            # 1. Obtener valor Q básico para el vecino
             delay_to_neighbor = self.q_table[current_node_id] \
                 .get(neighbor_id, {}) \
                 .get(function_id, self.get_default_q_value(function_id))
 
-            # 2. Buscar el mejor Q(a, b, function_id) entre los vecinos de 'a'
+            # 2. Aplicar optimizaciones de distancia y conectividad
+            distance_weighted_q = self.get_distance_weighted_q_value(neighbor_id, function_id)
+            connectivity_bonus = self.get_connectivity_bonus(neighbor_id)
+            
+            # 3. Combinar Q-value básico con optimizaciones
+            optimized_q_value = delay_to_neighbor + distance_weighted_q + connectivity_bonus
+
+            # 4. Buscar el mejor Q(a, b, function_id) entre los vecinos de 'a' (valor original)
             neighbor_q_table = self.q_table.get(neighbor_id, {})
             min_estimate_from_neighbor = self.get_default_q_value(function_id)
 
@@ -292,12 +328,13 @@ class QRoutingApplication(Application):
                 if estimate is not None:
                     min_estimate_from_neighbor = min(min_estimate_from_neighbor, estimate)
 
-            # 3. Calcular tiempo total estimado
-            total_estimate = delay_to_neighbor + min_estimate_from_neighbor
+            # 5. Calcular tiempo total estimado con optimizaciones
+            total_estimate = optimized_q_value + min_estimate_from_neighbor
 
             log.debug(
                 f"[Node_ID={current_node_id}] Evaluated path via {neighbor_id}: "
-                f"estimate={total_estimate:.2f}"
+                f"base_q={delay_to_neighbor:.2f}, dist_weighted={distance_weighted_q:.2f}, "
+                f"connectivity={connectivity_bonus:.2f}, total_estimate={total_estimate:.2f}"
             )
 
             if total_estimate < best_total_estimate:
@@ -344,12 +381,144 @@ class QRoutingApplication(Application):
         log.info(self.q_table)
 
     def get_default_q_value(self, function_id: str) -> float:
-        """Retorna un valor Q por defecto OPTIMISTA para redes dinámicas"""
+        """Retorna un valor Q por defecto OPTIMIZADO para topología y función específica"""
         if function_id not in self.q_value_defaults:
-            # Valor inicial OPTIMISTA para fomentar exploración agresiva
-            function_hash = hash(function_id) % 3   # Menor variabilidad
-            self.q_value_defaults[function_id] = 8.0 + function_hash  # Base optimista para estimular exploración
+            # Calcular densidad de red local
+            neighbors_count = len(self.node.network.get_neighbors(self.node.node_id))
+            total_nodes = len(self.node.network.nodes)
+            network_density = neighbors_count / max(total_nodes - 1, 1)
+            
+            # Base según densidad de red
+            if network_density > 0.15:  # Red densa (>15% conectividad)
+                base_value = 6.0  # Más optimista en redes densas
+            else:  # Red sparse
+                base_value = 9.0  # Más conservador en redes dispersas
+            
+            # Ajuste por función específica para secuencia A->B->C
+            function_bonus = 0
+            if function_id == 'A':  # Primera función - más exploración
+                function_bonus = 1.0
+            elif function_id == 'B':  # Función intermedia - balanceado
+                function_bonus = 0.5
+            elif function_id == 'C':  # Última función - más explotación
+                function_bonus = 0.0
+            else:
+                function_bonus = hash(function_id) % 2  # Funciones desconocidas
+            
+            self.q_value_defaults[function_id] = base_value + function_bonus
+
         return self.q_value_defaults[function_id]
+
+    def update_connectivity_memory(self, node_id, was_successful):
+        """
+        Actualiza la memoria de conectividad para un nodo específico.
+        Rastrea patrones de éxito para mejorar futuras decisiones de routing.
+        """
+        # Inicializar contadores si es la primera vez
+        if node_id not in self.node_attempt_counts:
+            self.node_attempt_counts[node_id] = 0
+            self.node_success_counts[node_id] = 0
+        
+        # Actualizar contadores
+        self.node_attempt_counts[node_id] += 1
+        if was_successful:
+            self.node_success_counts[node_id] += 1
+        
+        # Calcular nueva tasa de éxito
+        success_rate = self.node_success_counts[node_id] / self.node_attempt_counts[node_id]
+        
+        # Actualizar memoria con suavizado exponencial
+        old_memory = self.connectivity_memory.get(node_id, success_rate)
+        self.connectivity_memory[node_id] = old_memory * 0.7 + success_rate * 0.3
+        
+        # Límite de memoria para evitar que crezca indefinidamente
+        if self.node_attempt_counts[node_id] > 100:
+            # Reset parcial manteniendo tendencias
+            self.node_attempt_counts[node_id] = int(self.node_attempt_counts[node_id] * 0.8)
+            self.node_success_counts[node_id] = int(self.node_success_counts[node_id] * 0.8)
+
+    def get_connectivity_bonus(self, node_id):
+        """
+        Retorna un bonus basado en la memoria de conectividad para favorecer nodos confiables.
+        """
+        if node_id not in self.connectivity_memory:
+            return 0.0  # Sin información, sin bonus
+        
+        success_rate = self.connectivity_memory[node_id]
+        # Bonus entre -2.0 y +2.0 basado en tasa de éxito
+        bonus = (success_rate - 0.5) * 4.0
+        return max(-2.0, min(2.0, bonus))
+
+    def get_function_specific_epsilon(self, function_id):
+        """
+        Retorna epsilon adaptado por función para mejor balance exploración/explotación.
+        """
+        base_epsilon = self.get_adaptive_epsilon()
+        
+        # Ajustes por función en secuencia A->B->C
+        if function_id == 'A':  # Primera función - más exploración
+            return min(base_epsilon * 1.3, 0.9)
+        elif function_id == 'B':  # Función intermedia - balanceado
+            return base_epsilon
+        elif function_id == 'C':  # Última función - más explotación
+            return base_epsilon * 0.8
+        else:
+            return base_epsilon  # Funciones desconocidas usan base
+
+    def estimate_distance_to_function(self, target_function, current_node_id=None):
+        """
+        Estima la distancia mínima a un nodo que tiene la función objetivo.
+        Utiliza BFS simplificado para encontrar el camino más corto.
+        """
+        if current_node_id is None:
+            current_node_id = self.node.node_id
+        
+        # Buscar nodos que tienen la función objetivo
+        target_nodes = []
+        for node_id, node in self.node.network.nodes.items():
+            if hasattr(node, 'assigned_function') and node.assigned_function == target_function:
+                target_nodes.append(node_id)
+        
+        if not target_nodes:
+            return 10.0  # Distancia por defecto si no se encuentra la función
+        
+        # BFS simplificado para encontrar distancia mínima
+        visited = {current_node_id}
+        queue = [(current_node_id, 0)]
+        
+        while queue:
+            node_id, distance = queue.pop(0)
+            
+            if node_id in target_nodes:
+                return distance
+            
+            # Expandir vecinos activos
+            for neighbor_id in self.node.network.get_neighbors(node_id):
+                if neighbor_id not in visited and self.node.network.get_node(neighbor_id).status:
+                    visited.add(neighbor_id)
+                    queue.append((neighbor_id, distance + 1))
+        
+        return 15.0  # Distancia alta si no se encuentra ruta
+
+    def get_distance_weighted_q_value(self, function_id, target_node_id):
+        """
+        Retorna Q-value ajustado por distancia para favorecer rutas más cortas.
+        """
+        base_q = self.get_default_q_value(function_id)
+        
+        # Estimar distancia desde el nodo objetivo a la función
+        try:
+            estimated_distance = self.estimate_distance_to_function(function_id, target_node_id)
+            # Penalizar rutas más largas (factor moderado para no dominar el aprendizaje)
+            distance_penalty = estimated_distance * 0.3
+            
+            # Aplicar bonus de conectividad
+            connectivity_bonus = self.get_connectivity_bonus(target_node_id)
+            
+            return base_q + distance_penalty + connectivity_bonus
+        except:
+            # Fallback en caso de error
+            return base_q
 
     def initiate_max_hops_callback(self, packet):
         self.ensure_not_timeout()
@@ -790,6 +959,7 @@ class SenderQRoutingApplication(QRoutingApplication):
     def mark_episode_result(self, packet, success=True):
         """
         Marca un episodio como exitoso o fallido y lo registra en el registry global.
+        También actualiza la memoria de conectividad para aprendizaje adaptativo.
 
         Args:
             packet (dict): El paquete asociado al episodio.
@@ -804,6 +974,21 @@ class SenderQRoutingApplication(QRoutingApplication):
         log.debug(
             f"\n[Node_ID={self.node.node_id}] Marking Episode {episode_number} as {status_text}."
         )
+
+        # Actualizar memoria de conectividad para todos los nodos utilizados
+        # en este episodio (basado en la ruta tomada)
+        current_node_id = self.node.node_id
+        if hasattr(packet, 'route_taken') and packet['route_taken']:
+            for node_id in packet['route_taken']:
+                if node_id != current_node_id:  # No auto-actualizar
+                    self.update_connectivity_memory(node_id, success)
+        else:
+            # Fallback: actualizar memoria para todos los vecinos activos
+            # asumiendo que fueron considerados durante el episodio
+            for neighbor_id in self.node.network.get_neighbors(current_node_id):
+                neighbor_node = self.node.network.get_node(neighbor_id)
+                if neighbor_node.status:  # Solo vecinos activos
+                    self.update_connectivity_memory(neighbor_id, success)
 
         registry.log_complete_episode(episode_number, success)
 
@@ -1120,7 +1305,8 @@ class IntermediateQRoutingApplication(QRoutingApplication):
     def mark_episode_result(self, packet, success=True):
         """
         Marca un episodio como exitoso o fallido y lo registra en el registry global.
-        Versión simplificada para nodos intermedios.
+        También actualiza la memoria de conectividad para aprendizaje adaptativo.
+        Versión para nodos intermedios.
 
         Args:
             packet (dict): El paquete asociado al episodio.
@@ -1135,6 +1321,19 @@ class IntermediateQRoutingApplication(QRoutingApplication):
         log.debug(
             f"\n[Node_ID={self.node.node_id}] Marking Episode {episode_number} as {status_text}."
         )
+
+        # Actualizar memoria de conectividad para nodos intermedios
+        current_node_id = self.node.node_id
+        if hasattr(packet, 'route_taken') and packet['route_taken']:
+            for node_id in packet['route_taken']:
+                if node_id != current_node_id:  # No auto-actualizar
+                    self.update_connectivity_memory(node_id, success)
+        else:
+            # Fallback: actualizar memoria para vecinos que participaron
+            for neighbor_id in self.node.network.get_neighbors(current_node_id):
+                neighbor_node = self.node.network.get_node(neighbor_id)
+                if neighbor_node.status:  # Solo vecinos activos
+                    self.update_connectivity_memory(neighbor_id, success)
 
         try:
             if success:

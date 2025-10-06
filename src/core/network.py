@@ -193,7 +193,7 @@ class Network:
                         node.reconnect_time = current_time + np.random.exponential(
                             self.mean_reconnection_interval_ms
                         )
-                    if node.reconnect_time is not None and current_time >= node.reconnect_time:
+                    if hasattr(node, "reconnect_time") and node.reconnect_time is not None and current_time >= node.reconnect_time:
                         node.status = True
                         delattr(node, "reconnect_time")
                         log.debug("⚡ZZZAP⚡")
